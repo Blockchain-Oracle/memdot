@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=block" rel="stylesheet">
+<style>
+  :root { --ink: #0B0B0F; --cream: #EDE6DA; --muted: #8B8678; --ember: #FF5C35; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1500px; height: 500px; background: var(--ink); overflow: hidden; }
+  body {
+    position: relative;
+    font-family: 'Space Grotesk', sans-serif;
+    color: var(--cream);
+    background-image: radial-gradient(rgba(237, 230, 218, 0.07) 1px, transparent 1.2px);
+    background-size: 24px 24px;
+  }
+  .fade { position: absolute; inset: 0; background: linear-gradient(90deg, var(--ink) 0%, rgba(11,11,15,0.92) 45%, rgba(11,11,15,0.2) 100%); }
+  .left { position: absolute; left: 96px; top: 92px; }
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .brand svg { width: 96px; height: 96px; }
+  .word { font-size: 104px; font-weight: 600; letter-spacing: -0.045em; line-height: 1; }
+  .word span { color: var(--ember); }
+  .tag { margin-top: 30px; font-size: 31px; font-weight: 400; letter-spacing: -0.01em; color: rgba(237,230,218,0.86); max-width: 760px; line-height: 1.25; }
+  .verbs { margin-top: 26px; font-family: 'JetBrains Mono', monospace; font-size: 17px; letter-spacing: 0.06em; color: var(--muted); }
+  .verbs b { color: var(--cream); font-weight: 500; }
+  .event { position: absolute; left: 96px; bottom: 38px; font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
+  .grid { position: absolute; right: 96px; top: 86px; display: grid; grid-template-columns: repeat(8, 30px); gap: 14px; }
+  .cell { width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid rgba(237,230,218,0.14); }
+  .on { border: none; background: var(--cream); }
+  .hot { border: none; background: var(--ember); border-radius: 50%; }
+  .caption { position: absolute; right: 96px; bottom: 38px; font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <div class="fade"></div>
+  <div class="grid" id="grid"></div>
+  <div class="left">
+    <div class="brand">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <rect x="12" y="35" width="58" height="12" rx="6" fill="#EDE6DA"/>
+        <rect x="12" y="54" width="44" height="12" rx="6" fill="#EDE6DA" fill-opacity="0.72"/>
+        <rect x="12" y="73" width="30" height="12" rx="6" fill="#EDE6DA" fill-opacity="0.44"/>
+        <circle cx="92" cy="60" r="16" fill="#FF5C35"/>
+      </svg>
+      <div class="word">mem<span>dot</span></div>
+    </div>
+    <p class="tag">Encrypted, ownable memory for AI agents and apps on Portaldot.</p>
+    <p class="verbs"><b>remember</b> · <b>recall</b> · <b>share</b> · <b>renew</b></p>
+  </div>
+  <div class="event">Portaldot Hacker House 2026 — Modular Cloud &amp; Middleware</div>
+  <div class="caption">7-day retention · renew to keep</div>
+  <script>
+    // Memory cells fill from the top-left; a few have become durable dots.
+    const grid = document.getElementById('grid');
+    const rows = 7, cols = 8;
+    const hot = new Set(['0,7', '2,5', '4,6', '6,3']);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const el = document.createElement('div');
+        el.className = 'cell';
+        const key = `${r},${c}`;
+        const fill = (cols - c) + (rows - r) * 0.6;
+        if (hot.has(key)) el.classList.add('hot');
+        else if (fill > 7.5) { el.classList.add('on'); el.style.opacity = Math.min(1, (fill - 6) / 6).toFixed(2); }
+        grid.appendChild(el);
+      }
+    }
+  </script>
+</body>
+</html>
