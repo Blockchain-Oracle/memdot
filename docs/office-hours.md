@@ -4,7 +4,7 @@ Application for the Portaldot Hacker House 2026 mentor session. Written 2026-10-
 
 ## Project
 
-**MemDot**: encrypted, ownable memory for AI agents and apps on Portaldot V3. A Mem0-class developer product (SDK, REST API, CLI, MCP server, dashboard with API keys) whose memories are encrypted before they leave the client and whose ownership and access grants live on Portaldot. Track: Modular Cloud & Middleware.
+**MemDot**: storage and long-term memory for AI agents and apps on Portaldot V3. Agents remember and recall across sessions; data is encrypted before it leaves the client, stored and renewed on V3, and its ownership and access grants live in an on-chain registry. Developers reach it through one SDK, a REST API, a CLI, an MCP server for agents, and a dashboard with API keys. Track: Modular Cloud & Middleware.
 
 Repository: https://github.com/Blockchain-Oracle/memdot
 
@@ -12,7 +12,7 @@ Repository: https://github.com/Blockchain-Oracle/memdot
 
 | Area | State |
 |---|---|
-| Research | Done: event rules, V3 network, and two reference products studied in source (Mem0 for the developer experience, Walrus Memory for memory on decentralized storage). |
+| Research | Done: event rules and the V3 network's storage and contract surfaces. |
 | V3 runtime probe | Done: [`scripts/v3-probe.mjs`](../scripts/v3-probe.mjs) reads live metadata for `TransactionStorage`, `Revive` and `Contracts`. Output committed in [`docs/evidence/`](evidence). |
 | Brand | Done: logo mark and banner in [`assets/brand/`](../assets/brand). |
 | Architecture | Candidate only (see the [README](../README.md#candidate-architecture-not-final)). Three decisions are open, and they depend on the answers below. |

@@ -8,9 +8,9 @@ Encrypted, ownable memory for AI agents and apps on Portaldot V3.
 
 ## Why
 
-AI agents forget between sessions. The memory layers that fix this, such as [Mem0](https://github.com/mem0ai/mem0), keep each user's memories in the operator's database: the user cannot take them elsewhere, cannot prove what was stored, and has to trust the operator not to read them. Decentralized storage networks keep bytes, but they do not give a developer a memory API.
+AI agents forget between sessions. The memory layers that fix this keep each user's memories in the operator's database: the user cannot take them elsewhere, cannot prove what was stored, and has to trust the operator not to read them. Decentralized storage networks keep bytes, but they do not give a developer a memory API.
 
-MemDot aims to be both: a Mem0-class developer product (SDK, REST API, CLI, MCP server, dashboard with API keys) whose memories are encrypted before they leave the client and whose ownership and access grants live on Portaldot.
+MemDot aims to be both: storage and long-term memory for agents and apps, as a full developer product (SDK, REST API, CLI, MCP server, dashboard with API keys), with data encrypted before it leaves the client and ownership and access grants on Portaldot.
 
 The core loop is **remember → recall → share → renew**.
 
@@ -48,7 +48,7 @@ flowchart LR
 Decisions still open, each blocked on a question in [docs/office-hours.md](docs/office-hours.md):
 
 1. **Where the bytes live.** Native `TransactionStorage` with a renewal keeper, or an external store with only the content hash and grants on V3. This depends on whether the hosted node serves stored bytes back.
-2. **Where plaintext exists.** Memory extraction needs an LLM to read the text. Either the API sees plaintext briefly (like Walrus Memory's default relayer) or extraction runs client-side.
+2. **Where plaintext exists.** Memory extraction needs an LLM to read the text. Either the API sees plaintext briefly, or extraction runs client-side.
 3. **Which contract runtime** holds the registry: Solidity on `Revive`, or ink! on `Contracts`.
 
 ## Repository today
@@ -71,10 +71,5 @@ pnpm probe                      # defaults to wss://test-node-v3.portaldot.dev
 2. Settle the three open decisions above.
 3. Deploy the registry contract and wire remember and recall end to end through the SDK.
 4. A demo of the first flow and an architecture diagram that matches what is deployed.
-
-## References
-
-- [Mem0](https://github.com/mem0ai/mem0) (Apache-2.0) is the product baseline: memory API, CLI, MCP, plugins and dashboard.
-- [Walrus Memory / MemWal](https://github.com/MystenLabs/MemWal) (Apache-2.0) is the reference for memory on decentralized storage: encrypted blobs, on-chain ownership and a rebuildable index.
 
 Built for the [Portaldot Hacker House 2026](https://dorahacks.io/hackathon/portaldot-hacker-house-2026/detail), Modular Cloud & Middleware track.
