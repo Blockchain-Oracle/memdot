@@ -1,4 +1,5 @@
 # Local development database: Postgres 18 with pgvector.
+name: memdot
 services:
   postgres:
     image: pgvector/pgvector:pg18
@@ -7,7 +8,7 @@ services:
       POSTGRES_PASSWORD: memdot
       POSTGRES_DB: memdot
     ports:
-      - "5432:5432"
+      - "5434:5432" # 5432: native Postgres, 5433: another local project
     volumes:
       - memdot-pg:/var/lib/postgresql
     healthcheck:
