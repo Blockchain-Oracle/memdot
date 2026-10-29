@@ -12,6 +12,7 @@
     "probe": "tsx scripts/probe.ts",
     "keygen": "tsx scripts/keygen.ts",
     "demo": "tsx scripts/demo.ts",
+    "balance": "tsx scripts/balance.ts",
     "postinstall": "papi"
   },
   "devDependencies": {
