@@ -86,9 +86,11 @@ describe("recovery code", () => {
     const code = generateRecoveryCode();
     assert.equal(code.split(" ").length, 12);
     assert.ok(isValidRecoveryCode(`  ${code.toUpperCase()} `));
-    const words = code.split(" ");
-    words[0] = words[0] === "abandon" ? "ability" : "abandon";
-    assert.equal(isValidRecoveryCode(words.join(" ")), false);
+    // A 12-word code has a 4-bit checksum, so a random one-word typo slips through 1 time in 16.
+    // Use the BIP39 test vector, where swapping the last word is known to break the checksum.
+    const vector = `${"abandon ".repeat(11)}about`;
+    assert.ok(isValidRecoveryCode(vector));
+    assert.equal(isValidRecoveryCode("abandon ".repeat(12).trim()), false);
   });
 
   it("signs in with a key only the code can produce", () => {
