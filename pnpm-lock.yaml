@@ -130,6 +130,52 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  apps/worker:
+    dependencies:
+      '@memdot/chain':
+        specifier: workspace:*
+        version: link:../../packages/chain
+      '@memdot/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@memdot/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@memdot/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@memdot/jobs':
+        specifier: workspace:*
+        version: link:../../packages/jobs
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
+      drizzle-orm:
+        specifier: 0.45.4
+        version: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1)
+      pg-boss:
+        specifier: ^12.38.0
+        version: 12.38.0(@opentelemetry/api@1.10.0)
+      viem:
+        specifier: ^2.57.13
+        version: 2.57.13(typescript@6.0.3)(zod@4.6.7)
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.3(tsx@4.23.15)(typescript@6.0.3)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/chain:
     dependencies:
       '@memdot/config':

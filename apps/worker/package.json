@@ -1,0 +1,33 @@
+{
+  "name": "@memdot/worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MemDot worker: the relayer's serial signer queue, the renewal keeper, the chain indexer and ops alerts.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsdown src/main.ts --format esm --platform node",
+    "start": "node dist/main.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "chain:rebuild": "tsx scripts/rebuild.ts"
+  },
+  "dependencies": {
+    "@memdot/chain": "workspace:*",
+    "@memdot/config": "workspace:*",
+    "@memdot/contracts": "workspace:*",
+    "@memdot/db": "workspace:*",
+    "@memdot/jobs": "workspace:*",
+    "@noble/hashes": "^2.4.0",
+    "drizzle-orm": "0.45.4",
+    "pg-boss": "^12.38.0",
+    "viem": "^2.57.13",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}
