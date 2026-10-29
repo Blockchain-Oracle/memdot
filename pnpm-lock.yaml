@@ -118,6 +118,9 @@ importers:
         specifier: 0.3.1
         version: 0.3.1
     devDependencies:
+      '@memdot/chain':
+        specifier: workspace:*
+        version: link:../chain
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2

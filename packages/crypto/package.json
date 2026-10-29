@@ -19,7 +19,8 @@
     "dev": "tsdown src/index.ts --dts --watch",
     "typecheck": "tsc -p tsconfig.json",
     "test": "tsx --test test/*.test.ts",
-    "vectors": "tsx scripts/vectors.ts"
+    "vectors": "tsx scripts/vectors.ts",
+    "roundtrip": "tsx scripts/roundtrip.ts"
   },
   "dependencies": {
     "@noble/ciphers": "^2.4.0",
@@ -34,6 +35,7 @@
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "tsx": "^4.23.15",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "@memdot/chain": "workspace:*"
   }
 }
