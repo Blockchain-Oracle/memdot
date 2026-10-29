@@ -9,7 +9,14 @@ import {
   RETENTION_BLOCKS,
 } from "@memdot/config";
 import { blobStaging, jobs, objects, spaces, storedItems } from "@memdot/db";
-import { enqueueChainTx, JOB_KIND, jobEventOf, RENEW_BATCH_SIZE, updateJob } from "@memdot/jobs";
+import {
+  enqueueChainTx,
+  JOB_KIND,
+  jobEventOf,
+  RENEW_BATCH_SIZE,
+  settleObject,
+  updateJob,
+} from "@memdot/jobs";
 import { and, asc, eq, inArray, isNull, ne, notExists, type SQL, sql } from "drizzle-orm";
 import { bodyLimit } from "hono/body-limit";
 import { db } from "../db.js";
@@ -20,6 +27,7 @@ import { loadFolder, loadObject, loadSpace } from "../lib/ownership.js";
 import { afterCursor, newestFirst, page } from "../lib/pagination.js";
 import { accountOf, principalOf, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
+import { sponsoredStoragePaused } from "../lib/storage-status.js";
 import { Cid, fromBase64, IdParam, PageQuery, pageOf, SealedText, toBase64 } from "../schemas.js";
 import type { Services } from "../types.js";
 import { Job } from "./jobs.js";
@@ -195,29 +203,6 @@ async function isRelayed(object: ObjectRow): Promise<boolean> {
   return space?.mode === "sponsored";
 }
 
-/** After a blob is stored (by the relayer or a wallet), settle the object and its job. */
-export async function settleIfComplete(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  objectId: string,
-  jobId: string | null,
-): Promise<void> {
-  const items = await tx
-    .select({ status: storedItems.status })
-    .from(storedItems)
-    .where(eq(storedItems.objectId, objectId));
-  const done = items.filter((i) => i.status === "stored").length;
-  if (done === items.length) {
-    await tx.update(objects).set({ status: "stored" }).where(eq(objects.id, objectId));
-    await tx.update(objects).set({ status: "stored" }).where(eq(objects.segmentId, objectId));
-  }
-  if (jobId) {
-    await updateJob(tx, jobId, {
-      ...(done === items.length ? { status: "finalized" } : {}),
-      progress: { done, total: items.length },
-    });
-  }
-}
-
 export function objectRoutes(services: Services) {
   return createRouter()
     .openapi(
@@ -311,6 +296,13 @@ export function objectRoutes(services: Services) {
           }
         }
         const relayed = system || space?.mode === "sponsored";
+        if (relayed && (await sponsoredStoragePaused())) {
+          throw new HttpError(
+            503,
+            "STORAGE_PAUSED",
+            "Sponsored storage is paused while MemDot's relayer is topped up. Stored files are safe and renewals continue; try again later or use a self-signed space.",
+          );
+        }
         const objectId = randomUUID();
 
         try {
@@ -727,10 +719,12 @@ export function objectRoutes(services: Services) {
       }),
       async (c) => {
         const object = await loadObject(c, c.req.valid("param").id);
-        const items = await db
-          .select({ id: storedItems.id })
-          .from(storedItems)
-          .where(and(eq(storedItems.objectId, object.id), eq(storedItems.status, "stored")));
+        const items = (
+          await db
+            .select({ id: storedItems.id, block: storedItems.block })
+            .from(storedItems)
+            .where(and(eq(storedItems.objectId, object.id), eq(storedItems.status, "stored")))
+        ).flatMap((item) => (item.block === null ? [] : [{ id: item.id, atBlock: item.block }]));
         if (items.length === 0)
           throw conflict("NOTHING_TO_RENEW", "Nothing in this object is stored yet.");
         const job = await db.transaction(async (tx) => {
@@ -748,7 +742,7 @@ export function objectRoutes(services: Services) {
             await enqueueChainTx(services.boss, tx, {
               action: "renew",
               jobId: row.id,
-              storedItemIds: items.slice(i, i + RENEW_BATCH_SIZE).map((item) => item.id),
+              items: items.slice(i, i + RENEW_BATCH_SIZE),
             });
           }
           return row;
@@ -921,7 +915,7 @@ export function objectRoutes(services: Services) {
             .update(objects)
             .set({ status: "uploading" })
             .where(and(eq(objects.id, id), eq(objects.status, "queued")));
-          await settleIfComplete(tx, id, job?.id ?? null);
+          await settleObject(tx, id, job?.id ?? null);
         });
         const [updated] = await db.select().from(objects).where(eq(objects.id, id));
         const items = await db.select().from(storedItems).where(eq(storedItems.objectId, id));

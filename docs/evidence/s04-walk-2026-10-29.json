@@ -1,0 +1,91 @@
+{
+  "stage": "S04",
+  "network": "Portaldot V3 testnet (wss://test-node-v3.portaldot.dev)",
+  "relayer": "5C7WcuxqSY2z43Msr2Rs64EJLSkLAPeNwk19YTqMsqgixYmU",
+  "items": [
+    {
+      "kind": "key_bundle",
+      "role": "root",
+      "cid": "bafk2bzaceckwq6pwf46bzzfudomjnkkkmh6snwkv7bititlzogea6a7bwzbpy",
+      "contentHash": "0x956879f62f3c1ce4b41b9896a94a61fd26d955f851344d7971880f03e1b642fc",
+      "bytes": 219,
+      "store": {
+        "txHash": "0x151d06c05e1b32cec6f1baef5b736f5c402562827bc66b650298bebca0f156fc",
+        "block": 239032,
+        "index": 0,
+        "feePlanck": "3300581780744"
+      },
+      "renewal": {
+        "txHash": "0x15eb5bf17ba836b3744c748261d35ccf65e7dc75a433ec8058388fda82b71a39",
+        "from": {
+          "block": 239032,
+          "index": 0
+        },
+        "to": {
+          "block": 239047,
+          "index": 0
+        },
+        "feePlanck": "1170608433852"
+      }
+    },
+    {
+      "kind": "file",
+      "role": "chunk",
+      "cid": "bafk2bzaceapnbhmaa5adgloa6ul5qc4o2qhrn3bojrgjeullss42ltwe4u5bg",
+      "contentHash": "0x1ed09d800740332dc0f517d80b8ed40f16ec2e4c4c92516b94b9a5cec4e53a13",
+      "bytes": 280,
+      "store": {
+        "txHash": "0x78b35dceb88b50c8c9cbe576b96849ec0be2ef05fb175180fb1118bf8c3822a3",
+        "block": 239035,
+        "index": 0,
+        "feePlanck": "3910582034863"
+      },
+      "renewal": {
+        "txHash": "0x1a3ef3ab6cb8e39a3849a743db97adcf050c3d0c0db3f4f8395f29545d7d7801",
+        "from": {
+          "block": 239035,
+          "index": 0
+        },
+        "to": {
+          "block": 239047,
+          "index": 1
+        },
+        "feePlanck": "1170608433852"
+      }
+    },
+    {
+      "kind": "file",
+      "role": "root",
+      "cid": "bafk2bzacebcpoyqipsf2d4hacbsvj4f63fbwdgs6ejoach25y7ffmyvniyfoy",
+      "contentHash": "0x44f762087c8ba1f0e0106554f0bed943619a5e225c011f5dc7ca5662ad460aec",
+      "bytes": 479,
+      "store": {
+        "txHash": "0x784fa8e402d2095a2e0354f40d5ca5e5ba471074989b8793455dcca96a40180d",
+        "block": 239038,
+        "index": 0,
+        "feePlanck": "5900582871894"
+      },
+      "renewal": {
+        "txHash": "0xe4b13e5c4456c1f6e3b32064eca746f22f4001c982668608d17796b843b255d3",
+        "from": {
+          "block": 239038,
+          "index": 0
+        },
+        "to": {
+          "block": 239047,
+          "index": 2
+        },
+        "feePlanck": "1170608433852"
+      }
+    }
+  ],
+  "recordedAt": "2026-10-29",
+  "checks": [
+    "wallet sign-in (SIWS), recovery code registered, owner proof, key bundle stored as an account object",
+    "encrypted file uploaded with an API key: data chunk then manifest, both finalized; job followed over SSE",
+    "repeated Idempotency-Key replayed the same object; a quota breach was refused before any spend",
+    "gateway bytes (bitswap_v1_get, hash-checked) decrypted to the original file",
+    "keeper forced to renew: all three items, key bundle included, renewed in one block with explicit nonces; CIDs unchanged",
+    "storage records wiped and rebuilt from V3 events alone (locations, store tx hashes, renewal history): identical"
+  ]
+}

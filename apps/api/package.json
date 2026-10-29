@@ -11,6 +11,7 @@
     "start": "node dist/main.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "smoke:auth": "tsx scripts/smoke-auth.ts",
+    "walk:s04": "tsx scripts/walk-s04.ts",
     "auth:generate": "auth generate --config src/auth/index.ts --output ../../packages/db/src/schema/auth.ts --yes"
   },
   "dependencies": {

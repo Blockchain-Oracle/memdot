@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { accounts, account as authAccount, user as authUser, passkey } from "@memdot/db";
+import { accounts, account as authAccount, user as authUser, objects, passkey } from "@memdot/db";
 import { Address, verifySignature } from "@talismn/siws";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { type Hex, verifyMessage } from "viem";
 import { db } from "../db.js";
 import { badRequest, conflict, forbidden } from "../lib/errors.js";
@@ -62,7 +62,8 @@ const Setup = z
       }),
     ]),
     encryptionKey: z.string().regex(/^age1[0-9a-z]{58}$/, "Expected an age X25519 recipient."),
-    keyBundleCid: Cid,
+    /** Set on the second call, once the key bundle is stored as an account object. */
+    keyBundleCid: Cid.optional(),
   })
   .openapi("AccountSetup");
 
@@ -155,9 +156,9 @@ export function accountRoutes() {
         method: "put",
         path: "/v1/account",
         tags: ["Account"],
-        summary: "Finish setup: chain owner, sharing key and key bundle",
+        summary: "Set up the account: chain owner, sharing key, then key bundle",
         description:
-          "Called by the client after it creates the master key, stores the key bundle and registers the recovery code. Dashboard sessions only.",
+          "Two calls. First, after the client creates the master key and registers the recovery code: the owner proof and sharing key create the account. Then, once the key bundle is stored (POST /v1/objects, kind key_bundle), the same call with keyBundleCid points the account at it. Dashboard sessions only.",
         security: [{ Session: [] }],
         request: { body: { content: { "application/json": { schema: Setup } }, required: true } },
         responses: {
@@ -195,11 +196,34 @@ export function accountRoutes() {
           throw conflict("OWNER_TAKEN", "That chain account already owns another MemDot account.");
         }
 
+        if (body.keyBundleCid) {
+          const [bundle] = principal.accountId
+            ? await db
+                .select({ id: objects.id })
+                .from(objects)
+                .where(
+                  and(
+                    eq(objects.accountId, principal.accountId),
+                    eq(objects.kind, "key_bundle"),
+                    eq(objects.cid, body.keyBundleCid),
+                    ne(objects.status, "tombstoned"),
+                  ),
+                )
+                .limit(1)
+            : [];
+          if (!bundle) {
+            throw badRequest(
+              "KEY_BUNDLE_UNKNOWN",
+              "Store the key bundle on this account before pointing to it.",
+            );
+          }
+        }
+
         const values = {
           ownerAccount: owner.ownerAccount,
           evmAddress: owner.evmAddress,
           encryptionKey: body.encryptionKey,
-          keyBundleCid: body.keyBundleCid,
+          ...(body.keyBundleCid ? { keyBundleCid: body.keyBundleCid } : {}),
         };
         const [row] = await db
           .insert(accounts)
