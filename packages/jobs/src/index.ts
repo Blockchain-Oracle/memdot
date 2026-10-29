@@ -18,4 +18,4 @@ export {
   jobEventOf,
   updateJob,
 } from "./record.js";
-export { settleObject } from "./settle.js";
+export { failObject, openJobsOf, settleObject } from "./settle.js";

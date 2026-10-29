@@ -43,20 +43,43 @@ function progressOf(result: unknown): JobProgress | null {
   return progress && typeof progress.done === "number" ? progress : null;
 }
 
-/** Updates a job row and announces the new state on JOB_EVENTS_CHANNEL. */
+/** Pipeline order. A job only moves forward, and a finished job stays finished. */
+const STATUS_ORDER = sql.raw(
+  "array['queued','running','submitted','in_block','finalized','failed']::job_status[]",
+);
+
+function forwardOnly(status: JobStatus) {
+  return sql`case
+    when ${jobs.status} in ('finalized', 'failed') then ${jobs.status}
+    when array_position(${STATUS_ORDER}, ${jobs.status}) < array_position(${STATUS_ORDER}, ${status}::job_status)
+      then ${status}::job_status
+    else ${jobs.status}
+  end`;
+}
+
+/**
+ * Updates a job row and announces the new state on JOB_EVENTS_CHANNEL. Status never moves
+ * backwards (an object's later blobs restart at "running", a retry restarts at "submitted") and a
+ * finalized or failed job is never reopened.
+ */
 export async function updateJob(
   db: Executor,
   id: string,
   patch: JobPatch,
 ): Promise<JobEvent | null> {
-  const { progress, result, ...columns } = patch;
+  const { progress, result, status, ...columns } = patch;
   const merged =
     progress || result
       ? sql`coalesce(${jobs.result}, '{}'::jsonb) || ${JSON.stringify({ ...result, ...(progress ? { progress } : {}) })}::jsonb`
       : undefined;
   const [row] = await db
     .update(jobs)
-    .set({ ...columns, ...(merged ? { result: merged } : {}), updatedAt: new Date() })
+    .set({
+      ...columns,
+      ...(status ? { status: forwardOnly(status) } : {}),
+      ...(merged ? { result: merged } : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(jobs.id, id))
     .returning();
   if (!row) return null;

@@ -1,4 +1,4 @@
-import { toBytes } from "./cid.js";
+import { contentHash, toBytes, toHex } from "./cid.js";
 import type { ChainClient } from "./client.js";
 
 /** A TransactionStorage event: where an item now lives and which bytes it holds. */
@@ -51,4 +51,18 @@ export async function storageEventsAt(chain: ChainClient, block: number): Promis
     });
   }
   return events;
+}
+
+/**
+ * Hashes of every extrinsic in a block, as explorers show them (blake2b-256 of the encoded
+ * extrinsic). Events only carry the extrinsic's position, so this maps them to a tx hash.
+ */
+export async function extrinsicHashes(chain: ChainClient, block: number): Promise<string[]> {
+  const hash = await blockHashOf(chain, block);
+  if (!hash) return [];
+  const body = await chain.client._request<{ block: { extrinsics: string[] } }, [string]>(
+    "chain_getBlock",
+    [hash],
+  );
+  return body.block.extrinsics.map((ext) => toHex(contentHash(toBytes(ext))));
 }

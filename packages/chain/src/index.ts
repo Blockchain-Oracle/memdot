@@ -8,7 +8,7 @@ export {
   toHex,
 } from "./cid.js";
 export { type ChainClient, createChainClient, type PortaldotApi } from "./client.js";
-export { blockHashOf, type StorageEvent, storageEventsAt } from "./events.js";
+export { blockHashOf, extrinsicHashes, type StorageEvent, storageEventsAt } from "./events.js";
 export { estimateStoreFee, formatTpot, quoteRenewFee, quoteStoreFee } from "./fees.js";
 export {
   type RetentionState,
