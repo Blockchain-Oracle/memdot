@@ -1,0 +1,39 @@
+{
+  "name": "@memdot/crypto",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Client-side encryption for MemDot: master-key wraps, object encryption, manifests and segments.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --dts",
+    "dev": "tsdown src/index.ts --dts --watch",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts",
+    "vectors": "tsx scripts/vectors.ts"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "@scure/bip39": "^2.4.0",
+    "age-encryption": "0.3.1",
+    "@memdot/config": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}
