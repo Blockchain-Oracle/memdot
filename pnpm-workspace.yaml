@@ -17,3 +17,6 @@ catalog:
   # 7.x drops the classic compiler API that Next.js type-checks with; 6.0 is the last line that has it.
   typescript: 6.0.3
   zod: ^4.0.0
+
+allowBuilds:
+  esbuild: true

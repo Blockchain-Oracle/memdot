@@ -1,0 +1,22 @@
+{
+  "probedAt": "2026-10-29T12:30:25.765Z",
+  "chain": "PortaldotV3 Test",
+  "genesisHash": "0xd4f9acbcf7f52388d8b095abe3c198d19fc510e0343e643e87cfbccb155283bd",
+  "specName": "portaldot-v3",
+  "specVersion": 3002,
+  "finalizedBlock": 238241,
+  "blockTimeMs": "6000",
+  "transactionStorage": {
+    "maxTransactionSize": 8388608,
+    "maxBlockTransactions": 512,
+    "retentionPeriod": 100800,
+    "byteFee": "10",
+    "entryFee": "1000"
+  },
+  "revive": {
+    "chainId": "420420777",
+    "allowEvmBytecode": true,
+    "autoMap": true,
+    "nativeToEthRatio": 10000
+  }
+}

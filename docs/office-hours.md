@@ -13,7 +13,7 @@ Repository: https://github.com/Blockchain-Oracle/memdot
 | Area | State |
 |---|---|
 | Research | Done: event rules and the V3 network's storage and contract surfaces. |
-| V3 runtime probe | Done: [`scripts/v3-probe.mjs`](../scripts/v3-probe.mjs) reads live metadata for `TransactionStorage`, `Revive` and `Contracts`. Output committed in [`docs/evidence/`](evidence). |
+| V3 runtime probe | Done: [`packages/chain/scripts/probe.ts`](../packages/chain/scripts/probe.ts) reads live metadata for `TransactionStorage`, `Revive` and `Contracts`. Output committed in [`docs/evidence/`](evidence). |
 | Brand | Done: logo mark and banner in [`assets/brand/`](../assets/brand). |
 | Architecture | Candidate only (see the [README](../README.md#candidate-architecture-not-final)). Three decisions are open, and they depend on the answers below. |
 | Testnet deployment | **None yet, on purpose.** No signed transactions so far. We want the storage path settled before deploying anything. Test tPOT is being requested through a support ticket. |

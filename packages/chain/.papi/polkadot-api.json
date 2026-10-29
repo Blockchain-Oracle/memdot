@@ -1,0 +1,12 @@
+{
+  "version": 0,
+  "descriptorPath": ".papi/descriptors",
+  "entries": {
+    "portaldot": {
+      "wsUrl": "wss://test-node-v3.portaldot.dev",
+      "metadata": ".papi/metadata/portaldot.scale",
+      "genesis": "0xd4f9acbcf7f52388d8b095abe3c198d19fc510e0343e643e87cfbccb155283bd",
+      "codeHash": "0xedc03c9dc81d39fea5c02893cc34cf2ec898d55d7ee8f8e89eb27597a724c7c2"
+    }
+  }
+}

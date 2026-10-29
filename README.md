@@ -16,7 +16,7 @@ The core loop is **store → share → renew**, with **remember → recall** on 
 
 ## What V3 actually offers (measured)
 
-Read from the live testnet on 2026-10-29 with [`scripts/v3-probe.mjs`](scripts/v3-probe.mjs). Full output: [docs/evidence/v3-probe-2026-10-29.json](docs/evidence/v3-probe-2026-10-29.json).
+Read from the live testnet on 2026-10-29 with [`packages/chain/scripts/probe.ts`](packages/chain/scripts/probe.ts). Full output: [docs/evidence/v3-probe-2026-10-29.json](docs/evidence/v3-probe-2026-10-29.json).
 
 | Pallet | Calls we care about | Limits and constants |
 |---|---|---|
@@ -55,7 +55,7 @@ Decisions still open, each blocked on a question in [docs/office-hours.md](docs/
 
 | Path | What it is |
 |---|---|
-| [`scripts/v3-probe.mjs`](scripts/v3-probe.mjs) | Read-only probe of V3 runtime metadata (pallet calls, constants, storage values) |
+| [`packages/chain/scripts/probe.ts`](packages/chain/scripts/probe.ts) | Read-only probe of V3 runtime metadata (pallet calls, constants, storage values) |
 | [`docs/evidence/`](docs/evidence) | Dated probe output, so every number above can be checked |
 | [`docs/office-hours.md`](docs/office-hours.md) | Progress report and questions for the Portaldot mentors |
 | [`assets/brand/`](assets/brand) | Logo mark (SVG) and banner source |

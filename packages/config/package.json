@@ -6,6 +6,23 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
     "./tsconfig/*": "./tsconfig/*"
+  },
+  "files": [
+    "dist",
+    "tsconfig"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --dts",
+    "dev": "tsdown src/index.ts --dts --watch",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
   }
 }
