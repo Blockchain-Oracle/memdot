@@ -1,4 +1,5 @@
 export { type BossRole, enqueueChainTx, startBoss } from "./boss.js";
+export { JobEventHub } from "./listen.js";
 export {
   type ChainTxPayload,
   chainTxPayload,

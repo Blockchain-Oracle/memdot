@@ -22,12 +22,14 @@
   "dependencies": {
     "@memdot/db": "workspace:*",
     "drizzle-orm": "0.45.4",
+    "pg": "^8.23.1",
     "pg-boss": "^12.38.0",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@memdot/config": "workspace:*",
     "@types/node": "catalog:",
+    "@types/pg": "^8.23.1",
     "tsdown": "catalog:",
     "typescript": "catalog:"
   }

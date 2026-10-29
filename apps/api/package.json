@@ -1,0 +1,47 @@
+{
+  "name": "@memdot/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MemDot REST API: auth, spaces, files, grants, jobs and the CID gateway.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsdown src/main.ts --format esm --platform node",
+    "start": "node dist/main.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "smoke:auth": "tsx scripts/smoke-auth.ts",
+    "auth:generate": "auth generate --config src/auth/index.ts --output ../../packages/db/src/schema/auth.ts --yes"
+  },
+  "dependencies": {
+    "@better-auth/api-key": "^1.7.14",
+    "@better-auth/drizzle-adapter": "^1.7.14",
+    "@better-auth/passkey": "^1.7.14",
+    "@hono/node-server": "^2.1.5",
+    "@hono/zod-openapi": "^1.6.3",
+    "@memdot/chain": "workspace:*",
+    "@memdot/config": "workspace:*",
+    "@memdot/crypto": "workspace:*",
+    "@memdot/db": "workspace:*",
+    "@memdot/jobs": "workspace:*",
+    "@noble/hashes": "^2.4.0",
+    "@scalar/hono-api-reference": "^0.12.14",
+    "@talismn/siws": "^2.1.0",
+    "better-auth": "^1.7.14",
+    "drizzle-orm": "0.45.4",
+    "hono": "^4.13.14",
+    "pg-boss": "^12.38.0",
+    "viem": "^2.57.13",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@polkadot-labs/hdkd": "^0.0.32",
+    "@polkadot-labs/hdkd-helpers": "^0.0.34",
+    "@types/node": "catalog:",
+    "auth": "1.7.14",
+    "polkadot-api": "^3.3.0",
+    "tsdown": "catalog:",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}
