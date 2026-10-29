@@ -11,7 +11,15 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { memoryMode, objectKind, objectStatus, spaceMode, storedItemStatus } from "./enums.js";
+import { user } from "./auth.js";
+import {
+  memoryMode,
+  objectKind,
+  objectStatus,
+  spaceMode,
+  storedItemRole,
+  storedItemStatus,
+} from "./enums.js";
 
 const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
   dataType: () => "bytea",
@@ -23,21 +31,22 @@ const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull(
 
 /**
  * A MemDot account: the on-chain owner (AccountId32) plus the public parts of its keys. The
- * master key and every secret stay on the client; only public keys and CIDs live here.
+ * master key and every secret stay on the client; only public keys and CIDs live here. Sign-in
+ * methods (passkeys, wallets, the recovery-code key) live in the `auth` schema.
  */
 export const accounts = pgTable(
   "accounts",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id),
     /** AccountId32 as 0x-hex: the sr25519 public key that owns registry records. */
     ownerAccount: text("owner_account").notNull(),
     evmAddress: text("evm_address"),
     /** X25519 sharing key published in the registry. */
     encryptionKey: text("encryption_key"),
     keyBundleCid: text("key_bundle_cid"),
-    /** Public half of the recovery-code sign-in key (ed25519). */
-    recoveryPublicKey: text("recovery_public_key"),
     createdAt: createdAt(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
@@ -89,19 +98,21 @@ export const folders = pgTable(
 
 /**
  * A logical object the user sees: a file (its manifest), a segment of tiny files or memories,
- * an index snapshot, a key bundle or a wrapped grant key.
+ * an index snapshot, a key bundle or a wrapped grant key. Key bundles and grant keys belong to
+ * the account rather than a space.
  */
 export const objects = pgTable(
   "objects",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    spaceId: uuid("space_id")
+    accountId: uuid("account_id")
       .notNull()
-      .references(() => spaces.id),
+      .references(() => accounts.id),
+    spaceId: uuid("space_id").references(() => spaces.id),
     folderId: uuid("folder_id").references(() => folders.id),
     kind: objectKind("kind").notNull(),
     status: objectStatus("status").notNull().default("queued"),
-    /** blake2b-256 of the stored manifest or segment; also its CID. */
+    /** blake2b-256 of the root blob (manifest, segment, bundle); the CID encodes the same hash. */
     contentHash: text("content_hash"),
     cid: text("cid"),
     /** Padded plaintext size the client reported (real size lives in the manifest). */
@@ -115,6 +126,7 @@ export const objects = pgTable(
     tombstonedAt: timestamp("tombstoned_at", { withTimezone: true }),
   },
   (t) => [
+    index("objects_account_idx").on(t.accountId, t.createdAt),
     index("objects_space_folder_idx").on(t.spaceId, t.folderId),
     index("objects_segment_idx").on(t.segmentId),
     uniqueIndex("objects_space_hash_idx")
@@ -132,7 +144,8 @@ export const storedItems = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     objectId: uuid("object_id").references(() => objects.id),
-    /** Position of this chunk within its object (0 for single-chunk items). */
+    role: storedItemRole("role").notNull().default("root"),
+    /** Order of a data chunk within its object; always 0 for the root. */
     chunkIndex: integer("chunk_index").notNull().default(0),
     contentHash: text("content_hash").notNull(),
     cid: text("cid").notNull(),
@@ -142,15 +155,30 @@ export const storedItems = pgTable(
     /** Index inside the block's TransactionStorage list (from the Stored/Renewed event). */
     idx: integer("idx"),
     storedTxHash: text("stored_tx_hash"),
+    /** Fee paid for the `store`, in planck (decimal string). */
+    feePlanck: text("fee_planck"),
     lastRenewedAt: timestamp("last_renewed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
-    uniqueIndex("stored_items_object_chunk_idx").on(t.objectId, t.chunkIndex),
+    uniqueIndex("stored_items_object_chunk_idx").on(t.objectId, t.role, t.chunkIndex),
     index("stored_items_hash_idx").on(t.contentHash),
     index("stored_items_due_idx").on(t.status, t.block),
   ],
 );
+
+/**
+ * Ciphertext the API accepted but the relayer has not finalized on chain yet. The worker reads it
+ * from here (so API and worker share no disk) and deletes it once the store is finalized; the
+ * gateway serves it meanwhile so a fresh upload is readable at once.
+ */
+export const blobStaging = pgTable("blob_staging", {
+  storedItemId: uuid("stored_item_id")
+    .primaryKey()
+    .references(() => storedItems.id, { onDelete: "cascade" }),
+  data: bytea("data").notNull(),
+  createdAt: createdAt(),
+});
 
 export const renewals = pgTable(
   "renewals",

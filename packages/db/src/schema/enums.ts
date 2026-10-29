@@ -23,6 +23,12 @@ export const objectStatus = pgEnum("object_status", [
   "lost",
 ]);
 
+/**
+ * Every object has one root blob (a file's manifest, a segment, a key bundle) that names the
+ * rest, plus the data chunks the root lists. Both kinds are stored, renewed and verified alike.
+ */
+export const storedItemRole = pgEnum("stored_item_role", ["root", "chunk"]);
+
 /** One stored item on V3 TransactionStorage, as the keeper sees it. */
 export const storedItemStatus = pgEnum("stored_item_status", [
   "pending",
