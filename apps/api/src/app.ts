@@ -9,7 +9,19 @@ import { errorResponse } from "./lib/errors.js";
 import { resolvePrincipal } from "./lib/principal.js";
 import { RateLimiter, rateLimit } from "./lib/rate-limit.js";
 import { createRouter } from "./lib/router.js";
+import { accountRoutes } from "./routes/account.js";
+import { activityRoutes } from "./routes/activity.js";
+import { agentRoutes } from "./routes/agents.js";
+import { folderRoutes } from "./routes/folders.js";
+import { gatewayRoutes } from "./routes/gateway.js";
+import { grantRoutes } from "./routes/grants.js";
 import { healthRoutes } from "./routes/health.js";
+import { jobRoutes } from "./routes/jobs.js";
+import { keyRoutes } from "./routes/keys.js";
+import { objectRoutes } from "./routes/objects.js";
+import { proofRoutes } from "./routes/proof.js";
+import { spaceRoutes } from "./routes/spaces.js";
+import { usageRoutes } from "./routes/usage.js";
 import type { Services } from "./types.js";
 
 /** Dashboard sessions: generous, since one page fires several queries. */
@@ -77,6 +89,20 @@ export function createApp(services: Services) {
       requestId: c.get("requestId"),
     });
   });
+
+  app
+    .route("/", accountRoutes())
+    .route("/", spaceRoutes())
+    .route("/", folderRoutes())
+    .route("/", objectRoutes(services))
+    .route("/", gatewayRoutes(services))
+    .route("/", grantRoutes())
+    .route("/", keyRoutes())
+    .route("/", agentRoutes())
+    .route("/", jobRoutes(services))
+    .route("/", usageRoutes(services))
+    .route("/", activityRoutes())
+    .route("/", proofRoutes(services));
 
   app.openAPIRegistry.registerComponent("securitySchemes", "ApiKey", {
     type: "http",

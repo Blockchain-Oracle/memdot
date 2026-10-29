@@ -20,3 +20,4 @@ dist/
 
 # Local agent settings
 .claude/
+.cache/

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { PORTALDOT_WSS } from "@memdot/config";
+import { DEFAULT_MAX_FILE_BYTES, PORTALDOT_WSS, SPONSORED_QUOTA_BYTES } from "@memdot/config";
 import { z } from "zod";
 
 // In development the repo-root .env is the single source; in production Coolify injects env.
@@ -21,6 +21,12 @@ const schema = z.object({
   /** Parent domain for cookies shared by app. and api. in production; unset on localhost. */
   COOKIE_DOMAIN: z.string().optional(),
   PORTALDOT_WSS: z.string().default(PORTALDOT_WSS),
+  /** Ciphertext bytes a new sponsored space may hold (the relayer pays for it). */
+  SPONSORED_QUOTA_BYTES: z.coerce.number().int().positive().default(SPONSORED_QUOTA_BYTES),
+  /** Largest single object (all chunks plus its manifest). */
+  MAX_FILE_BYTES: z.coerce.number().int().positive().default(DEFAULT_MAX_FILE_BYTES),
+  /** Where the CID gateway keeps ciphertext it fetched from the chain. */
+  GATEWAY_CACHE_DIR: z.string().default(".cache/gateway"),
 });
 
 export type Env = z.infer<typeof schema>;

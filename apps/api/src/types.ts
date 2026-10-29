@@ -2,6 +2,8 @@ import type { ChainClient } from "@memdot/chain";
 import type { JobEventHub } from "@memdot/jobs";
 import type { PgBoss } from "pg-boss";
 import type { ApiKeyRole, Permissions } from "./auth/roles.js";
+import type { ChainHead } from "./lib/chain-head.js";
+import type { CiphertextCache } from "./lib/gateway-cache.js";
 import type { RequestLog } from "./lib/request-log.js";
 
 /** Who is calling: a dashboard session or an API key, resolved once per request. */
@@ -26,6 +28,8 @@ export interface Principal {
 export interface Services {
   boss: PgBoss;
   chain: ChainClient;
+  chainHead: ChainHead;
+  gatewayCache: CiphertextCache;
   jobEvents: JobEventHub;
   requestLog: RequestLog;
 }

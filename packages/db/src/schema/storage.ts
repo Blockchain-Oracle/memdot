@@ -155,6 +155,8 @@ export const storedItems = pgTable(
     /** Index inside the block's TransactionStorage list (from the Stored/Renewed event). */
     idx: integer("idx"),
     storedTxHash: text("stored_tx_hash"),
+    /** When the first `store` finalized (renewals keep this; they move block and idx). */
+    storedAt: timestamp("stored_at", { withTimezone: true }),
     /** Fee paid for the `store`, in planck (decimal string). */
     feePlanck: text("fee_planck"),
     lastRenewedAt: timestamp("last_renewed_at", { withTimezone: true }),

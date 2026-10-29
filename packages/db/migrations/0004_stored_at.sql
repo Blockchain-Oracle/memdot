@@ -1,0 +1,1 @@
+ALTER TABLE "stored_items" ADD COLUMN "stored_at" timestamp with time zone;

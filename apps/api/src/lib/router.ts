@@ -1,4 +1,4 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
+import { OpenAPIHono, type z } from "@hono/zod-openapi";
 import type { AppEnv } from "../types.js";
 import { ErrorSchema, validationHook } from "./errors.js";
 
@@ -20,4 +20,9 @@ export const errorResponses = {
 } as const;
 
 /** Both ways to authenticate, for routes that accept either. */
-export const authenticated = [{ ApiKey: [] }, { Session: [] }];
+export const authenticated: Record<string, string[]>[] = [{ ApiKey: [] }, { Session: [] }];
+
+/** A JSON content block for createRoute, keeping the schema's type for c.req.valid. */
+export const jsonContent = <T extends z.ZodType>(schema: T) => ({
+  "application/json": { schema },
+});
