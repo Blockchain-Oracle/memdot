@@ -1,0 +1,339 @@
+{
+  "probedAt": "2026-10-29T09:20:23.832Z",
+  "endpoint": "wss://test-node-v3.portaldot.dev",
+  "chain": "PortaldotV3 Test",
+  "nodeVersion": "3.0.0-dev-fddd43141f2",
+  "specName": "portaldot-v3",
+  "specVersion": 3002,
+  "bestBlock": 236354,
+  "blockTimeMs": 6000,
+  "properties": {
+    "isEthereum": false,
+    "ss58Format": "42",
+    "tokenDecimals": [
+      "14"
+    ],
+    "tokenSymbol": [
+      "tPOT"
+    ]
+  },
+  "palletCount": 69,
+  "pallets": {
+    "transactionStorage": {
+      "present": true,
+      "calls": {
+        "store": [
+          "data: Bytes"
+        ],
+        "renew": [
+          "block: u32",
+          "index: u32"
+        ],
+        "checkProof": [
+          "proof: SpTransactionStorageProofTransactionStorageProof"
+        ]
+      },
+      "constants": {
+        "maxBlockTransactions": "512",
+        "maxTransactionSize": "8,388,608"
+      },
+      "storage": {
+        "palletVersion": "0",
+        "authorizations": "(map)",
+        "transactions": "(map)",
+        "byteFee": "10",
+        "entryFee": "1,000",
+        "retentionPeriod": "100,800",
+        "blockTransactions": [],
+        "proofChecked": false
+      }
+    },
+    "revive": {
+      "present": true,
+      "calls": {
+        "ethTransact": [
+          "payload: Bytes"
+        ],
+        "call": [
+          "dest: H160",
+          "value: Compact<u128>",
+          "weightLimit: SpWeightsWeightV2Weight",
+          "storageDepositLimit: Compact<u128>",
+          "data: Bytes"
+        ],
+        "instantiate": [
+          "value: Compact<u128>",
+          "weightLimit: SpWeightsWeightV2Weight",
+          "storageDepositLimit: Compact<u128>",
+          "codeHash: H256",
+          "data: Bytes",
+          "salt: Option<[u8;32]>"
+        ],
+        "instantiateWithCode": [
+          "value: Compact<u128>",
+          "weightLimit: SpWeightsWeightV2Weight",
+          "storageDepositLimit: Compact<u128>",
+          "code: Bytes",
+          "data: Bytes",
+          "salt: Option<[u8;32]>"
+        ],
+        "ethInstantiateWithCode": [
+          "value: U256",
+          "weightLimit: SpWeightsWeightV2Weight",
+          "ethGasLimit: U256",
+          "code: Bytes",
+          "data: Bytes",
+          "transactionEncoded: Bytes",
+          "effectiveGasPrice: U256",
+          "encodedLen: u32"
+        ],
+        "ethCall": [
+          "dest: H160",
+          "value: U256",
+          "weightLimit: SpWeightsWeightV2Weight",
+          "ethGasLimit: U256",
+          "data: Bytes",
+          "transactionEncoded: Bytes",
+          "effectiveGasPrice: U256",
+          "encodedLen: u32"
+        ],
+        "ethSubstrateCall": [
+          "call: Call",
+          "transactionEncoded: Bytes"
+        ],
+        "uploadCode": [
+          "code: Bytes",
+          "storageDepositLimit: Compact<u128>"
+        ],
+        "removeCode": [
+          "codeHash: H256"
+        ],
+        "setCode": [
+          "dest: H160",
+          "codeHash: H256"
+        ],
+        "mapAccount": [],
+        "batchMapAccounts": [
+          "accounts: Vec<AccountId32>"
+        ],
+        "unmapAccount": [],
+        "dispatchAsFallbackAccount": [
+          "call: Call"
+        ]
+      },
+      "constants": {
+        "depositPerByte": "6,000,000,000,000",
+        "depositPerItem": "15,000,000,000,000",
+        "depositPerChildTrieItem": "150,000,000,000",
+        "codeHashLockupDepositPercent": "30.00%",
+        "allowEVMBytecode": true,
+        "chainId": "420,420,777",
+        "nativeToEthRatio": "10,000",
+        "maxEthExtrinsicWeight": "900,000,000,000,000,000",
+        "debugEnabled": false,
+        "autoMap": true,
+        "gasScale": "5"
+      },
+      "storage": {
+        "palletVersion": "0",
+        "pristineCode": "(map)",
+        "codeInfoOf": "(map)",
+        "accountInfoOf": "(map)",
+        "nativeDepositOf": "(map)",
+        "immutableDataOf": "(map)",
+        "deletionQueue": "(map)",
+        "deletionQueueCounter": {
+          "insertCounter": "0",
+          "deleteCounter": "0"
+        },
+        "originalAccount": "(map)",
+        "ethereumBlock": {
+          "baseFeePerGas": "27,690",
+          "blobGasUsed": "0",
+          "difficulty": "0",
+          "excessBlobGas": "0",
+          "extraData": "",
+          "gasLimit": "18,446,744,073,709,551,615",
+          "gasUsed": "0",
+          "hash_": "0xe24b7f65915353dd6b0fca4ba0a727bbb24ec95845692fbd90d892befb511baa",
+          "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "miner": "0x578f0a6155551b3b7c7ff255ea7dc2b08968e380",
+          "mixHash": "0x0000000000000000000000000000000000000000000000000008e1bc9bf04000",
+          "nonce": "0x0000000000000000",
+          "number": "236,355",
+          "parentBeaconBlockRoot": null,
+          "parentHash": "0x362d5e0e142a99c18b4051b8c98f2b13d85af1de3ff109598abff29151041c46",
+          "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+          "requestsHash": null,
+          "sha3Uncles": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "size_": "0",
+          "stateRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+          "timestamp": "1,793,265,624",
+          "totalDifficulty": null,
+          "transactions": {
+            "Hashes": []
+          },
+          "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421",
+          "uncles": [],
+          "withdrawals": [],
+          "withdrawalsRoot": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "blockHash": "(map)",
+        "receiptInfoData": [],
+        "ethBlockBuilderIR": {
+          "transactionRootBuilder": {
+            "key": "",
+            "valueType": "0",
+            "builderValue": "",
+            "stack": [],
+            "stateMasks": [],
+            "treeMasks": [],
+            "hashMasks": [],
+            "storedInDatabase": false,
+            "rlpBuf": "",
+            "index": "1"
+          },
+          "receiptsRootBuilder": {
+            "key": "",
+            "valueType": "0",
+            "builderValue": "",
+            "stack": [],
+            "stateMasks": [],
+            "treeMasks": [],
+            "hashMasks": [],
+            "storedInDatabase": false,
+            "rlpBuf": "",
+            "index": "1"
+          },
+          "baseFeePerGas": "27,690",
+          "blockGasLimit": "18,446,744,073,709,551,615",
+          "gasUsed": "0",
+          "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+          "txHashes": [],
+          "gasInfo": []
+        },
+        "ethBlockBuilderFirstValues": null,
+        "debugSettingsOf": {
+          "allowUnlimitedContractSize": false,
+          "bypassEip3607": false,
+          "pvmLogs": false,
+          "disableExecutionTracing": false
+        }
+      }
+    },
+    "contracts": {
+      "present": true,
+      "calls": {
+        "callOldWeight": [
+          "dest: MultiAddress",
+          "value: Compact<u128>",
+          "gasLimit: Compact<u64>",
+          "storageDepositLimit: Option<Compact<u128>>",
+          "data: Bytes"
+        ],
+        "instantiateWithCodeOldWeight": [
+          "value: Compact<u128>",
+          "gasLimit: Compact<u64>",
+          "storageDepositLimit: Option<Compact<u128>>",
+          "code: Bytes",
+          "data: Bytes",
+          "salt: Bytes"
+        ],
+        "instantiateOldWeight": [
+          "value: Compact<u128>",
+          "gasLimit: Compact<u64>",
+          "storageDepositLimit: Option<Compact<u128>>",
+          "codeHash: H256",
+          "data: Bytes",
+          "salt: Bytes"
+        ],
+        "uploadCode": [
+          "code: Bytes",
+          "storageDepositLimit: Option<Compact<u128>>",
+          "determinism: PalletContractsWasmDeterminism"
+        ],
+        "removeCode": [
+          "codeHash: H256"
+        ],
+        "setCode": [
+          "dest: MultiAddress",
+          "codeHash: H256"
+        ],
+        "call": [
+          "dest: MultiAddress",
+          "value: Compact<u128>",
+          "gasLimit: SpWeightsWeightV2Weight",
+          "storageDepositLimit: Option<Compact<u128>>",
+          "data: Bytes"
+        ],
+        "instantiateWithCode": [
+          "value: Compact<u128>",
+          "gasLimit: SpWeightsWeightV2Weight",
+          "storageDepositLimit: Option<Compact<u128>>",
+          "code: Bytes",
+          "data: Bytes",
+          "salt: Bytes"
+        ],
+        "instantiate": [
+          "value: Compact<u128>",
+          "gasLimit: SpWeightsWeightV2Weight",
+          "storageDepositLimit: Option<Compact<u128>>",
+          "codeHash: H256",
+          "data: Bytes",
+          "salt: Bytes"
+        ],
+        "migrate": [
+          "weightLimit: SpWeightsWeightV2Weight"
+        ]
+      },
+      "constants": {
+        "schedule": {
+          "limits": {
+            "eventTopics": "4",
+            "memoryPages": "16",
+            "subjectLen": "32",
+            "payloadLen": "16,384",
+            "runtimeMemory": "134,217,728",
+            "validatorRuntimeMemory": "536,870,912",
+            "eventRefTime": "60,000"
+          },
+          "instructionWeights": {
+            "base": "1,259"
+          }
+        },
+        "depositPerByte": "6,000,000,000,000",
+        "defaultDepositLimit": "6,306,816,000,000,000,000",
+        "depositPerItem": "15,000,000,000,000",
+        "codeHashLockupDepositPercent": "30.00%",
+        "maxCodeLen": "125,952",
+        "maxStorageKeyLen": "128",
+        "maxTransientStorageSize": "1,048,576",
+        "maxDelegateDependencies": "32",
+        "unsafeUnstableInterface": false,
+        "maxDebugBufferLen": "2,097,152",
+        "environment": {
+          "accountId": null,
+          "balance": null,
+          "hash_": null,
+          "hasher": null,
+          "timestamp": null,
+          "blockNumber": null
+        },
+        "apiVersion": "4"
+      },
+      "storage": {
+        "palletVersion": "16",
+        "pristineCode": "(map)",
+        "codeInfoOf": "(map)",
+        "nonce": "5",
+        "contractInfoOf": "(map)",
+        "deletionQueue": "(map)",
+        "deletionQueueCounter": {
+          "insertCounter": "0",
+          "deleteCounter": "0"
+        },
+        "migrationInProgress": null
+      }
+    }
+  }
+}
