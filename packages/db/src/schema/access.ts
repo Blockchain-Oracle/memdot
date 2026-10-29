@@ -10,9 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { granteeKind, grantScope, grantStatus, jobStatus } from "./enums.js";
-import { accounts, objects, spaces } from "./storage.js";
-
-const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
+import { accounts, createdAt, objects, spaces } from "./storage.js";
 
 /**
  * Access to a space or one object. A grant is "pending" until the recipient has registered an
@@ -74,6 +72,8 @@ export const jobs = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     accountId: uuid("account_id").references(() => accounts.id),
     kind: text("kind").notNull(),
+    /** The object a store, restore or "renew now" job is about. */
+    objectId: uuid("object_id").references(() => objects.id),
     status: jobStatus("status").notNull().default("queued"),
     idempotencyKey: text("idempotency_key"),
     payload: jsonb("payload").notNull().default({}),
@@ -86,7 +86,8 @@ export const jobs = pgTable(
   },
   (t) => [
     uniqueIndex("jobs_idempotency_idx").on(t.accountId, t.idempotencyKey),
-    index("jobs_account_idx").on(t.accountId, t.createdAt),
+    index("jobs_account_idx").on(t.accountId, t.createdAt, t.id),
+    index("jobs_object_idx").on(t.objectId, t.kind),
   ],
 );
 
@@ -106,7 +107,7 @@ export const requestLogs = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    index("request_logs_account_idx").on(t.accountId, t.createdAt),
+    index("request_logs_account_idx").on(t.accountId, t.createdAt, t.id),
     index("request_logs_created_brin").using("brin", t.createdAt),
   ],
 );

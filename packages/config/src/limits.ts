@@ -24,6 +24,12 @@ export const MAX_ENCRYPTED_META_BYTES = 4_096;
 /** Key bundles and wrapped grant keys are tiny; they are account objects outside any quota. */
 export const MAX_SYSTEM_OBJECT_BYTES = 16_384;
 
+/** Live key bundles and grant keys per account: the relayer pays for them, so they are capped. */
+export const MAX_SYSTEM_OBJECTS = 200;
+
+/** "Renew now" skips blobs stored or renewed within this many blocks (one hour). */
+export const RENEW_NOW_MIN_AGE_BLOCKS = 600;
+
 /** Ciphertext the API keeps on local disk for the CID gateway before evicting the oldest. */
 export const GATEWAY_CACHE_BYTES = 512 * 1024 * 1024;
 

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   customType,
   index,
   integer,
@@ -21,13 +22,19 @@ import {
   storedItemStatus,
 } from "./enums.js";
 
+/** bytea as Uint8Array, viewed in place both ways: blobs reach 7 MB, so no extra copies. */
 const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
   dataType: () => "bytea",
-  toDriver: (value) => Buffer.from(value),
-  fromDriver: (value) => new Uint8Array(value),
+  toDriver: (value) => Buffer.from(value.buffer, value.byteOffset, value.byteLength),
+  fromDriver: (value) => new Uint8Array(value.buffer, value.byteOffset, value.byteLength),
 });
 
-const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
+/**
+ * Millisecond precision, so a timestamp survives the round trip through a JS Date exactly and
+ * keyset cursors built from it never skip rows.
+ */
+export const createdAt = () =>
+  timestamp("created_at", { withTimezone: true, precision: 3 }).notNull().defaultNow();
 
 /**
  * A MemDot account: the on-chain owner (AccountId32) plus the public parts of its keys. The
@@ -122,12 +129,22 @@ export const objects = pgTable(
     /** Tiny files live inside a segment object. */
     segmentId: uuid("segment_id"),
     previousVersionId: uuid("previous_version_id"),
+    /**
+     * Decided once, when the object is declared: MemDot's relayer stores it (sponsored space or
+     * account object) or the owner's wallet does. Switching the space's mode later never changes it.
+     */
+    relayed: boolean("relayed").notNull().default(true),
+    /** Quota bytes this object holds in its space; released exactly once, then zero. */
+    reservedBytes: bigint("reserved_bytes", { mode: "number" }).notNull().default(0),
     createdAt: createdAt(),
     tombstonedAt: timestamp("tombstoned_at", { withTimezone: true }),
   },
   (t) => [
-    index("objects_account_idx").on(t.accountId, t.createdAt),
-    index("objects_space_folder_idx").on(t.spaceId, t.folderId),
+    index("objects_account_idx").on(t.accountId, t.createdAt, t.id),
+    index("objects_space_folder_idx").on(t.spaceId, t.folderId, t.createdAt, t.id),
+    index("objects_previous_version_idx")
+      .on(t.previousVersionId)
+      .where(sql`${t.previousVersionId} is not null`),
     index("objects_segment_idx").on(t.segmentId),
     uniqueIndex("objects_space_hash_idx")
       .on(t.spaceId, t.contentHash)
@@ -144,6 +161,8 @@ export const storedItems = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     objectId: uuid("object_id").references(() => objects.id),
+    /** Copied from the object so activity and usage read one table per account. */
+    accountId: uuid("account_id").references(() => accounts.id),
     role: storedItemRole("role").notNull().default("root"),
     /** Order of a data chunk within its object; always 0 for the root. */
     chunkIndex: integer("chunk_index").notNull().default(0),
@@ -155,8 +174,15 @@ export const storedItems = pgTable(
     /** Index inside the block's TransactionStorage list (from the Stored/Renewed event). */
     idx: integer("idx"),
     storedTxHash: text("stored_tx_hash"),
+    /** Where the first `store` landed; `block`/`idx` move with each renewal, these never do. */
+    firstBlock: integer("first_block"),
+    firstIdx: integer("first_idx"),
     /** When the first `store` finalized (renewals keep this; they move block and idx). */
-    storedAt: timestamp("stored_at", { withTimezone: true }),
+    storedAt: timestamp("stored_at", { withTimezone: true, precision: 3 }),
+    /** Set when the keeper queues a renewal, so later scans do not queue it again. */
+    renewQueuedAt: timestamp("renew_queued_at", { withTimezone: true }),
+    /** Failed attempts to re-store an expired item before it is declared lost. */
+    restoreAttempts: integer("restore_attempts").notNull().default(0),
     /** Fee paid for the `store`, in planck (decimal string). */
     feePlanck: text("fee_planck"),
     lastRenewedAt: timestamp("last_renewed_at", { withTimezone: true }),
@@ -166,6 +192,11 @@ export const storedItems = pgTable(
     uniqueIndex("stored_items_object_chunk_idx").on(t.objectId, t.role, t.chunkIndex),
     index("stored_items_hash_idx").on(t.contentHash),
     index("stored_items_due_idx").on(t.status, t.block),
+    index("stored_items_tx_idx").on(t.storedTxHash).where(sql`${t.storedTxHash} is not null`),
+    index("stored_items_account_stored_idx")
+      .on(t.accountId, t.storedAt, t.id)
+      .where(sql`${t.storedTxHash} is not null`),
+    index("stored_items_stored_at_idx").on(t.storedAt).where(sql`${t.storedTxHash} is not null`),
   ],
 );
 
@@ -189,6 +220,7 @@ export const renewals = pgTable(
     storedItemId: uuid("stored_item_id")
       .notNull()
       .references(() => storedItems.id),
+    accountId: uuid("account_id").references(() => accounts.id),
     txHash: text("tx_hash").notNull(),
     fromBlock: integer("from_block").notNull(),
     fromIdx: integer("from_idx").notNull(),
@@ -197,7 +229,13 @@ export const renewals = pgTable(
     feePlanck: text("fee_planck"),
     createdAt: createdAt(),
   },
-  (t) => [index("renewals_item_idx").on(t.storedItemId)],
+  (t) => [
+    index("renewals_item_idx").on(t.storedItemId),
+    // The worker and the indexer may both see one renewal; it is recorded once.
+    uniqueIndex("renewals_tx_item_idx").on(t.txHash, t.storedItemId),
+    index("renewals_account_idx").on(t.accountId, t.createdAt, t.id),
+    index("renewals_created_idx").on(t.createdAt),
+  ],
 );
 
 /** Raw chain metadata the indexer keeps per event, for rebuilds and proof pages. */
