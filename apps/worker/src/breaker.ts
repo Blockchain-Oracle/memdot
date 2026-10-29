@@ -10,6 +10,8 @@ import { type Deps, freeBalance } from "./deps.js";
  */
 export class StoreBreaker {
   private workerId: string | null = null;
+  /** One check at a time: overlapping checks could start a second store worker. */
+  private checking: Promise<void> | null = null;
 
   constructor(
     private readonly deps: Deps,
@@ -20,7 +22,14 @@ export class StoreBreaker {
     return this.workerId === null;
   }
 
-  async refresh(): Promise<void> {
+  refresh(): Promise<void> {
+    this.checking ??= this.check().finally(() => {
+      this.checking = null;
+    });
+    return this.checking;
+  }
+
+  private async check(): Promise<void> {
     const balance = await freeBalance(this.deps);
     const low = balance < this.deps.env.lowBalancePlanck;
     if (low) {

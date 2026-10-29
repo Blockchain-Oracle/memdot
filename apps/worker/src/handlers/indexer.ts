@@ -1,9 +1,8 @@
-import { blockHashOf, type StorageEvent, storageEventsAt, toBytes, toHex } from "@memdot/chain";
+import { extrinsicHashes, type StorageEvent, storageEventsAt, toHex } from "@memdot/chain";
 import { EVM_CHAIN_ID } from "@memdot/config";
 import { memDotRegistryAbi } from "@memdot/contracts";
-import { blobStaging, chainCursors, chainEvents, jobs, renewals, storedItems } from "@memdot/db";
-import { JOB_KIND, settleObject } from "@memdot/jobs";
-import { blake2b } from "@noble/hashes/blake2.js";
+import { blobStaging, chainCursors, chainEvents, renewals, storedItems } from "@memdot/db";
+import { openJobsOf, settleObject } from "@memdot/jobs";
 import { and, eq, lt, sql } from "drizzle-orm";
 import { createPublicClient, defineChain, http, type Log } from "viem";
 import type { Deps } from "../deps.js";
@@ -15,7 +14,6 @@ const BOOTSTRAP_BLOCKS = 600;
 /** Blocks one run reads; at ~2 RPCs a block a run stays well under the 1-minute schedule. */
 const MAX_BLOCKS_PER_RUN = 120;
 const MAX_LOG_RANGE = 1_000;
-const EXTRINSIC_HASH_BYTES = 32;
 
 async function cursorOf(deps: Deps, name: string): Promise<number | null> {
   const [row] = await deps.db.select().from(chainCursors).where(eq(chainCursors.name, name));
@@ -29,19 +27,6 @@ async function saveCursor(deps: Deps, name: string, block: number): Promise<void
     .onConflictDoUpdate({ target: chainCursors.name, set: { block, updatedAt: new Date() } });
 }
 
-/** Extrinsic hashes are blake2b-256 of the encoded extrinsic, as explorers show them. */
-async function extrinsicHashes(deps: Deps, block: number): Promise<string[]> {
-  const hash = await blockHashOf(deps.chain, block);
-  if (!hash) return [];
-  const body = await deps.chain.client._request<{ block: { extrinsics: string[] } }, [string]>(
-    "chain_getBlock",
-    [hash],
-  );
-  return body.block.extrinsics.map((ext) =>
-    toHex(blake2b(toBytes(ext), { dkLen: EXTRINSIC_HASH_BYTES })),
-  );
-}
-
 /**
  * Records the relayer's TransactionStorage events in one block and repairs our records from them:
  * a store or renewal that finalized while the worker crashed before writing it down is found here.
@@ -51,7 +36,7 @@ export async function indexBlock(deps: Deps, block: number): Promise<number> {
     (event) => event.payer === deps.signer.address,
   );
   if (events.length === 0) return 0;
-  const hashes = await extrinsicHashes(deps, block);
+  const hashes = await extrinsicHashes(deps.chain, block);
   for (const event of events) {
     const txHash = event.extrinsicIndex === null ? null : (hashes[event.extrinsicIndex] ?? null);
     await deps.db.transaction(async (tx) => {
@@ -92,23 +77,17 @@ async function reconcile(deps: Deps, block: number, event: StorageEvent, txHash:
             status: "stored",
             block,
             idx: event.index,
+            firstBlock: block,
+            firstIdx: event.index,
             storedTxHash: txHash,
             storedAt: new Date(),
             feePlanck: event.feePlanck?.toString() ?? null,
+            restoreAttempts: 0,
           })
-          .where(eq(storedItems.id, item.id));
+          .where(and(eq(storedItems.id, item.id), eq(storedItems.status, "pending")));
         await tx.delete(blobStaging).where(eq(blobStaging.storedItemId, item.id));
         if (item.objectId) {
-          const [job] = await tx
-            .select({ id: jobs.id })
-            .from(jobs)
-            .where(
-              and(
-                eq(jobs.kind, JOB_KIND.storeObject),
-                sql`${jobs.payload}->>'objectId' = ${item.objectId}`,
-              ),
-            );
-          await settleObject(tx, item.objectId, job?.id ?? null);
+          await settleObject(tx, item.objectId, await openJobsOf(tx, item.objectId));
         }
       });
       console.warn(
@@ -131,19 +110,23 @@ async function reconcile(deps: Deps, block: number, event: StorageEvent, txHash:
   for (const item of stale) {
     if (!txHash || item.block === null || item.idx === null) continue;
     await deps.db.transaction(async (tx) => {
-      await tx.insert(renewals).values({
-        storedItemId: item.id,
-        txHash,
-        fromBlock: item.block ?? 0,
-        fromIdx: item.idx ?? 0,
-        toBlock: block,
-        toIdx: event.index,
-        feePlanck: event.feePlanck?.toString() ?? null,
-      });
+      await tx
+        .insert(renewals)
+        .values({
+          storedItemId: item.id,
+          accountId: item.accountId,
+          txHash,
+          fromBlock: item.block ?? 0,
+          fromIdx: item.idx ?? 0,
+          toBlock: block,
+          toIdx: event.index,
+          feePlanck: event.feePlanck?.toString() ?? null,
+        })
+        .onConflictDoNothing();
       await tx
         .update(storedItems)
-        .set({ block, idx: event.index, lastRenewedAt: new Date() })
-        .where(eq(storedItems.id, item.id));
+        .set({ block, idx: event.index, lastRenewedAt: new Date(), renewQueuedAt: null })
+        .where(and(eq(storedItems.id, item.id), eq(storedItems.block, item.block ?? 0)));
     });
     console.warn(
       `[indexer] recovered an unrecorded renewal of ${item.cid} → ${block}/${event.index}`,
