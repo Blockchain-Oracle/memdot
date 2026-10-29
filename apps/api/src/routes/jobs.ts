@@ -1,16 +1,16 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { jobs } from "@memdot/db";
+import { jobs, objects } from "@memdot/db";
 import { type JobEvent, jobEventOf } from "@memdot/jobs";
-import { and, eq, type SQL } from "drizzle-orm";
+import { and, eq, inArray, type SQL } from "drizzle-orm";
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { db } from "../db.js";
 import { notFound } from "../lib/errors.js";
 import { afterCursor, newestFirst, page } from "../lib/pagination.js";
-import { accountOf, requireScope } from "../lib/principal.js";
+import { accountOf, principalOf, requireAccountWide, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { IdParam, PageQuery, pageOf } from "../schemas.js";
-import type { AppEnv, Services } from "../types.js";
+import type { AppEnv, Principal, Services } from "../types.js";
 
 /** Comment lines keep proxies from closing an idle stream. */
 const HEARTBEAT_MS = 15_000;
@@ -34,11 +34,21 @@ export const Job = z
 
 const sse = { "text/event-stream": { schema: z.string() } };
 
-async function loadJob(accountId: string, id: string) {
+/** Space-scoped keys only see jobs about objects in their own spaces. */
+function visibleTo(principal: Principal): SQL | undefined {
+  const allowed = principal.apiKey?.spaceIds;
+  if (!allowed) return undefined;
+  return inArray(
+    jobs.objectId,
+    db.select({ id: objects.id }).from(objects).where(inArray(objects.spaceId, allowed)),
+  );
+}
+
+async function loadJob(principal: Principal, accountId: string, id: string) {
   const [row] = await db
     .select()
     .from(jobs)
-    .where(and(eq(jobs.id, id), eq(jobs.accountId, accountId)))
+    .where(and(eq(jobs.id, id), eq(jobs.accountId, accountId), visibleTo(principal)))
     .limit(1);
   if (!row) throw notFound("Job");
   return row;
@@ -117,6 +127,7 @@ export function jobRoutes(services: Services) {
           const query = c.req.valid("query");
           const filters: (SQL | undefined)[] = [
             eq(jobs.accountId, accountId),
+            visibleTo(principalOf(c)),
             query.status ? eq(jobs.status, query.status) : undefined,
             query.kind ? eq(jobs.kind, query.kind) : undefined,
             afterCursor(query.cursor, jobs.createdAt, jobs.id),
@@ -144,7 +155,8 @@ export function jobRoutes(services: Services) {
           description:
             "The dashboard's job tray: every change to any of your jobs, until you disconnect.",
           security: authenticated,
-          middleware: [requireScope("jobs", "read")] as const,
+          // Account-wide: the stream carries every job, whatever space it is about.
+          middleware: [requireScope("jobs", "read"), requireAccountWide] as const,
           responses: {
             200: { description: "Event stream of Job", content: sse },
             ...errorResponses,
@@ -171,7 +183,11 @@ export function jobRoutes(services: Services) {
           request: { params: IdParam },
           responses: { 200: { description: "Job", content: jsonContent(Job) }, ...errorResponses },
         }),
-        async (c) => c.json(jobEventOf(await loadJob(accountOf(c), c.req.valid("param").id)), 200),
+        async (c) =>
+          c.json(
+            jobEventOf(await loadJob(principalOf(c), accountOf(c), c.req.valid("param").id)),
+            200,
+          ),
       )
       .openapi(
         createRoute({
@@ -192,11 +208,11 @@ export function jobRoutes(services: Services) {
         async (c) => {
           const accountId = accountOf(c);
           const { id } = c.req.valid("param");
-          await loadJob(accountId, id);
+          await loadJob(principalOf(c), accountId, id);
           return stream(
             c,
             (push) => services.jobEvents.subscribeJob(id, push),
-            async () => [jobEventOf(await loadJob(accountId, id))],
+            async () => [jobEventOf(await loadJob(principalOf(c), accountId, id))],
             (event) => TERMINAL.has(event.status),
           );
         },

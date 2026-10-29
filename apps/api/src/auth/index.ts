@@ -4,8 +4,6 @@ import { passkey } from "@better-auth/passkey";
 import {
   API_KEY_LENGTH,
   API_KEY_PREFIX,
-  API_KEY_RATE_MAX,
-  API_KEY_RATE_WINDOW_MS,
   API_KEY_VISIBLE_CHARS,
   EVM_CHAIN_ID,
 } from "@memdot/config";
@@ -20,7 +18,7 @@ import {
   walletAddress,
 } from "@memdot/db";
 import { betterAuth } from "better-auth";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { siwe } from "better-auth/plugins";
 import { type Hex, verifyMessage } from "viem";
 import { generateSiweNonce } from "viem/siwe";
@@ -33,8 +31,8 @@ import { siws } from "./siws.js";
 
 const SESSION_DAYS = 30;
 const DAY_SECONDS = 24 * 60 * 60;
-/** Sensitive actions (new recovery code, removing a passkey) need a sign-in this recent. */
-const FRESH_SESSION_SECONDS = 15 * 60;
+/** Sensitive actions (new recovery code, linking a passkey or wallet, new keys) need a sign-in this recent. */
+export const FRESH_SESSION_SECONDS = 15 * 60;
 /** How long a session check may be answered from the signed cookie instead of the database. */
 const SESSION_COOKIE_CACHE_SECONDS = 60;
 const DISPLAY_NAME_MAX = 64;
@@ -45,6 +43,10 @@ const PASSKEY_VERIFY_PATHS = new Set([
   "/passkey/verify-registration",
   "/passkey/verify-authentication",
 ]);
+
+export function isFresh(sessionCreatedAt: Date | string): boolean {
+  return Date.now() - new Date(sessionCreatedAt).getTime() <= FRESH_SESSION_SECONDS * 1000;
+}
 
 function displayName(context: string | null | undefined): string {
   const name = context?.trim().slice(0, DISPLAY_NAME_MAX);
@@ -78,19 +80,38 @@ export const auth = betterAuth({
     freshAge: FRESH_SESSION_SECONDS,
     cookieCache: { enabled: true, maxAge: SESSION_COOKIE_CACHE_SECONDS },
   },
-  rateLimit: { storage: "database" },
+  rateLimit: {
+    storage: "database",
+    customRules: {
+      // Each new account costs a little (a sponsored space, a relayer-paid key bundle).
+      "/passkey/generate-register-options": { window: 60, max: 10 },
+      "/passkey/verify-registration": { window: 60, max: 10 },
+    },
+  },
   advanced: {
     cookiePrefix: "memdot",
     useSecureCookies: isProduction,
     crossSubDomainCookies: env.COOKIE_DOMAIN
       ? { enabled: true, domain: env.COOKIE_DOMAIN }
       : undefined,
+    ipAddress: { trustedProxies: env.TRUSTED_PROXIES },
   },
   // Keys are minted through /v1/keys so every key carries a role; the raw plugin routes stay
   // closed to clients.
   disabledPaths: ["/api-key/create", "/api-key/update"],
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // Adding a passkey to an existing account needs a recent sign-in, like a recovery code.
+      if (ctx.path === "/passkey/generate-register-options") {
+        const session = await getSessionFromCtx(ctx);
+        if (session && !isFresh(session.session.createdAt)) {
+          throw APIError.fromStatus("FORBIDDEN", {
+            message: "Sign in again to add a passkey.",
+            code: "SESSION_NOT_FRESH",
+          });
+        }
+        return;
+      }
       if (!PASSKEY_VERIFY_PATHS.has(ctx.path)) return;
       if (ctx.body?.response?.clientExtensionResults?.prf?.results) {
         throw APIError.fromStatus("BAD_REQUEST", {
@@ -127,7 +148,7 @@ export const auth = betterAuth({
         },
       },
     }),
-    siws({ origin: env.WEB_ORIGIN }),
+    siws({ origin: env.WEB_ORIGIN, isFresh }),
     siwe({
       domain: new URL(env.WEB_ORIGIN).host,
       emailDomainName: "siwe.placeholder.invalid",
@@ -149,11 +170,9 @@ export const auth = betterAuth({
       startingCharactersConfig: { shouldStore: true, charactersLength: API_KEY_VISIBLE_CHARS },
       enableMetadata: true,
       requireName: true,
-      rateLimit: {
-        enabled: true,
-        timeWindow: API_KEY_RATE_WINDOW_MS,
-        maxRequests: API_KEY_RATE_MAX,
-      },
+      // Requests are counted in the API's own per-key limiter: verified keys are cached for 30 s,
+      // so the plugin would only see cache misses.
+      rateLimit: { enabled: false },
       permissions: { defaultPermissions: ROLE_PERMISSIONS.read_only },
     }),
   ],

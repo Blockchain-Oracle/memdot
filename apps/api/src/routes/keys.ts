@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { MAX_SPACES_PER_ACCOUNT } from "@memdot/config";
 import { agents, apikey } from "@memdot/db";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { auth } from "../auth/index.js";
@@ -6,7 +7,14 @@ import { API_KEY_ROLES, type ApiKeyMetadata, ROLE_PERMISSIONS } from "../auth/ro
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import { loadSpace } from "../lib/ownership.js";
-import { accountOf, principalOf, requireScope } from "../lib/principal.js";
+import {
+  accountOf,
+  assertFreshSession,
+  forgetApiKeys,
+  principalOf,
+  requireAccountWide,
+  requireScope,
+} from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 
 const DAY_SECONDS = 24 * 60 * 60;
@@ -42,7 +50,7 @@ const CreateKey = z
   .object({
     name: z.string().trim().min(1).max(32),
     role: Role.default("read_write"),
-    spaceIds: z.array(z.uuid()).min(1).nullable().default(null),
+    spaceIds: z.array(z.uuid()).min(1).max(MAX_SPACES_PER_ACCOUNT).nullable().default(null),
     agentId: z.uuid().optional(),
     expiresInDays: z.number().int().min(1).max(MAX_EXPIRY_DAYS).optional(),
   })
@@ -116,7 +124,7 @@ export function keyRoutes() {
         tags: ["API keys"],
         summary: "List API keys",
         security: authenticated,
-        middleware: [requireScope("keys", "read")] as const,
+        middleware: [requireScope("keys", "read"), requireAccountWide] as const,
         responses: {
           200: { description: "Keys", content: jsonContent(z.object({ items: z.array(ApiKey) })) },
           ...errorResponses,
@@ -139,7 +147,7 @@ export function keyRoutes() {
         summary: "Create an API key",
         description: "The full key is in this response only. MemDot keeps a hash.",
         security: authenticated,
-        middleware: [requireScope("keys", "write")] as const,
+        middleware: [requireScope("keys", "write"), requireAccountWide] as const,
         request: { body: { content: jsonContent(CreateKey), required: true } },
         responses: {
           201: { description: "Created", content: jsonContent(NewKey) },
@@ -148,6 +156,7 @@ export function keyRoutes() {
       }),
       async (c) => {
         const principal = principalOf(c);
+        assertFreshSession(principal);
         const accountId = accountOf(c);
         const body = c.req.valid("json");
         for (const spaceId of body.spaceIds ?? []) await loadSpace(c, spaceId);
@@ -187,7 +196,7 @@ export function keyRoutes() {
         description:
           "Revokes the key first, then mints a new one with the same name, role, spaces and expiry. The old key stops working at once.",
         security: authenticated,
-        middleware: [requireScope("keys", "write")] as const,
+        middleware: [requireScope("keys", "write"), requireAccountWide] as const,
         request: {
           params: z.object({ id: z.string().openapi({ param: { name: "id", in: "path" } }) }),
         },
@@ -198,8 +207,10 @@ export function keyRoutes() {
       }),
       async (c) => {
         const principal = principalOf(c);
+        assertFreshSession(principal);
         const old = await loadKey(principal.userId, c.req.valid("param").id);
         await db.delete(apikey).where(eq(apikey.id, old.id));
+        forgetApiKeys();
         const key = await mint(principal.userId, {
           name: old.name ?? "Rotated key",
           metadata: metadataOf(old),
@@ -215,7 +226,7 @@ export function keyRoutes() {
         tags: ["API keys"],
         summary: "Revoke an API key",
         security: authenticated,
-        middleware: [requireScope("keys", "write")] as const,
+        middleware: [requireScope("keys", "write"), requireAccountWide] as const,
         request: {
           params: z.object({ id: z.string().openapi({ param: { name: "id", in: "path" } }) }),
         },
@@ -231,6 +242,7 @@ export function keyRoutes() {
         const principal = principalOf(c);
         const key = await loadKey(principal.userId, c.req.valid("param").id);
         await db.delete(apikey).where(eq(apikey.id, key.id));
+        forgetApiKeys();
         return c.json({ revoked: true as const }, 200);
       },
     );

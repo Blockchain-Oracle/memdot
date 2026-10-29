@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { bitswapGet, contentHashFromCid, IntegrityError, toHex } from "@memdot/chain";
 import { blobStaging, storedItems } from "@memdot/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { HttpError } from "../lib/errors.js";
 import { clientIp, RateLimiter, rateLimit } from "../lib/rate-limit.js";
@@ -15,12 +15,21 @@ const IMMUTABLE = "public, max-age=31536000, immutable";
 
 type Source = "staging" | "cache" | "chain";
 
-async function staged(cid: string): Promise<Uint8Array | null> {
+/**
+ * Ciphertext the API accepted but the chain does not hold yet. Only its owner can read it here
+ * (to open a file right after uploading it); everyone else reads what is actually stored.
+ */
+async function staged(cid: string, accountId: string): Promise<Uint8Array | null> {
   const [row] = await db
     .select({ data: blobStaging.data })
     .from(blobStaging)
     .innerJoin(storedItems, eq(storedItems.id, blobStaging.storedItemId))
-    .where(eq(storedItems.contentHash, toHex(contentHashFromCid(cid))))
+    .where(
+      and(
+        eq(storedItems.contentHash, toHex(contentHashFromCid(cid))),
+        eq(storedItems.accountId, accountId),
+      ),
+    )
     .limit(1);
   return row?.data ?? null;
 }
@@ -29,8 +38,11 @@ export function gatewayRoutes(services: Services) {
   const cache = services.gatewayCache;
   const limiter = new RateLimiter(GATEWAY_RATE.max, GATEWAY_RATE.windowMs);
 
-  async function read(cid: string): Promise<{ bytes: Uint8Array; source: Source }> {
-    const pending = await staged(cid);
+  async function read(
+    cid: string,
+    accountId: string | null,
+  ): Promise<{ bytes: Uint8Array; source: Source }> {
+    const pending = accountId ? await staged(cid, accountId) : null;
     if (pending) return { bytes: pending, source: "staging" };
     const cached = await cache.get(cid);
     if (cached) return { bytes: cached, source: "cache" };
@@ -81,7 +93,7 @@ export function gatewayRoutes(services: Services) {
       const { cid } = c.req.valid("param");
       const etag = `"${cid}"`;
       if (c.req.header("if-none-match") === etag) return c.body(null, 304);
-      const { bytes, source } = await read(cid);
+      const { bytes, source } = await read(cid, c.get("principal")?.accountId ?? null);
       // Node buffers here are never shared memory, so the narrower view type is safe.
       return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
         "content-type": "application/octet-stream",

@@ -16,6 +16,8 @@ import { placeholderEmail } from "./placeholder.js";
 export interface SiwsOptions {
   /** The dashboard origin; the message's domain and URI must name it. */
   origin: string;
+  /** Whether a session is recent enough to add a sign-in method to its account. */
+  isFresh: (sessionCreatedAt: Date) => boolean;
 }
 
 const PROVIDER_ID = "siws";
@@ -139,7 +141,14 @@ export const siws = (options: SiwsOptions) => {
             await ctx.context.internalAdapter.deleteAccount(owner.account.id);
           }
 
-          // Signed in already: link the wallet to the current account and keep the session.
+          // Signed in already: link the wallet to the current account and keep the session. A
+          // linked wallet outlives the session, so linking needs a recent sign-in.
+          if (session && owner?.kind !== "owned" && !options.isFresh(session.session.createdAt)) {
+            throw APIError.fromStatus("FORBIDDEN", {
+              message: "Sign in again to link a wallet.",
+              code: "SESSION_NOT_FRESH",
+            });
+          }
           if (session && owner?.kind !== "owned") {
             await ctx.context.internalAdapter.linkAccount({
               userId: session.user.id,

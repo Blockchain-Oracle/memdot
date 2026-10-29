@@ -12,6 +12,8 @@ export interface Principal {
   via: "session" | "api_key";
   /** The MemDot account, once the client has finished setup (`PUT /v1/account`). */
   accountId: string | null;
+  /** When the dashboard session signed in; sensitive changes need a recent one. */
+  sessionCreatedAt: Date | null;
   apiKey: {
     id: string;
     /** First characters of the key (prefix included), safe to log and show. */

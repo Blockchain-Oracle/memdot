@@ -37,16 +37,27 @@ const serialize = (row: FolderRow) => ({
 
 const SpaceParam = z.object({ spaceId: Uuid.openapi({ param: { name: "spaceId", in: "path" } }) });
 
-/** The folder and every folder below it. */
-async function subtreeIds(rootId: string): Promise<string[]> {
-  const result = await db.execute<{ id: string }>(sql`
+type Executor = Pick<typeof db, "execute">;
+
+/**
+ * The folder and every live folder below it, within its space. `union` (not `union all`) stops
+ * at a folder already seen, so even a corrupted parent chain cannot loop forever.
+ */
+async function subtreeIds(executor: Executor, rootId: string, spaceId: string): Promise<string[]> {
+  const result = await executor.execute<{ id: string }>(sql`
     with recursive tree as (
       select id from folders where id = ${rootId}
-      union all
-      select f.id from folders f join tree t on f.parent_id = t.id where f.deleted_at is null
+      union
+      select f.id from folders f join tree t on f.parent_id = t.id
+       where f.space_id = ${spaceId} and f.deleted_at is null
     )
     select id from tree`);
   return result.rows.map((row) => row.id);
+}
+
+/** Folder moves in one space run one at a time, so two moves cannot form a cycle together. */
+async function lockSpaceFolders(tx: Executor, spaceId: string): Promise<void> {
+  await tx.execute(sql`select id from spaces where id = ${spaceId} for update`);
 }
 
 export function folderRoutes() {
@@ -163,18 +174,25 @@ export function folderRoutes() {
           if (parent.spaceId !== folder.spaceId) {
             throw badRequest("PARENT_SPACE", "A folder can only move within its space.");
           }
-          if ((await subtreeIds(folder.id)).includes(parent.id)) {
+        }
+        const row = await db.transaction(async (tx) => {
+          await lockSpaceFolders(tx, folder.spaceId);
+          if (
+            body.parentId &&
+            (await subtreeIds(tx, folder.id, folder.spaceId)).includes(body.parentId)
+          ) {
             throw badRequest("FOLDER_CYCLE", "A folder cannot move inside itself.");
           }
-        }
-        const [row] = await db
-          .update(folders)
-          .set({
-            ...(body.encryptedName ? { encryptedName: fromBase64(body.encryptedName) } : {}),
-            ...(body.parentId !== undefined ? { parentId: body.parentId } : {}),
-          })
-          .where(eq(folders.id, folder.id))
-          .returning();
+          const [updated] = await tx
+            .update(folders)
+            .set({
+              ...(body.encryptedName ? { encryptedName: fromBase64(body.encryptedName) } : {}),
+              ...(body.parentId !== undefined ? { parentId: body.parentId } : {}),
+            })
+            .where(eq(folders.id, folder.id))
+            .returning();
+          return updated;
+        });
         if (!row) throw new Error("folder update returned no row");
         return c.json(serialize(row), 200);
       },
@@ -204,11 +222,19 @@ export function folderRoutes() {
       }),
       async (c) => {
         const folder = await loadFolder(c, c.req.valid("param").id);
-        const ids = await subtreeIds(folder.id);
-        const tombstoned = await db.transaction(async (tx) => {
-          const n = await tombstoneObjects(tx, inArray(objects.folderId, ids));
-          await tx.update(folders).set({ deletedAt: new Date() }).where(inArray(folders.id, ids));
-          return n;
+        const { ids, tombstoned } = await db.transaction(async (tx) => {
+          await lockSpaceFolders(tx, folder.spaceId);
+          const subtree = await subtreeIds(tx, folder.id, folder.spaceId);
+          const n = await tombstoneObjects(
+            tx,
+            and(eq(objects.spaceId, folder.spaceId), inArray(objects.folderId, subtree)) ??
+              sql`false`,
+          );
+          await tx
+            .update(folders)
+            .set({ deletedAt: new Date() })
+            .where(inArray(folders.id, subtree));
+          return { ids: subtree, tombstoned: n };
         });
         return c.json({ deleted: true as const, folders: ids.length, objects: tombstoned }, 200);
       },

@@ -2,13 +2,11 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { agents, apikey, grants } from "@memdot/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db.js";
-import { conflict, notFound } from "../lib/errors.js";
-import { accountOf, requireScope } from "../lib/principal.js";
+import { conflict, isUniqueViolation, notFound } from "../lib/errors.js";
+import { accountOf, forgetApiKeys, requireAccountWide, requireScope } from "../lib/principal.js";
 import { revokeGrants } from "../lib/revoke.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { IdParam } from "../schemas.js";
-
-const POSTGRES_UNIQUE_VIOLATION = "23505";
 
 const AgentKey = z
   .string()
@@ -59,7 +57,7 @@ export function agentRoutes() {
         tags: ["Agents"],
         summary: "List connected agents",
         security: authenticated,
-        middleware: [requireScope("agents", "read")] as const,
+        middleware: [requireScope("agents", "read"), requireAccountWide] as const,
         responses: {
           200: { description: "Agents", content: jsonContent(z.object({ items: z.array(Agent) })) },
           ...errorResponses,
@@ -83,7 +81,7 @@ export function agentRoutes() {
         description:
           "Step one of connecting an agent: its public key is registered here, then the owner's client wraps namespace keys to it and creates grants.",
         security: authenticated,
-        middleware: [requireScope("agents", "write")] as const,
+        middleware: [requireScope("agents", "write"), requireAccountWide] as const,
         request: {
           body: {
             content: jsonContent(
@@ -113,7 +111,7 @@ export function agentRoutes() {
           if (!row) throw new Error("agent insert returned no row");
           return c.json(serialize(row), 201);
         } catch (error) {
-          if ((error as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION) {
+          if (isUniqueViolation(error, "agents_key_idx")) {
             throw conflict("AGENT_KEY_TAKEN", "That key is already registered to an agent.");
           }
           throw error;
@@ -127,7 +125,7 @@ export function agentRoutes() {
         tags: ["Agents"],
         summary: "Rename an agent",
         security: authenticated,
-        middleware: [requireScope("agents", "write")] as const,
+        middleware: [requireScope("agents", "write"), requireAccountWide] as const,
         request: {
           params: IdParam,
           body: {
@@ -160,7 +158,7 @@ export function agentRoutes() {
         description:
           "Deletes its API keys and revokes its grants at once; the affected spaces move to a new key epoch so future writes are unreadable to it.",
         security: authenticated,
-        middleware: [requireScope("agents", "write")] as const,
+        middleware: [requireScope("agents", "write"), requireAccountWide] as const,
         request: { params: IdParam },
         responses: {
           200: {
@@ -190,6 +188,7 @@ export function agentRoutes() {
           );
           return { keys: keys.length, grants: revoked };
         });
+        forgetApiKeys();
         return c.json({ revoked: true as const, ...result }, 200);
       },
     );

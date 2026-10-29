@@ -65,3 +65,14 @@ export function validationHook(
   }));
   return c.json(body(c, "VALIDATION", "The request is not valid.", issues), 400);
 }
+
+const POSTGRES_UNIQUE_VIOLATION = "23505";
+
+/** Drizzle wraps driver errors; the Postgres code and constraint sit on `cause`. */
+export function isUniqueViolation(error: unknown, constraint: string): boolean {
+  const pgError = ((error as { cause?: unknown }).cause ?? error) as {
+    code?: string;
+    constraint?: string;
+  };
+  return pgError.code === POSTGRES_UNIQUE_VIOLATION && pgError.constraint === constraint;
+}

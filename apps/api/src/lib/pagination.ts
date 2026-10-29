@@ -1,10 +1,11 @@
-import { and, desc, eq, lt, or, type SQL } from "drizzle-orm";
+import { desc, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { badRequest } from "./errors.js";
 
 /**
  * Keyset pagination on (created_at, id), newest first. The cursor is opaque to clients and
- * stable under inserts, unlike offsets.
+ * stable under inserts, unlike offsets. Timestamps are stored at millisecond precision, so the
+ * cursor's JS Date matches the column exactly and rows sharing a timestamp are not skipped.
  */
 interface Cursor {
   t: string;
@@ -34,8 +35,8 @@ export function afterCursor(
 ): SQL | undefined {
   if (!cursor) return undefined;
   const { t, id: lastId } = decodeCursor(cursor);
-  const at = new Date(t);
-  return or(lt(createdAt, at), and(eq(createdAt, at), lt(id, lastId)));
+  // A row comparison, so an index on (…, created_at, id) can start right after the cursor.
+  return sql`(${createdAt}, ${id}) < (${new Date(t).toISOString()}::timestamptz, ${lastId})`;
 }
 
 export const newestFirst = (createdAt: PgColumn, id: PgColumn) => [desc(createdAt), desc(id)];

@@ -1,12 +1,13 @@
+import { BlockList, isIP } from "node:net";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context, MiddlewareHandler } from "hono";
+import { env } from "../env.js";
 import type { AppEnv } from "../types.js";
 import { HttpError } from "./errors.js";
 
 /**
- * Fixed-window counters in memory. API keys are limited by Better Auth's api-key plugin (shared
- * through the database); this covers public routes per IP and dashboard sessions per user. One
- * API instance runs today, so a process-local window is exact; several instances would each
+ * Fixed-window counters in memory: per API key, per dashboard user, and per IP on public routes.
+ * One API instance runs today, so a process-local window is exact; several instances would each
  * allow the full budget.
  */
 export class RateLimiter {
@@ -37,15 +38,44 @@ export class RateLimiter {
   }
 }
 
-/** The caller's IP: the first X-Forwarded-For hop behind Coolify's proxy, else the socket. */
-export function clientIp(c: Context): string {
-  const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-  if (forwarded) return forwarded;
+const trusted = new BlockList();
+for (const entry of env.TRUSTED_PROXIES) {
+  const [address = "", prefix] = entry.split("/");
+  const family = isIP(address) === 6 ? "ipv6" : "ipv4";
+  if (prefix) trusted.addSubnet(address, Number(prefix), family);
+  else trusted.addAddress(address, family);
+}
+
+const isTrusted = (address: string) => {
+  const family = isIP(address);
+  return family !== 0 && trusted.check(address, family === 6 ? "ipv6" : "ipv4");
+};
+
+function socketAddress(c: Context): string {
   try {
     return getConnInfo(c).remote.address ?? "unknown";
   } catch {
     return "unknown";
   }
+}
+
+/**
+ * The caller's IP. A client can write any X-Forwarded-For it likes, so the header is only read
+ * when the request came through a trusted proxy, walking the chain right to left past trusted
+ * hops: the first untrusted address is the client.
+ */
+export function clientIp(c: Context): string {
+  const socket = socketAddress(c);
+  if (!isTrusted(socket)) return socket;
+  const hops = (c.req.header("x-forwarded-for") ?? "")
+    .split(",")
+    .map((hop) => hop.trim())
+    .filter(Boolean);
+  for (let i = hops.length - 1; i >= 0; i -= 1) {
+    const hop = hops[i] ?? "";
+    if (!isTrusted(hop)) return hop;
+  }
+  return socket;
 }
 
 export function rateLimit(

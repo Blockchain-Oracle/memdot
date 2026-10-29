@@ -6,10 +6,11 @@ import { and, desc, eq, inArray, isNotNull, isNull, or, type SQL } from "drizzle
 import { db } from "../db.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { loadObject, loadSpace } from "../lib/ownership.js";
-import { accountOf, requireScope } from "../lib/principal.js";
+import { accountOf, assertSpaceAllowed, principalOf, requireScope } from "../lib/principal.js";
 import { revokeGrants } from "../lib/revoke.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { Cid, IdParam } from "../schemas.js";
+import type { Principal } from "../types.js";
 
 const Scope = z.enum(["read", "read_write"]);
 const Status = z.enum(["pending", "active", "revoked", "expired"]);
@@ -89,7 +90,7 @@ const serialize = (row: GrantRow, owner: string | null, keyEpoch: number) => ({
   revokedAt: row.revokedAt?.toISOString() ?? null,
 });
 
-async function loadOwnGrant(accountId: string, id: string) {
+async function loadOwnGrant(principal: Principal, accountId: string, id: string) {
   const [row] = await db
     .select({ grant: grants, keyEpoch: spaces.keyEpoch, owner: accounts.ownerAccount })
     .from(grants)
@@ -98,7 +99,14 @@ async function loadOwnGrant(accountId: string, id: string) {
     .where(and(eq(grants.id, id), eq(spaces.accountId, accountId)))
     .limit(1);
   if (!row) throw notFound("Grant");
+  assertSpaceAllowed(principal, row.grant.spaceId);
   return row;
+}
+
+/** Space-scoped keys see only grants on their own spaces. */
+function allowedSpaces(principal: Principal): SQL | undefined {
+  const allowed = principal.apiKey?.spaceIds;
+  return allowed ? inArray(grants.spaceId, allowed) : undefined;
 }
 
 export function grantRoutes() {
@@ -151,7 +159,7 @@ export function grantRoutes() {
         if (query.spaceId) await loadSpace(c, query.spaceId);
         let scope: SQL | undefined;
         if (query.direction === "given") {
-          scope = eq(spaces.accountId, accountId);
+          scope = and(eq(spaces.accountId, accountId), allowedSpaces(principalOf(c)));
         } else {
           const [me] = await db
             .select({ owner: accounts.ownerAccount })
@@ -334,6 +342,7 @@ export function grantRoutes() {
           .where(
             and(
               eq(spaces.accountId, accountId),
+              allowedSpaces(principalOf(c)),
               eq(grants.status, "pending"),
               eq(grants.granteeKind, "account"),
               isNull(spaces.deletedAt),
@@ -375,6 +384,7 @@ export function grantRoutes() {
       }),
       async (c) => {
         const { grant, owner, keyEpoch } = await loadOwnGrant(
+          principalOf(c),
           accountOf(c),
           c.req.valid("param").id,
         );
@@ -411,7 +421,7 @@ export function grantRoutes() {
         },
       }),
       async (c) => {
-        const { grant } = await loadOwnGrant(accountOf(c), c.req.valid("param").id);
+        const { grant } = await loadOwnGrant(principalOf(c), accountOf(c), c.req.valid("param").id);
         await db.transaction((tx) => revokeGrants(tx, eq(grants.id, grant.id)));
         const [space] = await db
           .select({ keyEpoch: spaces.keyEpoch })

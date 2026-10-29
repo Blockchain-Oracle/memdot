@@ -20,6 +20,19 @@ const schema = z.object({
   RP_ID: z.string().min(1).default("localhost"),
   /** Parent domain for cookies shared by app. and api. in production; unset on localhost. */
   COOKIE_DOMAIN: z.string().optional(),
+  /**
+   * Reverse proxies (IPs or CIDR ranges, comma-separated) whose X-Forwarded-For entries are
+   * trusted. Unset: the socket address is the client, and X-Forwarded-For is ignored.
+   */
+  TRUSTED_PROXIES: z
+    .string()
+    .optional()
+    .transform((value) =>
+      (value ?? "")
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
   PORTALDOT_WSS: z.string().default(PORTALDOT_WSS),
   /** Ciphertext bytes a new sponsored space may hold (the relayer pays for it). */
   SPONSORED_QUOTA_BYTES: z.coerce.number().int().positive().default(SPONSORED_QUOTA_BYTES),

@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { badRequest } from "../lib/errors.js";
 import { afterCursor, encodeCursor, newestFirst, page } from "../lib/pagination.js";
-import { accountOf, requireScope } from "../lib/principal.js";
+import { accountOf, requireAccountWide, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { PageQuery, pageOf } from "../schemas.js";
 
@@ -65,7 +65,7 @@ export function activityRoutes() {
         tags: ["Activity"],
         summary: "Your API requests (metadata only: never bodies)",
         security: authenticated,
-        middleware: [requireScope("usage", "read")] as const,
+        middleware: [requireScope("usage", "read"), requireAccountWide] as const,
         request: { query: PageQuery },
         responses: {
           200: { description: "Requests", content: jsonContent(pageOf(RequestEntry)) },
@@ -113,7 +113,7 @@ export function activityRoutes() {
         tags: ["Activity"],
         summary: "Every store and renewal on Portaldot V3 for your data",
         security: authenticated,
-        middleware: [requireScope("usage", "read")] as const,
+        middleware: [requireScope("usage", "read"), requireAccountWide] as const,
         request: { query: PageQuery },
         responses: {
           200: { description: "Transactions", content: jsonContent(pageOf(ChainTx)) },
@@ -124,24 +124,31 @@ export function activityRoutes() {
         const accountId = accountOf(c);
         const query = c.req.valid("query");
         const after = query.cursor ? decodeTxCursor(query.cursor) : null;
+        // Each branch is cut to one page on its own index (account, time, id) before the merge.
+        const take = query.limit + 1;
+        const storeAfter = after
+          ? sql`and (si.stored_at, si.id) < (${after.at}::timestamptz, ${after.id}::uuid)`
+          : sql``;
+        const renewAfter = after
+          ? sql`and (r.created_at, r.id) < (${after.at}::timestamptz, ${after.id}::uuid)`
+          : sql``;
         const result = await db.execute<TxRow>(sql`
           select * from (
-            select si.id::text as id, 'store' as type, si.stored_tx_hash as tx_hash, si.cid,
-                   coalesce((select r.from_block from renewals r where r.stored_item_id = si.id
-                             order by r.created_at limit 1), si.block) as block,
-                   si.fee_planck, si.stored_at as at
-              from stored_items si join objects o on o.id = si.object_id
-             where o.account_id = ${accountId} and si.stored_tx_hash is not null and si.stored_at is not null
+            (select si.id::text as id, 'store' as type, si.stored_tx_hash as tx_hash, si.cid,
+                    si.first_block as block, si.fee_planck, si.stored_at as at
+               from stored_items si
+              where si.account_id = ${accountId} and si.stored_tx_hash is not null ${storeAfter}
+              order by si.stored_at desc, si.id desc
+              limit ${take})
             union all
-            select r.id::text, 'renew', r.tx_hash, si.cid, r.to_block, r.fee_planck, r.created_at
-              from renewals r
-              join stored_items si on si.id = r.stored_item_id
-              join objects o on o.id = si.object_id
-             where o.account_id = ${accountId}
+            (select r.id::text, 'renew', r.tx_hash, si.cid, r.to_block, r.fee_planck, r.created_at
+               from renewals r join stored_items si on si.id = r.stored_item_id
+              where r.account_id = ${accountId} ${renewAfter}
+              order by r.created_at desc, r.id desc
+              limit ${take})
           ) t
-          ${after ? sql`where (t.at, t.id) < (${after.at}::timestamptz, ${after.id})` : sql``}
           order by t.at desc, t.id desc
-          limit ${query.limit + 1}`);
+          limit ${take}`);
         const rows = result.rows;
         const items = rows.slice(0, query.limit);
         const last = items.at(-1);

@@ -1,5 +1,6 @@
 import { CLIENT_HEADER, IDEMPOTENCY_HEADER, REQUEST_ID_HEADER } from "@memdot/config";
 import { Scalar } from "@scalar/hono-api-reference";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
@@ -26,6 +27,9 @@ import type { Services } from "./types.js";
 
 /** Dashboard sessions: generous, since one page fires several queries. */
 const SESSION_RATE = { max: 1_200, windowMs: 60_000 };
+/** JSON bodies are small; only blob uploads (their own 7 MB limit) carry real payloads. */
+const JSON_BODY_LIMIT = 1024 * 1024;
+const BLOB_UPLOAD_PATH = /^\/v1\/objects\/[^/]+\/blobs\/[^/]+\/[^/]+$/;
 
 export function createApp(services: Services) {
   const app = createRouter();
@@ -57,6 +61,25 @@ export function createApp(services: Services) {
       exposeHeaders: [REQUEST_ID_HEADER, "retry-after"],
       maxAge: 600,
     }),
+  );
+
+  const jsonLimit = bodyLimit({
+    maxSize: JSON_BODY_LIMIT,
+    onError: (c) =>
+      c.json(
+        {
+          error: {
+            code: "TOO_LARGE",
+            message: "The request body is too large.",
+            requestId: c.get("requestId"),
+          },
+        },
+        413,
+      ),
+  });
+  app.use("/api/auth/*", jsonLimit);
+  app.use("/v1/*", (c, next) =>
+    c.req.method === "PUT" && BLOB_UPLOAD_PATH.test(c.req.path) ? next() : jsonLimit(c, next),
   );
 
   app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));

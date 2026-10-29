@@ -184,6 +184,20 @@ export function spaceRoutes() {
             "Link a wallet before switching to self-signed writes.",
           );
         }
+        if (body.mode && body.mode !== space.mode) {
+          const [inFlight] = await db
+            .select({ n: count() })
+            .from(objects)
+            .where(
+              and(eq(objects.spaceId, space.id), inArray(objects.status, ["queued", "uploading"])),
+            );
+          if ((inFlight?.n ?? 0) > 0) {
+            throw conflict(
+              "UPLOADS_IN_FLIGHT",
+              "Finish or cancel this space's uploads before switching who signs them.",
+            );
+          }
+        }
         const [row] = await db
           .update(spaces)
           .set({

@@ -49,6 +49,9 @@ export async function loadObject(c: Context<AppEnv>, objectId: string) {
     .where(and(eq(objects.id, objectId), eq(objects.accountId, accountId)))
     .limit(1);
   if (!object) throw notFound("Object");
-  if (object.spaceId) assertSpaceAllowed(principalOf(c), object.spaceId);
+  const principal = principalOf(c);
+  if (object.spaceId) assertSpaceAllowed(principal, object.spaceId);
+  // Key bundles and grant keys belong to the whole account: invisible to space-limited keys.
+  else if (principal.apiKey?.spaceIds) throw notFound("Object");
   return object;
 }

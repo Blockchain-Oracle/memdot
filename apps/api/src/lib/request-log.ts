@@ -4,6 +4,8 @@ const FLUSH_INTERVAL_MS = 2_000;
 const FLUSH_AT_ROWS = 200;
 /** Cap on rows held while the database is unreachable; older rows are dropped first. */
 const MAX_BUFFERED_ROWS = 10_000;
+/** Rows per INSERT: 8 parameters each keeps a statement far below Postgres's 65,535 limit. */
+const INSERT_CHUNK = 1_000;
 
 type Row = typeof requestLogs.$inferInsert;
 
@@ -34,18 +36,23 @@ export class RequestLog {
     if (this.buffer.length === 0) return;
     const rows = this.buffer;
     this.buffer = [];
-    this.flushing = this.db
-      .insert(requestLogs)
-      .values(rows)
-      .then(() => undefined)
-      .catch((error) => {
-        console.error("[request-log] write failed; keeping rows for the next flush", error);
-        this.buffer = [...rows, ...this.buffer].slice(-MAX_BUFFERED_ROWS);
-      })
-      .finally(() => {
-        this.flushing = null;
-      });
+    this.flushing = this.write(rows).finally(() => {
+      this.flushing = null;
+    });
     return this.flushing;
+  }
+
+  private async write(rows: Row[]): Promise<void> {
+    for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+      const chunk = rows.slice(i, i + INSERT_CHUNK);
+      try {
+        await this.db.insert(requestLogs).values(chunk);
+      } catch (error) {
+        console.error("[request-log] write failed; keeping rows for the next flush", error);
+        this.buffer = [...rows.slice(i), ...this.buffer].slice(-MAX_BUFFERED_ROWS);
+        return;
+      }
+    }
   }
 
   async close(): Promise<void> {

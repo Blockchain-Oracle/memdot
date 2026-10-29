@@ -5,7 +5,7 @@ import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { type Hex, verifyMessage } from "viem";
 import { db } from "../db.js";
 import { badRequest, conflict, forbidden } from "../lib/errors.js";
-import { principalOf } from "../lib/principal.js";
+import { assertFreshSession, forgetAccount, principalOf } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses } from "../lib/router.js";
 import { Cid, Hex32 } from "../schemas.js";
 
@@ -171,6 +171,9 @@ export function accountRoutes() {
         if (principal.via !== "session") {
           throw forbidden("Account setup happens in the dashboard, not with an API key.");
         }
+        // Replacing the sharing key or owner on an existing account redirects future shares, so it
+        // needs a recent sign-in; first-time setup happens right after sign-up anyway.
+        if (principal.accountId) assertFreshSession(principal);
         const body = c.req.valid("json");
         const [recovery] = await db
           .select({ id: authAccount.id })
@@ -231,6 +234,7 @@ export function accountRoutes() {
           .onConflictDoUpdate({ target: accounts.userId, set: values })
           .returning();
         if (!row) throw new Error("account upsert returned no row");
+        forgetAccount(principal.userId);
         return c.json(serialize(row), 200);
       },
     );
