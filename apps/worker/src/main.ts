@@ -8,6 +8,7 @@ import { type Deps, freeBalance } from "./deps.js";
 import { env } from "./env.js";
 import { indexChain } from "./handlers/indexer.js";
 import { keeperScan } from "./handlers/keeper.js";
+import { maintenance } from "./handlers/maintenance.js";
 import { handleRenew } from "./handlers/renew.js";
 import { handleStore } from "./handlers/store.js";
 
@@ -63,6 +64,8 @@ await boss.schedule(QUEUE.keeperScan, "*/10 * * * *");
 await boss.work(QUEUE.keeperScan, () => keeperScan(deps));
 await boss.schedule(QUEUE.indexer, "* * * * *");
 await boss.work(QUEUE.indexer, () => indexChain(deps));
+await boss.schedule(QUEUE.maintenance, "17 3 * * *");
+await boss.work(QUEUE.maintenance, () => maintenance(deps));
 await boss.work(QUEUE.alerts, async ([job]: Job<unknown>[]) => {
   if (job) await deliverAlert(env, job.data as AlertMessage);
 });

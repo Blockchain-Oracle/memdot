@@ -8,6 +8,8 @@ export const QUEUE = {
   indexer: "indexer",
   /** Ops alerts (low balance, renewal at risk) delivered to the Discord webhook. */
   alerts: "alerts",
+  /** Daily: prune the request log past its retention. */
+  maintenance: "maintenance",
 } as const;
 
 /**

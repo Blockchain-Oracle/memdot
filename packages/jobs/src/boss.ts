@@ -41,6 +41,7 @@ export async function startBoss(connectionString: string, role: BossRole): Promi
   await boss.createQueue(QUEUE.keeperScan, { policy: "exclusive" });
   await boss.createQueue(QUEUE.indexer, { policy: "exclusive" });
   await boss.createQueue(QUEUE.alerts, { retryLimit: 3, retryDelay: 30, retryBackoff: true });
+  await boss.createQueue(QUEUE.maintenance, { policy: "exclusive" });
   return boss;
 }
 
