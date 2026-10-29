@@ -4,7 +4,7 @@ Application for the Portaldot Hacker House 2026 mentor session. Written 2026-10-
 
 ## Project
 
-**MemDot**: storage and long-term memory for AI agents and apps on Portaldot V3. Agents remember and recall across sessions; data is encrypted before it leaves the client, stored and renewed on V3, and its ownership and access grants live in an on-chain registry. Developers reach it through one SDK, a REST API, a CLI, an MCP server for agents, and a dashboard with API keys. Track: Modular Cloud & Middleware.
+**MemDot**: decentralized storage on Portaldot V3 for apps, files and AI-agent memory. Data is encrypted on the client, stored and renewed on-chain, and its ownership and access grants live in an on-chain registry. Agent memory (remember and recall) is built on the same layer. Developers reach it through one SDK, a REST API, a CLI, an MCP server for agents, and a dashboard with API keys. Track: Modular Cloud & Middleware.
 
 Repository: https://github.com/Blockchain-Oracle/memdot
 

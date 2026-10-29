@@ -1,18 +1,18 @@
-<p align="center"><img src="assets/brand/banner.png" alt="MemDot — encrypted, ownable memory for AI agents and apps on Portaldot" width="100%"></p>
+<p align="center"><img src="assets/brand/banner.png" alt="MemDot — encrypted, ownable storage for apps, files and AI agents on Portaldot" width="100%"></p>
 
 # MemDot
 
-Encrypted, ownable memory for AI agents and apps on Portaldot V3.
+Decentralized storage on Portaldot V3 for apps, files and AI-agent memory.
 
 > **Status — 2026-10-29, early build.** Research and a live-runtime probe are done. The storage architecture is still being decided; the open questions are in [docs/office-hours.md](docs/office-hours.md). Nothing is deployed to the testnet yet, and this README will say so until it is.
 
 ## Why
 
-AI agents forget between sessions. The memory layers that fix this keep each user's memories in the operator's database: the user cannot take them elsewhere, cannot prove what was stored, and has to trust the operator not to read them. Decentralized storage networks keep bytes, but they do not give a developer a memory API.
+Portaldot apps and agents need somewhere to keep data they own. Today that means a cloud bucket or an operator's database: the user cannot take the data elsewhere, cannot prove what was stored, and has to trust the operator not to read it. AI agents have the sharpest version of this problem, because they forget between sessions unless someone else holds their memory.
 
-MemDot aims to be both: storage and long-term memory for agents and apps, as a full developer product (SDK, REST API, CLI, MCP server, dashboard with API keys), with data encrypted before it leaves the client and ownership and access grants on Portaldot.
+MemDot is a storage layer on V3. Files and app data are encrypted before they leave the client, stored and renewed on-chain, and their ownership and access grants live in an on-chain registry. Agent memory (remember and recall) is built on the same layer. Developers reach it through one SDK, a REST API, a CLI, an MCP server for agents, and a dashboard with API keys.
 
-The core loop is **remember → recall → share → renew**.
+The core loop is **store → share → renew**, with **remember → recall** on top for agents.
 
 ## What V3 actually offers (measured)
 
