@@ -25,6 +25,8 @@ export interface StoreResult {
   location: StorageLocation;
   contentHash: Uint8Array;
   cid: string;
+  /** What the signer actually paid (TransactionFeePaid), in planck. */
+  feePlanck: bigint | null;
 }
 
 export interface RenewResult {
@@ -32,6 +34,14 @@ export interface RenewResult {
   blockHash: string;
   location: StorageLocation;
   contentHash: Uint8Array;
+  feePlanck: bigint | null;
+}
+
+function feeOf(api: PortaldotApi, finalized: TxFinalizedPayload): bigint | null {
+  return (
+    api.event.TransactionPayment.TransactionFeePaid.filter(finalized.events)[0]?.payload
+      .actual_fee ?? null
+  );
 }
 
 interface Submittable {
@@ -96,6 +106,7 @@ export async function storeChunk(
     location: { block: finalized.block.number, index: stored.payload.index },
     contentHash: hash,
     cid: cidFromContentHash(hash),
+    feePlanck: feeOf(api, finalized),
   };
 }
 
@@ -118,5 +129,6 @@ export async function renew(
     blockHash: finalized.block.hash,
     location: { block: finalized.block.number, index: renewed.payload.index },
     contentHash: toBytes(renewed.payload.content_hash),
+    feePlanck: feeOf(api, finalized),
   };
 }

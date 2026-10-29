@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { Database } from "@memdot/db";
 import { sql } from "drizzle-orm";
 import { fromDrizzle, PgBoss } from "pg-boss";
@@ -46,9 +47,16 @@ export async function startBoss(connectionString: string, role: BossRole): Promi
 /** Anything Drizzle can run SQL through: the database or an open transaction. */
 type Executor = Pick<Database, "execute">;
 
+/** A stable UUID for (job, stored item): the same store enqueued twice is one queue entry. */
+function storeQueueId(jobId: string, storedItemId: string): string {
+  const hex = createHash("sha256").update(`store:${jobId}:${storedItemId}`).digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 /**
  * Enqueues relayer work inside the caller's transaction, so the `jobs` row and the queue entry
- * commit together. A store job's id is its stored item id, which makes a repeated enqueue a no-op.
+ * commit together. A store is keyed by (job, stored item), so enqueueing it again is a no-op while
+ * a later re-store of the same item (a new job) still runs.
  */
 export async function enqueueChainTx(
   boss: PgBoss,
@@ -58,7 +66,7 @@ export async function enqueueChainTx(
   const db = fromDrizzle(executor, sql);
   if (payload.action === "store") {
     await boss.send(QUEUE.chainTx, payload, {
-      id: payload.storedItemId,
+      id: storeQueueId(payload.jobId, payload.storedItemId),
       priority: PRIORITY.store,
       db,
     });

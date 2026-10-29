@@ -8,10 +8,17 @@ export const storeBlobPayload = z.object({
   storedItemId: z.uuid(),
 });
 
-/** Renew up to RENEW_BATCH_SIZE stored items; each is its own top-level `renew` extrinsic. */
+/**
+ * Renew up to RENEW_BATCH_SIZE stored items; each is its own top-level `renew` extrinsic.
+ * `atBlock` is where the item lived when this was queued: if it has moved since, it was already
+ * renewed and is skipped, so a repeated job never pays twice.
+ */
 export const renewBatchPayload = z.object({
   action: z.literal("renew"),
-  storedItemIds: z.array(z.uuid()).min(1).max(RENEW_BATCH_SIZE),
+  items: z
+    .array(z.object({ id: z.uuid(), atBlock: z.number().int().positive() }))
+    .min(1)
+    .max(RENEW_BATCH_SIZE),
   /** Set when a user asked for "Renew now", so their job reports the result. */
   jobId: z.uuid().optional(),
 });

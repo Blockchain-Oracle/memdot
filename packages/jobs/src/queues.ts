@@ -23,5 +23,7 @@ export const RENEW_BATCH_SIZE = 20;
 export const JOB_KIND = {
   storeObject: "store_object",
   renew: "renew",
+  /** The keeper re-storing an item that expired before it could be renewed. */
+  restore: "restore",
 } as const;
 export type JobKind = (typeof JOB_KIND)[keyof typeof JOB_KIND];

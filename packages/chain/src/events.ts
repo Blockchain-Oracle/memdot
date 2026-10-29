@@ -9,6 +9,9 @@ export interface StorageEvent {
   contentHash: Uint8Array;
   /** Position of the extrinsic that caused it, when it came from one. */
   extrinsicIndex: number | null;
+  /** The account that paid for that extrinsic (its signer), from TransactionFeePaid. */
+  payer: string | null;
+  feePlanck: bigint | null;
 }
 
 export async function blockHashOf(chain: ChainClient, block: number): Promise<string | null> {
@@ -23,16 +26,28 @@ export async function storageEventsAt(chain: ChainClient, block: number): Promis
   const hash = await blockHashOf(chain, block);
   if (!hash) return [];
   const records = await chain.api.query.System.Events.getValue({ at: hash });
+  const fees = new Map<number, { payer: string; fee: bigint }>();
+  for (const record of records) {
+    if (record.phase.type !== "ApplyExtrinsic") continue;
+    if (record.event.type !== "TransactionPayment") continue;
+    if (record.event.value.type !== "TransactionFeePaid") continue;
+    const paid = record.event.value.value;
+    fees.set(record.phase.value, { payer: paid.who, fee: paid.actual_fee });
+  }
   const events: StorageEvent[] = [];
   for (const record of records) {
     if (record.event.type !== "TransactionStorage") continue;
     const inner = record.event.value;
     if (inner.type !== "Stored" && inner.type !== "Renewed") continue;
+    const extrinsicIndex = record.phase.type === "ApplyExtrinsic" ? record.phase.value : null;
+    const paid = extrinsicIndex === null ? undefined : fees.get(extrinsicIndex);
     events.push({
       kind: inner.type === "Stored" ? "stored" : "renewed",
       index: inner.value.index,
       contentHash: toBytes(inner.value.content_hash),
-      extrinsicIndex: record.phase.type === "ApplyExtrinsic" ? record.phase.value : null,
+      extrinsicIndex,
+      payer: paid?.payer ?? null,
+      feePlanck: paid?.fee ?? null,
     });
   }
   return events;
