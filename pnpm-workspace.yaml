@@ -1,0 +1,19 @@
+packages:
+  - apps/*
+  - packages/*
+  - integrations/*
+  - examples/*
+
+# Refuse versions published less than a day ago (supply-chain guard).
+minimumReleaseAge: 1440
+
+# One version of each shared dependency across the workspace.
+catalog:
+  "@biomejs/biome": 2.6.3
+  "@changesets/cli": 3.0.3
+  "@types/node": ^24.0.0
+  tsdown: 0.23.3
+  turbo: 2.11.10
+  # 7.x drops the classic compiler API that Next.js type-checks with; 6.0 is the last line that has it.
+  typescript: 6.0.3
+  zod: ^4.0.0

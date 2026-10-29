@@ -1,6 +1,22 @@
-.firecrawl/
-refs/
-.DS_Store
-.env
-node_modules/
+# Local research and reference clones (never published)
 context/
+refs/
+.firecrawl/
+
+# Dependencies and build output
+node_modules/
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# Local agent settings
+.claude/

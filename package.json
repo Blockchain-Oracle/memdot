@@ -1,12 +1,27 @@
 {
   "name": "memdot",
   "private": true,
+  "description": "Decentralized storage on Portaldot V3 for apps, files and AI-agent memory.",
+  "license": "Apache-2.0",
   "type": "module",
-  "scripts": {
-    "probe": "node scripts/v3-probe.mjs"
-  },
   "packageManager": "pnpm@11.24.0",
-  "dependencies": {
-    "@polkadot/api": "^16.5.6"
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "probe": "pnpm --filter @memdot/chain probe",
+    "changeset": "changeset"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@changesets/cli": "catalog:",
+    "turbo": "catalog:",
+    "typescript": "catalog:"
   }
 }

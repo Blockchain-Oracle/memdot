@@ -1,0 +1,17 @@
+{
+  "name": "@memdot/chain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Portaldot V3 client for MemDot: TransactionStorage store, renew and bitswap reads.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "probe": "node scripts/v3-probe.mjs"
+  },
+  "devDependencies": {
+    "@memdot/config": "workspace:*",
+    "@polkadot/api": "^16.5.6",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}
