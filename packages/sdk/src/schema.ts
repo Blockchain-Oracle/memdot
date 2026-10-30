@@ -2988,6 +2988,8 @@ export interface paths {
                     cursor?: string;
                     limit?: number;
                     folderId?: string;
+                    /** @description Only objects of this kind (files, say, without their segments) */
+                    kind?: "file" | "segment" | "index_snapshot";
                 };
                 header?: never;
                 path: {

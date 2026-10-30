@@ -27,11 +27,14 @@ const STEPS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["minute", 60],
 ];
 
-/** "3 minutes ago", "in 2 days". */
-export function formatRelative(date: string | Date): string {
+const RELATIVE_SHORT = new Intl.RelativeTimeFormat("en", { numeric: "auto", style: "narrow" });
+
+/** "3 minutes ago", "in 2 days"; `short` gives "3m ago" for dense tables. */
+export function formatRelative(date: string | Date, short = false): string {
   const seconds = (new Date(date).getTime() - Date.now()) / 1000;
+  const format = short ? RELATIVE_SHORT : RELATIVE;
   for (const [unit, size] of STEPS) {
-    if (Math.abs(seconds) >= size) return RELATIVE.format(Math.round(seconds / size), unit);
+    if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
   }
   return "just now";
 }

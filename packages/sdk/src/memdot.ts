@@ -1,11 +1,13 @@
 import type { ChainClient } from "@memdot/chain";
 import { PORTALDOT_WSS } from "@memdot/config";
 import { AccountApi } from "./account.js";
+import { ActivityApi } from "./activity.js";
 import type { Context, Schemas } from "./context.js";
 import { MemDotError } from "./errors.js";
 import { FilesApi } from "./files.js";
 import { JobsApi } from "./jobs.js";
 import { KeysApi } from "./keys.js";
+import { ProofApi } from "./proof.js";
 import { SharingApi } from "./sharing.js";
 import { FoldersApi, SpacesApi } from "./spaces.js";
 import { Transport, type TransportOptions, unwrap } from "./transport.js";
@@ -39,6 +41,8 @@ export class MemDot {
   readonly sharing: SharingApi;
   readonly jobs: JobsApi;
   readonly keys: KeysApi;
+  readonly activity: ActivityApi;
+  readonly proof: ProofApi;
 
   private readonly transport: Transport;
   private chainClient: Promise<ChainClient> | null = null;
@@ -53,6 +57,8 @@ export class MemDot {
     };
     this.jobs = new JobsApi(ctx);
     this.keys = new KeysApi(ctx);
+    this.activity = new ActivityApi(ctx);
+    this.proof = new ProofApi(ctx);
     this.spaces = new SpacesApi(ctx);
     this.folders = new FoldersApi(ctx, this.spaces);
     this.files = new FilesApi(ctx, this.spaces, this.jobs);

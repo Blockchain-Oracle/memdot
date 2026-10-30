@@ -9,12 +9,18 @@ import {
 import type { Context, Schemas } from "./context.js";
 import { MemDotError } from "./errors.js";
 import { type FileInfo, type ObjectDetail, openFileInfo, readObject } from "./files.js";
-import type { SpacesApi } from "./spaces.js";
+import { openText, type SpacesApi } from "./spaces.js";
 import { storeObject } from "./store.js";
 import { unwrap } from "./transport.js";
 import { keyringIdentities, type ReceivedKeys } from "./vault.js";
 
 export type Grant = Schemas["Grant"];
+export type SharedSpace = Schemas["SharedSpace"];
+
+/** A received grant, opened on this device: the space's (or file's) name in clear. */
+export interface SharedDetails extends Omit<SharedSpace, "encryptedName"> {
+  name: string | null;
+}
 export type Recipient = Schemas["Recipient"];
 
 export type ShareTarget = { address: string } | { agentId: string; agentKey: string };
@@ -138,6 +144,19 @@ export class SharingApi {
     return keys;
   }
 
+  /** What a received grant opens, with its name decrypted here (space name, or the file's). */
+  async details(grantId: string): Promise<SharedDetails> {
+    const { encryptedName, ...shared } = await unwrap(
+      this.ctx.transport.api.GET("/v1/shared/{grantId}", { params: { path: { grantId } } }),
+    );
+    const keys = await this.open(grantId);
+    const name =
+      keys.kind === "file"
+        ? keys.manifest.name
+        : await openText(encryptedName, keyringIdentities(keys.keys));
+    return { ...shared, name };
+  }
+
   /** Files a received grant lets you open, names decrypted here. */
   async files(
     grantId: string,
@@ -146,7 +165,7 @@ export class SharingApi {
     const keys = await this.open(grantId);
     const page = await unwrap(
       this.ctx.transport.api.GET("/v1/shared/{grantId}/objects", {
-        params: { path: { grantId }, query },
+        params: { path: { grantId }, query: { kind: "file", ...query } },
       }),
     );
     return {

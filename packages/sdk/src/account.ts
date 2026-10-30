@@ -10,6 +10,7 @@ import {
   parseKeyBundle,
   recoverySecret,
   recoverySignInKey,
+  removeWrap,
   serializeKeyBundle,
   signRecoveryChallenge,
   unwrapMasterKey,
@@ -27,6 +28,17 @@ import { unwrap } from "./transport.js";
 import type { Wallet } from "./wallet.js";
 
 export type Me = Schemas["Me"];
+
+/** A passkey as the auth server lists it. `credentialID` is the key bundle's wrap id. */
+export interface Passkey {
+  id: string;
+  name?: string | null;
+  credentialID: string;
+  deviceType: "singleDevice" | "multiDevice";
+  backedUp: boolean;
+  aaguid?: string | null;
+  createdAt: string;
+}
 export type Account = Schemas["Account"];
 
 /** Mirrors the API's owner proof: the wallet signs a message bound to the user id. */
@@ -345,6 +357,41 @@ export class AccountApi {
     await this.storeBundle(
       addWrap(await this.keyBundle(), amk, { kind: "vrf", id: wallet.address }, secret),
     );
+  }
+
+  /** This account's passkeys (sign-in), as the auth server lists them. */
+  passkeys(): Promise<Passkey[]> {
+    return this.ctx.transport.json<Passkey[]>("GET", `${PASSKEY_AUTH}/list-user-passkeys`);
+  }
+
+  /**
+   * Removes a passkey: first its unlock wrap (the recovery code always remains), then the passkey
+   * itself. Needs the account unlocked when the passkey can unlock.
+   */
+  async removePasskey(passkey: Pick<Passkey, "id" | "credentialID">): Promise<void> {
+    const bundle = await this.keyBundle();
+    if (bundle.wraps.some((w) => w.kind === "passkey" && w.id === passkey.credentialID)) {
+      this.ctx.vault.amk("removing a passkey");
+      await this.storeBundle(removeWrap(bundle, "passkey", passkey.credentialID));
+    }
+    await this.ctx.transport.json("POST", `${PASSKEY_AUTH}/delete-passkey`, { id: passkey.id });
+  }
+
+  /** Stops a wallet from unlocking through `signVrf` (its sign-in, if linked, stays). */
+  async removeWalletUnlock(address: string): Promise<void> {
+    this.ctx.vault.amk("removing a wallet unlock");
+    await this.storeBundle(removeWrap(await this.keyBundle(), "vrf", address));
+  }
+
+  /** The display name MemDot greets you with (stays on MemDot's server, unencrypted). */
+  async rename(name: string): Promise<void> {
+    await this.ctx.transport.json("POST", "/api/auth/update-user", { name });
+  }
+
+  /** Signs out every session of this account, this one included. */
+  async signOutEverywhere(): Promise<void> {
+    this.lock();
+    await this.ctx.transport.json("POST", "/api/auth/revoke-sessions", {});
   }
 
   /** Ends the session and forgets the keys on this device. */

@@ -5555,6 +5555,21 @@
             "required": false,
             "name": "folderId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "file",
+                "segment",
+                "index_snapshot"
+              ],
+              "description": "Only objects of this kind (files, say, without their segments)"
+            },
+            "required": false,
+            "description": "Only objects of this kind (files, say, without their segments)",
+            "name": "kind",
+            "in": "query"
           }
         ],
         "responses": {

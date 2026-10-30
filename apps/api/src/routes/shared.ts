@@ -176,7 +176,15 @@ export function sharedRoutes(services: Services) {
         middleware: [requireScope("files", "read")] as const,
         request: {
           params: GrantParam,
-          query: PageQuery.extend({ folderId: z.uuid().optional() }),
+          query: PageQuery.extend({
+            folderId: z.uuid().optional(),
+            kind: z
+              .enum(["file", "segment", "index_snapshot"])
+              .optional()
+              .openapi({
+                description: "Only objects of this kind (files, say, without their segments)",
+              }),
+          }),
         },
         responses: {
           200: { description: "Objects", content: jsonContent(pageOf(StoredObject)) },
@@ -193,6 +201,7 @@ export function sharedRoutes(services: Services) {
             and(
               coveredBy(grant),
               query.folderId ? eq(objects.folderId, query.folderId) : undefined,
+              query.kind ? eq(objects.kind, query.kind) : undefined,
               afterCursor(query.cursor, objects.createdAt, objects.id),
             ),
           )

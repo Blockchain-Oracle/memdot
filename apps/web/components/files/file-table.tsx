@@ -47,8 +47,9 @@ const features = tableFeatures({
 });
 const helper = createColumnHelper<typeof features, FileRow>();
 const ROW_HEIGHT = 44;
+/** Phones: name, size, status. md: + renewal and updated. xl: + CID. */
 const GRID =
-  "grid grid-cols-[32px_minmax(0,1fr)_84px_104px] items-center gap-x-3 md:grid-cols-[32px_minmax(0,1fr)_84px_150px_120px_104px_96px]";
+  "grid grid-cols-[28px_minmax(0,1fr)_64px_96px] items-center gap-x-3 md:grid-cols-[28px_minmax(0,1fr)_64px_96px_116px_88px] xl:grid-cols-[28px_minmax(0,1fr)_72px_140px_100px_120px_96px]";
 
 /** Folders always sort above files, whichever column sorts. */
 const foldersFirst = (a: FileRow, b: FileRow) =>
@@ -191,7 +192,7 @@ export function FileTable({
         <span role="columnheader" className="text-right">
           {sortHeader("size", "Size", "justify-end")}
         </span>
-        <span role="columnheader" className="hidden md:block">
+        <span role="columnheader" className="hidden xl:block">
           CID
         </span>
         <span role="columnheader">Status</span>
@@ -237,7 +238,7 @@ export function FileTable({
                 <span role="cell" className="text-right text-ui-sm text-text-4">
                   —
                 </span>
-                <span className="hidden md:block" />
+                <span className="hidden xl:block" />
                 <span role="cell" className="text-ui-sm text-text-3">
                   Folder
                 </span>
@@ -297,15 +298,18 @@ export function FileTable({
               <span role="cell" className="hidden items-center gap-2 md:flex">
                 <RetentionMeter remaining={retention.remaining} state={retention.state} />
                 {retention.blocksLeft !== null && retention.blocksLeft > 0 && (
-                  <span className="font-mono text-ui-sm text-text-3 tabular">
+                  <span className="font-mono text-ui-sm whitespace-nowrap text-text-3 tabular">
                     {blocksToDuration(retention.blocksLeft)}
                   </span>
                 )}
               </span>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span role="cell" className="hidden text-right text-ui-sm text-text-3 md:block">
-                    {formatRelative(file.createdAt)}
+                  <span
+                    role="cell"
+                    className="hidden truncate text-right text-ui-sm text-text-3 md:block"
+                  >
+                    {formatRelative(file.createdAt, true)}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="left" className="font-mono text-[12px]">

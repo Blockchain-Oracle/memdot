@@ -5,11 +5,13 @@ export {
   AccountApi,
   type Me,
   type Owner,
+  type Passkey,
   type PasskeySignIn,
   type SetupOptions,
   type SignInOptions,
   type UnlockWrap,
 } from "./account.js";
+export { ActivityApi, type ChainTransaction, type RequestLogEntry } from "./activity.js";
 export {
   type BrowserWallet,
   connectEvmWallet,
@@ -35,10 +37,19 @@ export { type Job, JobFailedError, JobsApi, type WaitOptions } from "./jobs.js";
 export { type ApiKey, KeysApi, type NewApiKey } from "./keys.js";
 export { MemDot, type MemDotOptions, type Usage } from "./memdot.js";
 export { passkeysSupported } from "./passkey.js";
+export {
+  type CidProof,
+  ProofApi,
+  type ProofRecent,
+  type ProofStats,
+  type TxProof,
+} from "./proof.js";
 export type { components, paths } from "./schema.js";
 export {
   type Grant,
   type Recipient,
+  type SharedDetails,
+  type SharedSpace,
   type ShareOptions,
   type ShareTarget,
   SharingApi,
