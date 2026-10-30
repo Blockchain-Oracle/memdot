@@ -1,0 +1,301 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+@source "../../../../apps/web/**/*.{ts,tsx}";
+@source "../**/*.{ts,tsx}";
+
+/*
+ * MemDot tokens. The brand palette lives in --md-* variables; shadcn's semantic variables
+ * (--primary, --muted, ...) are mapped onto them so installed components pick the brand up
+ * without edits. Ember is for the primary action, focus and the "dot" only.
+ */
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Brand ladder, usable directly: bg-surface-2, text-text-3, border-border-strong, ... */
+  --color-surface-1: var(--md-surface-1);
+  --color-surface-2: var(--md-surface-2);
+  --color-surface-3: var(--md-surface-3);
+  --color-border-strong: var(--md-border-strong);
+  --color-text-2: var(--md-text-2);
+  --color-text-3: var(--md-text-3);
+  --color-text-4: var(--md-text-4);
+  --color-ember: var(--md-ember);
+  --color-ember-hover: var(--md-ember-hover);
+  --color-ember-press: var(--md-ember-press);
+  --color-ember-text: var(--md-ember-text);
+  --color-ok: var(--md-ok);
+  --color-ok-fg: var(--md-ok-fg);
+  --color-warn: var(--md-warn);
+  --color-warn-fg: var(--md-warn-fg);
+  --color-danger: var(--md-danger);
+  --color-danger-fg: var(--md-danger-fg);
+
+  /* 4 chips · 6 buttons/inputs/menus · 10 cards/sheets/dialogs. Retention cells use 3. */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 5px;
+  --radius-lg: 6px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
+  --radius-4xl: 20px;
+
+  --shadow-overlay: var(--md-shadow-overlay);
+  --shadow-card: var(--md-shadow-card);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Type scale (design §1.4): text-h1, text-ui, text-label, text-mono, ... */
+@theme {
+  --text-display-xl: 72px;
+  --text-display-xl--line-height: 72px;
+  --text-display-xl--letter-spacing: -0.035em;
+  --text-display-xl--font-weight: 400;
+  --text-display: 48px;
+  --text-display--line-height: 52px;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 400;
+  --text-h1: 28px;
+  --text-h1--line-height: 34px;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 500;
+  --text-h2: 20px;
+  --text-h2--line-height: 28px;
+  --text-h2--letter-spacing: -0.015em;
+  --text-h2--font-weight: 500;
+  --text-h3: 16px;
+  --text-h3--line-height: 24px;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 500;
+  --text-body: 15px;
+  --text-body--line-height: 24px;
+  --text-body--letter-spacing: -0.005em;
+  --text-ui: 14px;
+  --text-ui--line-height: 20px;
+  --text-ui-sm: 13px;
+  --text-ui-sm--line-height: 18px;
+  --text-label: 11px;
+  --text-label--line-height: 16px;
+  --text-label--letter-spacing: 0.08em;
+  --text-label--font-weight: 500;
+  --text-mono: 13px;
+  --text-mono--line-height: 20px;
+
+  --animate-dot-pop: dot-pop 180ms var(--ease-enter) both;
+  --animate-cell-fill: cell-fill 180ms var(--ease-enter) both;
+  --animate-loader-bar: loader-bar 1.2s var(--ease-standard) infinite;
+  --animate-loader-dot: loader-dot 1.2s var(--ease-standard) infinite;
+
+  @keyframes dot-pop {
+    from {
+      transform: scale(0.6);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes cell-fill {
+    from {
+      opacity: 0.2;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes loader-bar {
+    0%,
+    100% {
+      transform: scaleX(1);
+    }
+    50% {
+      transform: scaleX(0.55);
+    }
+  }
+  @keyframes loader-dot {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(0.7);
+      opacity: 0.55;
+    }
+  }
+}
+
+:root {
+  --md-bg: #faf8f4;
+  --md-surface-1: #ffffff;
+  --md-surface-2: #f2ede4;
+  --md-surface-3: #ede6da;
+  --md-border: #e4ded3;
+  --md-border-strong: #d3cbbe;
+  --md-text: #0b0b0f;
+  --md-text-2: #3a372f;
+  --md-text-3: #6b665c;
+  --md-text-4: #8b8678;
+  --md-ember: #ff5c35;
+  --md-ember-hover: #ff7452;
+  --md-ember-press: #e64a24;
+  --md-on-ember: #0b0b0f;
+  --md-ember-text: #b83a18;
+  --md-ok: #2f9e5f;
+  --md-ok-fg: #1e7a46;
+  --md-warn: #d99a1e;
+  --md-warn-fg: #8a5a00;
+  --md-danger: #d13438;
+  --md-danger-fg: #d13438;
+  --md-shadow-overlay: 0 8px 24px rgb(11 11 15 / 0.1);
+  --md-shadow-card: inset 0 -1px 0 rgb(11 11 15 / 0.06);
+
+  --motion-instant: 120ms;
+  --motion-state: 180ms;
+  --motion-large: 260ms;
+
+  --background: var(--md-bg);
+  --foreground: var(--md-text);
+  --card: var(--md-surface-1);
+  --card-foreground: var(--md-text);
+  --popover: var(--md-surface-1);
+  --popover-foreground: var(--md-text);
+  --primary: var(--md-ember);
+  --primary-foreground: var(--md-on-ember);
+  --secondary: var(--md-surface-2);
+  --secondary-foreground: var(--md-text);
+  --muted: var(--md-surface-2);
+  --muted-foreground: var(--md-text-3);
+  --accent: var(--md-surface-3);
+  --accent-foreground: var(--md-text);
+  --destructive: var(--md-danger);
+  --border: var(--md-border);
+  --input: var(--md-border-strong);
+  --ring: var(--md-ember);
+  /* Charts: a neutral ramp; ember only for the highlighted series, ok for success stacks. */
+  --chart-1: var(--md-text);
+  --chart-2: var(--md-text-3);
+  --chart-3: var(--md-border-strong);
+  --chart-4: var(--md-ember);
+  --chart-5: var(--md-ok);
+  --radius: 0.375rem;
+  --sidebar: var(--md-surface-2);
+  --sidebar-foreground: var(--md-text-2);
+  --sidebar-primary: var(--md-ember);
+  --sidebar-primary-foreground: var(--md-on-ember);
+  --sidebar-accent: var(--md-surface-3);
+  --sidebar-accent-foreground: var(--md-text);
+  --sidebar-border: var(--md-border);
+  --sidebar-ring: var(--md-ember);
+}
+
+.dark {
+  --md-bg: #0b0b0f;
+  --md-surface-1: #121217;
+  --md-surface-2: #18181e;
+  --md-surface-3: #202027;
+  --md-border: #26262e;
+  --md-border-strong: #34343d;
+  --md-text: #ede6da;
+  --md-text-2: #b3ac9f;
+  --md-text-3: #8b8678;
+  --md-text-4: #5e5a52;
+  --md-ember-text: #ff7a57;
+  --md-ok: #4cc38a;
+  --md-ok-fg: #4cc38a;
+  --md-warn: #f0b43c;
+  --md-warn-fg: #f0b43c;
+  --md-danger: #f2555a;
+  --md-danger-fg: #f2555a;
+  --md-shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.55);
+  --md-shadow-card: none;
+
+  --sidebar: var(--md-bg);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply bg-background;
+  }
+  body {
+    @apply bg-background text-ui text-foreground antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  code,
+  kbd,
+  samp,
+  pre {
+    @apply font-mono;
+  }
+  ::selection {
+    background: var(--md-surface-3);
+    color: var(--md-text);
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section eyebrows and column-group labels: mono, uppercase, tracked. */
+@utility eyebrow {
+  @apply font-mono text-label text-text-3 uppercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

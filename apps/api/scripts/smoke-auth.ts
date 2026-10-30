@@ -11,7 +11,7 @@ import { SiwsMessage } from "@talismn/siws";
 import { AccountId } from "polkadot-api";
 
 const API = process.env.API_URL ?? "http://localhost:8787";
-const ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:3000";
+const ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:3100";
 
 const hex = (bytes: Uint8Array) => `0x${bytesToHex(bytes)}`;
 

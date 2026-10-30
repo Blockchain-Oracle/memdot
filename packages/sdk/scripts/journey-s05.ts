@@ -12,7 +12,7 @@ import { type Job, MemDot, MemDotError, walletFromMnemonic } from "../src/index.
 import { keyringIdentities } from "../src/vault.js";
 
 const baseUrl = process.env.API_URL ?? "http://localhost:8787";
-const origin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
+const origin = process.env.WEB_ORIGIN ?? "http://localhost:3100";
 const client = () => MemDot.create({ baseUrl, origin, client: "journey-s05" });
 
 const evidence: Record<string, unknown>[] = [];

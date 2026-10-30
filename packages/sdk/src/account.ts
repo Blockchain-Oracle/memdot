@@ -56,6 +56,11 @@ export class AccountApi {
     return this.ctx.vault.unlocked;
   }
 
+  /** Calls the listener when this device locks or unlocks (for UIs); returns the unsubscribe. */
+  onLockChange(listener: () => void): () => void {
+    return this.ctx.vault.subscribe(listener);
+  }
+
   /** Sign-In with Substrate: the wallet signs a one-use message for this site. */
   async signInWithWallet(wallet: Wallet, options: SignInOptions = {}): Promise<{ userId: string }> {
     const origin = new URL(options.origin ?? this.defaultOrigin ?? requireOrigin());

@@ -19,7 +19,7 @@ import { AccountId } from "polkadot-api";
 import { ownerProofMessage } from "../src/routes/account.js";
 
 export const API = process.env.API_URL ?? "http://localhost:8787";
-export const ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:3000";
+export const ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:3100";
 const FINALIZE_TIMEOUT_MS = 4 * 60_000;
 
 export const hex = (bytes: Uint8Array) => `0x${bytesToHex(bytes)}`;

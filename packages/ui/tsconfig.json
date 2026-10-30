@@ -1,0 +1,10 @@
+{
+  "extends": "@memdot/config/tsconfig/dom.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "@memdot/ui/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}

@@ -15,7 +15,7 @@ const schema = z.object({
   /** Public base URL of this API (Better Auth builds callback URLs from it). */
   API_URL: z.url().default("http://localhost:8787"),
   /** The dashboard origin: CORS, passkey ceremonies and wallet sign-in messages must match it. */
-  WEB_ORIGIN: z.url().default("http://localhost:3000"),
+  WEB_ORIGIN: z.url().default("http://localhost:3100"),
   /** WebAuthn relying-party id. `memdot.xyz` in production so passkeys work on every subdomain. */
   RP_ID: z.string().min(1).default("localhost"),
   /** Parent domain for cookies shared by app. and api. in production; unset on localhost. */

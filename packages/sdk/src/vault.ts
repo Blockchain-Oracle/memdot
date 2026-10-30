@@ -21,20 +21,28 @@ export type ReceivedKeys =
 export class Vault {
   private masterKey: Uint8Array | null = null;
   private readonly received = new Map<string, ReceivedKeys>();
+  private readonly listeners = new Set<() => void>();
 
   get unlocked(): boolean {
     return this.masterKey !== null;
   }
 
   unlock(masterKey: Uint8Array): void {
-    this.lock();
+    this.forget();
     this.masterKey = Uint8Array.from(masterKey);
+    this.notify();
   }
 
   lock(): void {
-    this.masterKey?.fill(0);
-    this.masterKey = null;
-    this.received.clear();
+    const wasUnlocked = this.unlocked;
+    this.forget();
+    if (wasUnlocked) this.notify();
+  }
+
+  /** Calls the listener whenever the vault locks or unlocks; returns the unsubscribe. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   amk(what?: string): Uint8Array {
@@ -75,6 +83,16 @@ export class Vault {
 
   receivedKeys(grantId: string): ReceivedKeys | undefined {
     return this.received.get(grantId);
+  }
+
+  private forget(): void {
+    this.masterKey?.fill(0);
+    this.masterKey = null;
+    this.received.clear();
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) listener();
   }
 }
 
