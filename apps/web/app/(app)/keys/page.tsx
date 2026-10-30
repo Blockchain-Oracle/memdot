@@ -123,7 +123,9 @@ function Keys() {
                 <Empty className="rounded-xl border border-dashed border-border-strong py-8">
                   <EmptyHeader>
                     <EmptyTitle className="text-ui">
-                      No {group.roles.includes("management") ? "management" : ""} keys yet
+                      {group.roles.includes("management")
+                        ? "No management keys yet"
+                        : "No keys yet"}
                     </EmptyTitle>
                     <EmptyDescription className="font-mono text-ui-sm">
                       MEMDOT_API_KEY=md_…

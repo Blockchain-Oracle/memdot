@@ -48,7 +48,8 @@ export default function OverviewPage() {
     },
     {
       title: "Store a file on Portaldot",
-      done: (usage.data?.storedBytes ?? 0) > 0,
+      // Space usage counts files only (the key bundle and share keys are account objects).
+      done: spaces.data?.some((s) => s.usedBytes > 0) ?? false,
       href: firstSpace ? `/spaces/${firstSpace.id}?upload=1` : "/files",
       action: "Upload",
     },
@@ -137,7 +138,11 @@ export default function OverviewPage() {
           label="Stored"
           value={u?.storedBytes}
           format={formatBytes}
-          hint={u ? `${formatNumber(u.blobs.stored)} blobs on chain` : undefined}
+          hint={
+            u
+              ? `${formatNumber(u.blobs.stored)} blob${u.blobs.stored === 1 ? "" : "s"} on chain`
+              : undefined
+          }
         />
         <Stat
           label="In flight"

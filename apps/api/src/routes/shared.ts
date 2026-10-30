@@ -178,12 +178,9 @@ export function sharedRoutes(services: Services) {
           params: GrantParam,
           query: PageQuery.extend({
             folderId: z.uuid().optional(),
-            kind: z
-              .enum(["file", "segment", "index_snapshot"])
-              .optional()
-              .openapi({
-                description: "Only objects of this kind (files, say, without their segments)",
-              }),
+            kind: z.enum(["file", "segment", "index_snapshot"]).optional().openapi({
+              description: "Only objects of this kind (files, say, without their segments)",
+            }),
           }),
         },
         responses: {

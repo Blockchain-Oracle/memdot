@@ -39,7 +39,9 @@ export default function UsagePage() {
           label="Stored"
           value={u?.storedBytes}
           format={formatBytes}
-          hint={u ? `${formatNumber(u.blobs.stored)} blobs` : undefined}
+          hint={
+            u ? `${formatNumber(u.blobs.stored)} blob${u.blobs.stored === 1 ? "" : "s"}` : undefined
+          }
         />
         <Stat label="Spaces" value={spaces?.length} hint={`Up to ${MAX_SPACES_PER_ACCOUNT}`} />
         <Stat

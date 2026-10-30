@@ -18,7 +18,7 @@
   ],
   "scripts": {
     "build": "tsdown src/index.ts --dts",
-    "dev": "tsdown src/index.ts --dts --watch",
+    "dev": "tsdown src/index.ts --dts --watch --no-clean",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
