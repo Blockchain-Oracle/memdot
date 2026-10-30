@@ -46,6 +46,11 @@ export interface FileInfo extends Omit<RawObject, "encryptedMeta"> {
   size: number | null;
 }
 
+/** A file in a listing: when it leaves the chain unless renewed (the keeper renews it first). */
+export interface ListedFile extends FileInfo {
+  expiresAtBlock: number | null;
+}
+
 export interface PutOptions {
   spaceId: string;
   folderId?: string;
@@ -255,15 +260,19 @@ export class FilesApi {
       cursor?: string;
       limit?: number;
     } = {},
-  ): Promise<{ items: FileInfo[]; nextCursor: string | null }> {
+  ): Promise<{ items: ListedFile[]; nextCursor: string | null; headBlock: number | null }> {
     const page = await unwrap(
       this.ctx.transport.api.GET("/v1/objects", { params: { query: { kind: "file", ...query } } }),
     );
     return {
       items: await Promise.all(
-        page.items.map(async (raw) => openFileInfo(raw, await this.identitiesFor(raw))),
+        page.items.map(async ({ expiresAtBlock, ...raw }) => ({
+          ...(await openFileInfo(raw, await this.identitiesFor(raw))),
+          expiresAtBlock,
+        })),
       ),
       nextCursor: page.nextCursor,
+      headBlock: page.headBlock,
     };
   }
 

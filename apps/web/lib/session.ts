@@ -23,17 +23,20 @@ export function useMe() {
   });
 }
 
-export type Gate = "loading" | "sign-in" | "setup" | "unlock" | "ready";
+export type Gate = "loading" | "offline" | "sign-in" | "setup" | "unlock" | "ready";
 
-/** Where this visitor stands: signed out, mid-setup, locked, or ready. */
-export function useGate(): { gate: Gate; me: Me | null | undefined } {
-  const { data: me, isPending } = useMe();
+/** Where this visitor stands: API unreachable, signed out, mid-setup, locked, or ready. */
+export function useGate(): { gate: Gate; me: Me | null | undefined; retry: () => void } {
+  const { data: me, isPending, isError, refetch } = useMe();
   const unlocked = useUnlocked();
-  if (isPending) return { gate: "loading", me };
-  if (!me) return { gate: "sign-in", me };
-  if (!me.account?.keyBundleCid) return { gate: "setup", me };
-  if (!unlocked) return { gate: "unlock", me };
-  return { gate: "ready", me };
+  const retry = () => void refetch();
+  if (isPending) return { gate: "loading", me, retry };
+  // A network failure is not a sign-out: keep the visitor where they are.
+  if (isError && me === undefined) return { gate: "offline", me, retry };
+  if (!me) return { gate: "sign-in", me, retry };
+  if (!me.account?.keyBundleCid) return { gate: "setup", me, retry };
+  if (!unlocked) return { gate: "unlock", me, retry };
+  return { gate: "ready", me, retry };
 }
 
 export const HOME = "/overview";

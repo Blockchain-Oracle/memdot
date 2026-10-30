@@ -1164,10 +1164,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            items: components["schemas"]["Object"][];
-                            nextCursor: string | null;
-                        };
+                        "application/json": components["schemas"]["ObjectPage"];
                     };
                 };
                 /** @description The request is not valid. */
@@ -5156,6 +5153,14 @@ export interface components {
             previousVersionId?: string;
             /** @description The space key epoch the manifest and metadata are sealed with. Required for space objects; must be the space's current epoch. */
             keyEpoch?: number;
+        };
+        ObjectPage: {
+            items: components["schemas"]["ListedObject"][];
+            nextCursor: string | null;
+            headBlock: number | null;
+        };
+        ListedObject: components["schemas"]["Object"] & {
+            expiresAtBlock: number | null;
         };
         ObjectDetail: components["schemas"]["Object"] & {
             blobs: components["schemas"]["Blob"][];

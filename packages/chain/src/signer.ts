@@ -53,3 +53,14 @@ export function txCreatorFromInjected(
 ): TxCreator {
   return getTxCreatorFromPjs(address, signer.signPayload, signer.signRaw, type) as TxCreator;
 }
+
+/** The SS58 address (prefix 42) of an AccountId32, given as bytes or hex. */
+export function addressOf(accountId: Uint8Array | string): string {
+  const bytes =
+    typeof accountId === "string"
+      ? Uint8Array.from(accountId.replace(/^0x/, "").match(/../g) ?? [], (h) =>
+          Number.parseInt(h, 16),
+        )
+      : accountId;
+  return AccountId(SS58_PREFIX).dec(bytes);
+}

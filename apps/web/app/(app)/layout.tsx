@@ -4,6 +4,8 @@ import { BrandLoader } from "@memdot/ui/components/brand";
 import { SidebarInset, SidebarProvider } from "@memdot/ui/components/sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { UploadsProvider } from "@/components/files/uploads";
+import { OfflineState } from "@/components/offline-state";
 import { AppSidebar } from "@/components/shell/app-sidebar";
 import { CommandPalette } from "@/components/shell/command-palette";
 import { TopBar } from "@/components/shell/top-bar";
@@ -20,7 +22,7 @@ const SIDEBAR_STYLE = {
  * sign-in, setup or unlock and comes back here after.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { gate } = useGate();
+  const { gate, retry } = useGate();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -31,6 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     else if (gate === "unlock") router.replace(`/unlock${next}`);
   }, [gate, pathname, router]);
 
+  if (gate === "offline") return <OfflineState onRetry={retry} />;
   if (gate !== "ready") {
     return (
       <main className="flex min-h-svh items-center justify-center">
@@ -41,13 +44,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider style={SIDEBAR_STYLE}>
-      <CommandPalette>
-        <AppSidebar />
-        <SidebarInset className="min-w-0">
-          <TopBar />
-          <div className="flex flex-1 flex-col">{children}</div>
-        </SidebarInset>
-      </CommandPalette>
+      <UploadsProvider>
+        <CommandPalette>
+          <AppSidebar />
+          <SidebarInset className="min-w-0">
+            <TopBar />
+            <div className="flex flex-1 flex-col">{children}</div>
+          </SidebarInset>
+        </CommandPalette>
+      </UploadsProvider>
     </SidebarProvider>
   );
 }

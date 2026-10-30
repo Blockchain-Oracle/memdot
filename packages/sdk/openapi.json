@@ -785,6 +785,55 @@
           "root"
         ]
       },
+      "ObjectPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListedObject"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "headBlock": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "headBlock"
+        ]
+      },
+      "ListedObject": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Object"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "expiresAtBlock": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "expiresAtBlock"
+            ]
+          }
+        ]
+      },
       "ObjectDetail": {
         "allOf": [
           {
@@ -3406,25 +3455,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Object"
-                      }
-                    },
-                    "nextCursor": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "items",
-                    "nextCursor"
-                  ]
+                  "$ref": "#/components/schemas/ObjectPage"
                 }
               }
             }

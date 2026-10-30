@@ -26,6 +26,7 @@ export { LockedError, MemDotError } from "./errors.js";
 export {
   type FileInfo,
   FilesApi,
+  type ListedFile,
   type PutOptions,
   type PutResult,
   type VerifyResult,

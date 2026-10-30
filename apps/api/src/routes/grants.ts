@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { SS58_PREFIX } from "@memdot/config";
+import { EVM_ACCOUNT_SUFFIX, SS58_PREFIX } from "@memdot/config";
 import { accounts, agents, grants, objects, spaces } from "@memdot/db";
 import { Address } from "@talismn/siws";
 import {
@@ -76,10 +76,18 @@ const ReadyGrant = z
   .openapi("ReadyGrant");
 
 /** SS58 (any prefix) or 0x AccountId32 → the account's id (lowercase hex) and SS58 form. */
+const H160 = /^0x[0-9a-fA-F]{40}$/;
+
+/** SS58, a 32-byte account id, or an EVM address (mapped the way Revive maps it). */
 function parseAddress(address: string): { accountId: string; address: string } {
-  const parsed = Address.fromSs58(address);
+  const parsed = H160.test(address)
+    ? Address.fromPubKey(`${address.toLowerCase()}${EVM_ACCOUNT_SUFFIX}`)
+    : Address.fromSs58(address);
   if (!parsed || parsed.isEthereum) {
-    throw badRequest("ADDRESS", "Enter a Substrate address (SS58) or a 32-byte account id.");
+    throw badRequest(
+      "ADDRESS",
+      "Enter a Substrate address (SS58), an EVM address (0x…) or a 32-byte account id.",
+    );
   }
   return { accountId: parsed.toPubKey().toLowerCase(), address: parsed.toSs58(SS58_PREFIX) };
 }

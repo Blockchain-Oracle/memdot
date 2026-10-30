@@ -34,6 +34,7 @@ import {
   inArray,
   isNull,
   lte,
+  min,
   ne,
   notExists,
   notInArray,
@@ -108,6 +109,15 @@ export const StoredObject = z
     tombstonedAt: z.iso.datetime().nullable(),
   })
   .openapi("Object");
+
+/** In lists: when the object's earliest blob leaves the chain (a segment entry: its segment's). */
+const ListedObject = StoredObject.extend({
+  expiresAtBlock: z.number().int().nullable(),
+}).openapi("ListedObject");
+
+const ObjectPage = pageOf(ListedObject)
+  .extend({ headBlock: z.number().int().nullable() })
+  .openapi("ObjectPage");
 
 export const ObjectDetail = StoredObject.extend({
   blobs: z.array(Blob),
@@ -184,6 +194,26 @@ export function serializeBlob(row: StoredItemRow, staged: boolean) {
     renewDueAtBlock:
       row.block === null ? null : row.block + Math.floor(RETENTION_BLOCKS * RENEW_AT_FRACTION),
   };
+}
+
+/** Each object's soonest expiry over its live blobs (stored, or expired but still served). */
+async function earliestExpiries(objectIds: string[]): Promise<Map<string, number>> {
+  if (objectIds.length === 0) return new Map();
+  const rows = await db
+    .select({ objectId: storedItems.objectId, block: min(storedItems.block) })
+    .from(storedItems)
+    .where(
+      and(
+        inArray(storedItems.objectId, [...new Set(objectIds)]),
+        inArray(storedItems.status, ["stored", "expired_served"]),
+      ),
+    )
+    .groupBy(storedItems.objectId);
+  return new Map(
+    rows.flatMap((row) =>
+      row.objectId && row.block !== null ? [[row.objectId, row.block + RETENTION_BLOCKS]] : [],
+    ),
+  );
 }
 
 const uploadUrl = (objectId: string, role: string, index: number) =>
@@ -601,7 +631,7 @@ export function objectRoutes(services: Services) {
           }),
         },
         responses: {
-          200: { description: "Objects", content: jsonContent(pageOf(StoredObject)) },
+          200: { description: "Objects", content: jsonContent(ObjectPage) },
           ...errorResponses,
         },
       }),
@@ -630,8 +660,16 @@ export function objectRoutes(services: Services) {
           .orderBy(...newestFirst(objects.createdAt, objects.id))
           .limit(query.limit + 1);
         const result = page(rows, query.limit);
+        const expiries = await earliestExpiries(result.items.map((row) => row.segmentId ?? row.id));
         return c.json(
-          { items: result.items.map(serializeObject), nextCursor: result.nextCursor },
+          {
+            items: result.items.map((row) => ({
+              ...serializeObject(row),
+              expiresAtBlock: expiries.get(row.segmentId ?? row.id) ?? null,
+            })),
+            nextCursor: result.nextCursor,
+            headBlock: services.chainHead.block,
+          },
           200,
         );
       },

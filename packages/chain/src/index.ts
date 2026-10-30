@@ -17,6 +17,7 @@ export {
   retentionState,
 } from "./retention.js";
 export {
+  addressOf,
   type InjectedSigner,
   type LocalSigner,
   publicKeyOf,
