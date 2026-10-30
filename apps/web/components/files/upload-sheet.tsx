@@ -1,5 +1,6 @@
 "use client";
 
+import { TINY_FILE_BYTES } from "@memdot/config";
 import { formatTpot, type Space } from "@memdot/sdk";
 import { Button } from "@memdot/ui/components/button";
 import {
@@ -49,8 +50,14 @@ export function UploadSheet({
 
   const total = files.reduce((sum, f) => sum + f.size, 0);
   const estimates = files.map((f) => memdot.files.estimate(f.size));
-  const blobs = estimates.reduce((sum, e) => sum + e.blobs, 0);
-  const planck = estimates.reduce((sum, e) => sum + e.planck, 0n);
+  // Small files share one segment, so they cost one store between them.
+  const tinyBytes = files
+    .filter((f) => f.size <= TINY_FILE_BYTES)
+    .reduce((sum, f) => sum + f.size, 0);
+  const shared = tinyBytes > 0 ? memdot.files.estimate(tinyBytes) : { blobs: 0, planck: 0n };
+  const large = estimates.filter((_, i) => (files[i]?.size ?? 0) > TINY_FILE_BYTES);
+  const blobs = shared.blobs + large.reduce((sum, e) => sum + e.blobs, 0);
+  const planck = shared.planck + large.reduce((sum, e) => sum + e.planck, 0n);
   const free = Math.max(0, space.quotaBytes - space.usedBytes);
   const sponsored = space.mode === "sponsored";
   const overQuota = sponsored && total > free;
@@ -105,8 +112,10 @@ export function UploadSheet({
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-ui">{file.name}</span>
                     <span className="font-mono text-ui-sm text-text-3 tabular">
-                      {formatBytes(file.size)} · {estimates[i]?.blobs ?? 1} blob
-                      {(estimates[i]?.blobs ?? 1) > 1 ? "s" : ""}
+                      {formatBytes(file.size)} ·{" "}
+                      {file.size <= TINY_FILE_BYTES
+                        ? "shared segment"
+                        : `${estimates[i]?.blobs ?? 1} blobs`}
                     </span>
                   </span>
                   <Button
@@ -139,8 +148,8 @@ export function UploadSheet({
           )}
           {files.length > 0 && (
             <p className="text-ui-sm text-text-3">
-              Files under 64 KB are packed into one encrypted segment. The keeper renews everything
-              before the 7-day window ends.
+              Files under 64 KB share one encrypted segment: one blob on chain, renewed together.
+              The keeper renews everything before the 7-day window ends.
             </p>
           )}
           {overQuota && (

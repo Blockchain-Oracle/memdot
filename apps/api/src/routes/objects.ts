@@ -10,6 +10,7 @@ import {
 import {
   CHUNK_BYTES,
   IDEMPOTENCY_HEADER,
+  MAX_SEGMENT_ENTRIES,
   MAX_SYSTEM_OBJECT_BYTES,
   MAX_SYSTEM_OBJECTS,
   RENEW_AT_FRACTION,
@@ -66,8 +67,6 @@ import { Job } from "./jobs.js";
 const SYSTEM_KINDS = new Set(["key_bundle", "grant_key"]);
 /** Kinds whose bytes may span several chunks under one root. */
 const CHUNKED_KINDS = new Set(["file", "index_snapshot"]);
-/** Entries per call; a segment with more registers them in several calls (JSON bodies cap at 1 MiB). */
-const MAX_SEGMENT_ENTRIES = 150;
 
 const Kind = z.enum(["file", "segment", "index_snapshot", "key_bundle", "grant_key"]);
 const Role = z.enum(["root", "chunk"]);

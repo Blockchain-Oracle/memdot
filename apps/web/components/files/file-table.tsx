@@ -288,7 +288,7 @@ export function FileTable({
               </span>
               <span
                 role="cell"
-                className="hidden truncate font-mono text-ui-sm text-text-2 md:block"
+                className="hidden truncate font-mono text-ui-sm text-text-2 xl:block"
               >
                 {file.cid ? middleEllipsis(file.cid) : file.segmentId ? "in segment" : "—"}
               </span>

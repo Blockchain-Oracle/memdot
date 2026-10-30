@@ -36,3 +36,8 @@ export const GATEWAY_CACHE_BYTES = 512 * 1024 * 1024;
 /** Default and largest page for list endpoints. */
 export const PAGE_SIZE = 50;
 export const MAX_PAGE_SIZE = 200;
+
+/** Segment entries registered per call (JSON bodies are capped at 1 MiB). */
+export const MAX_SEGMENT_ENTRIES = 150;
+/** Plaintext packed into one segment before sealing; stays under one chunk with header room. */
+export const SEGMENT_PACK_BYTES = 6_000_000;

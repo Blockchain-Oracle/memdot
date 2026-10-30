@@ -6,7 +6,12 @@ import {
   storageEventsAt,
   toHex,
 } from "@memdot/chain";
-import { BITSWAP_TIMEOUT_MS, TINY_FILE_BYTES } from "@memdot/config";
+import {
+  BITSWAP_TIMEOUT_MS,
+  MAX_SEGMENT_ENTRIES,
+  SEGMENT_PACK_BYTES,
+  TINY_FILE_BYTES,
+} from "@memdot/config";
 import {
   buildManifest,
   decryptObject,
@@ -23,7 +28,7 @@ import { utf8ToBytes } from "@noble/hashes/utils.js";
 import type { Context, Schemas } from "./context.js";
 import { MemDotError } from "./errors.js";
 import type { Job, JobsApi } from "./jobs.js";
-import type { SpacesApi } from "./spaces.js";
+import type { RawSpace, SpacesApi } from "./spaces.js";
 import { openText } from "./spaces.js";
 import { storeObject } from "./store.js";
 import { unwrap } from "./transport.js";
@@ -162,38 +167,12 @@ export class FilesApi {
     let jobId: string;
     if (data.length <= TINY_FILE_BYTES && !options.previousVersionId) {
       // A tiny file is a one-entry segment: one blob on chain instead of a manifest and a chunk.
-      const entryId = crypto.randomUUID();
-      const segment = await sealSegment(
-        [{ id: entryId, kind: "file", name: meta.name, mime: meta.mime, data }],
-        recipient,
-      );
-      const declared = await storeObject(this.ctx, {
-        kind: "segment",
-        spaceId: space.id,
-        keyEpoch: space.keyEpoch,
-        sizeBytes: segment.length,
-        root: segment,
-        ...(options.folderId ? { folderId: options.folderId } : {}),
-        ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
+      const stored = await this.storeSegment(space, recipient, [{ data, meta, encryptedMeta }], {
+        ...options,
         ...(wallet ? { wallet } : {}),
       });
-      await unwrap(
-        this.ctx.transport.api.POST("/v1/objects/{id}/entries", {
-          params: { path: { id: declared.object.id } },
-          body: {
-            entries: [
-              {
-                id: entryId,
-                encryptedMeta: toBase64(encryptedMeta),
-                sizeBytes: data.length,
-                ...(options.folderId ? { folderId: options.folderId } : {}),
-              },
-            ],
-          },
-        }),
-      );
-      fileId = entryId;
-      jobId = declared.job.id;
+      fileId = stored.entryIds[0] as string;
+      jobId = stored.jobId;
     } else {
       const encrypted = await encryptObject(data);
       const manifest = buildManifest({
@@ -230,6 +209,123 @@ export class FilesApi {
             options.onProgress ? { onUpdate: options.onProgress } : {},
           );
     return { file: await this.info(fileId), job };
+  }
+
+  /**
+   * Stores several files at once. Files under 64 KiB are packed together into shared encrypted
+   * segments (one blob on chain each, renewed together); larger files are stored one by one.
+   * Results come back in input order.
+   */
+  async putMany(
+    files: { data: Uint8Array; name: string; mime?: string }[],
+    options: Omit<PutOptions, "name" | "mime" | "previousVersionId" | "idempotencyKey">,
+  ): Promise<PutResult[]> {
+    const results = new Array<PutResult>(files.length);
+    const tiny = files.flatMap((file, index) =>
+      file.data.length <= TINY_FILE_BYTES ? [{ file, index }] : [],
+    );
+    if (tiny.length > 0) {
+      const space = await this.spaces.raw(options.spaceId);
+      this.epochs.set(space.id, space.keyEpoch);
+      const recipient = this.ctx.vault.sealTo(space.id, space.keyEpoch);
+      const wallet = space.mode === "self_signed" ? requireWallet(options.wallet) : undefined;
+      // Fill each segment up to the pack budget.
+      const groups: (typeof tiny)[] = [];
+      let bytes = 0;
+      for (const item of tiny) {
+        const last = groups.at(-1);
+        if (!last || bytes + item.file.data.length > SEGMENT_PACK_BYTES) {
+          groups.push([item]);
+          bytes = item.file.data.length;
+        } else {
+          last.push(item);
+          bytes += item.file.data.length;
+        }
+      }
+      for (const group of groups) {
+        const entries = await Promise.all(
+          group.map(async ({ file }) => {
+            const meta: FileMeta = {
+              name: file.name,
+              mime: file.mime ?? "application/octet-stream",
+              size: file.data.length,
+            };
+            return {
+              data: file.data,
+              meta,
+              encryptedMeta: await sealTo(utf8ToBytes(JSON.stringify(meta)), [recipient]),
+            };
+          }),
+        );
+        const stored = await this.storeSegment(space, recipient, entries, {
+          ...options,
+          ...(wallet ? { wallet } : {}),
+        });
+        const job =
+          options.wait === false
+            ? await this.jobs.get(stored.jobId)
+            : await this.jobs.waitFor(
+                stored.jobId,
+                options.onProgress ? { onUpdate: options.onProgress } : {},
+              );
+        await Promise.all(
+          group.map(async ({ index }, i) => {
+            results[index] = { file: await this.info(stored.entryIds[i] as string), job };
+          }),
+        );
+      }
+    }
+    for (const [index, file] of files.entries()) {
+      if (file.data.length <= TINY_FILE_BYTES) continue;
+      results[index] = await this.put(file.data, { ...options, name: file.name, mime: file.mime });
+    }
+    return results;
+  }
+
+  /** Seals files into one segment, declares it, and registers each file as an entry of it. */
+  private async storeSegment(
+    space: RawSpace,
+    recipient: string,
+    files: { data: Uint8Array; meta: FileMeta; encryptedMeta: Uint8Array }[],
+    options: Pick<PutOptions, "folderId" | "idempotencyKey" | "wallet">,
+  ): Promise<{ entryIds: string[]; jobId: string }> {
+    const entryIds = files.map(() => crypto.randomUUID());
+    const segment = await sealSegment(
+      files.map((file, i) => ({
+        id: entryIds[i] as string,
+        kind: "file" as const,
+        name: file.meta.name,
+        mime: file.meta.mime,
+        data: file.data,
+      })),
+      recipient,
+    );
+    const declared = await storeObject(this.ctx, {
+      kind: "segment",
+      spaceId: space.id,
+      keyEpoch: space.keyEpoch,
+      sizeBytes: segment.length,
+      root: segment,
+      ...(options.folderId ? { folderId: options.folderId } : {}),
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
+      ...(options.wallet ? { wallet: options.wallet } : {}),
+    });
+    for (let start = 0; start < files.length; start += MAX_SEGMENT_ENTRIES) {
+      await unwrap(
+        this.ctx.transport.api.POST("/v1/objects/{id}/entries", {
+          params: { path: { id: declared.object.id } },
+          body: {
+            entries: files.slice(start, start + MAX_SEGMENT_ENTRIES).map((file, i) => ({
+              id: entryIds[start + i] as string,
+              encryptedMeta: toBase64(file.encryptedMeta),
+              sizeBytes: file.data.length,
+              ...(options.folderId ? { folderId: options.folderId } : {}),
+            })),
+          },
+        }),
+      );
+    }
+    return { entryIds, jobId: declared.job.id };
   }
 
   /** Downloads and decrypts a file on this device. */

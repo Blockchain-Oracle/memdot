@@ -1,5 +1,6 @@
 "use client";
 
+import { TINY_FILE_BYTES } from "@memdot/config";
 import type { FileInfo, Job } from "@memdot/sdk";
 import { Button } from "@memdot/ui/components/button";
 import { ChainProgress } from "@memdot/ui/components/chain-progress";
@@ -46,46 +47,99 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
   const memdot = useMemDot();
   const queryClient = useQueryClient();
   const [uploads, setUploads] = useState<Upload[]>([]);
-  const pending = useRef<{ upload: Upload; file: File }[]>([]);
+  const pending = useRef<
+    { items: { upload: Upload; file: File }[]; spaceId: string; folderId: string | null }[]
+  >([]);
   const running = useRef(false);
 
-  const patch = useCallback((id: string, next: Partial<Upload>) => {
-    setUploads((list) => list.map((u) => (u.id === id ? { ...u, ...next } : u)));
+  const patch = useCallback((ids: string[], next: Partial<Upload>) => {
+    setUploads((list) => list.map((u) => (ids.includes(u.id) ? { ...u, ...next } : u)));
   }, []);
+
+  const refresh = useCallback(
+    (spaceId: string) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["files", spaceId] }),
+        queryClient.invalidateQueries({ queryKey: ["spaces"] }),
+        queryClient.invalidateQueries({ queryKey: ["usage"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+      ]),
+    [queryClient],
+  );
+
+  /** Follows one store: the first update means the object is declared, so its row can show. */
+  const follow = useCallback(
+    (ids: string[], spaceId: string) => {
+      let listed = false;
+      return (job: Job) => {
+        patch(ids, { job });
+        if (listed) return;
+        listed = true;
+        void queryClient.invalidateQueries({ queryKey: ["files", spaceId] });
+      };
+    },
+    [patch, queryClient],
+  );
 
   const drain = useCallback(async () => {
     if (running.current) return;
     running.current = true;
     while (pending.current.length > 0) {
-      const item = pending.current.shift();
-      if (!item) break;
-      const { upload, file } = item;
-      patch(upload.id, { state: "storing" });
-      try {
-        const result = await memdot.files.put(new Uint8Array(await file.arrayBuffer()), {
-          spaceId: upload.spaceId,
-          ...(upload.folderId ? { folderId: upload.folderId } : {}),
-          name: file.name,
-          mime: file.type || "application/octet-stream",
-          onProgress: (job) => patch(upload.id, { job }),
-        });
-        patch(upload.id, { state: "done", job: result.job, file: result.file });
-      } catch (error) {
-        patch(upload.id, { state: "failed", error: describeError(error).title });
+      const batch = pending.current.shift();
+      if (!batch) break;
+      const target = {
+        spaceId: batch.spaceId,
+        ...(batch.folderId ? { folderId: batch.folderId } : {}),
+      };
+      // Small files of one batch share a segment: one blob on chain, renewed together.
+      const tiny = batch.items.filter((i) => i.file.size <= TINY_FILE_BYTES);
+      const large = batch.items.filter((i) => i.file.size > TINY_FILE_BYTES);
+      if (tiny.length > 0) {
+        const ids = tiny.map((i) => i.upload.id);
+        patch(ids, { state: "storing" });
+        try {
+          const files = await Promise.all(
+            tiny.map(async ({ file }) => ({
+              data: new Uint8Array(await file.arrayBuffer()),
+              name: file.name,
+              mime: file.type || "application/octet-stream",
+            })),
+          );
+          const results = await memdot.files.putMany(files, {
+            ...target,
+            onProgress: follow(ids, batch.spaceId),
+          });
+          results.forEach((result, i) => {
+            const id = ids[i];
+            if (id) patch([id], { state: "done", job: result.job, file: result.file });
+          });
+        } catch (error) {
+          patch(ids, { state: "failed", error: describeError(error).title });
+        }
+        await refresh(batch.spaceId);
       }
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["files", upload.spaceId] }),
-        queryClient.invalidateQueries({ queryKey: ["spaces"] }),
-        queryClient.invalidateQueries({ queryKey: ["usage"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-      ]);
+      for (const { upload, file } of large) {
+        patch([upload.id], { state: "storing" });
+        try {
+          const result = await memdot.files.put(new Uint8Array(await file.arrayBuffer()), {
+            ...target,
+            name: file.name,
+            mime: file.type || "application/octet-stream",
+            onProgress: follow([upload.id], batch.spaceId),
+          });
+          patch([upload.id], { state: "done", job: result.job, file: result.file });
+        } catch (error) {
+          patch([upload.id], { state: "failed", error: describeError(error).title });
+        }
+        await refresh(batch.spaceId);
+      }
     }
     running.current = false;
-  }, [memdot, patch, queryClient]);
+  }, [memdot, patch, follow, refresh]);
 
   const enqueue = useCallback<UploadsValue["enqueue"]>(
     (files, target) => {
-      const added = files.map((file) => ({
+      const items = files.map((file) => ({
         upload: {
           id: crypto.randomUUID(),
           name: file.name,
@@ -99,8 +153,8 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
         },
         file,
       }));
-      pending.current.push(...added);
-      setUploads((list) => [...added.map((a) => a.upload), ...list]);
+      pending.current.push({ items, spaceId: target.spaceId, folderId: target.folderId });
+      setUploads((list) => [...items.map((i) => i.upload), ...list]);
       void drain();
     },
     [drain],
