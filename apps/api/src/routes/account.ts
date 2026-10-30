@@ -1,12 +1,13 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { accounts, account as authAccount, user as authUser, objects, passkey } from "@memdot/db";
 import { Address, verifySignature } from "@talismn/siws";
-import { and, count, eq, isNull, ne } from "drizzle-orm";
+import { and, count, eq, isNull, ne, type SQL } from "drizzle-orm";
 import { type Hex, verifyMessage } from "viem";
 import { db } from "../db.js";
 import { badRequest, conflict, forbidden } from "../lib/errors.js";
-import { assertFreshSession, forgetAccount, principalOf } from "../lib/principal.js";
-import { authenticated, createRouter, errorResponses } from "../lib/router.js";
+import { tombstoneObjects } from "../lib/lifecycle.js";
+import { accountOf, assertFreshSession, forgetAccount, principalOf } from "../lib/principal.js";
+import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { Cid, Hex32 } from "../schemas.js";
 
 const RECOVERY_PROVIDER = "recovery-code";
@@ -235,6 +236,79 @@ export function accountRoutes() {
           .returning();
         if (!row) throw new Error("account upsert returned no row");
         forgetAccount(principal.userId);
+        return c.json(serialize(row), 200);
+      },
+    )
+    .openapi(
+      createRoute({
+        method: "patch",
+        path: "/v1/account",
+        tags: ["Account"],
+        summary: "Point the account at a new key bundle",
+        description:
+          "After the client re-wraps the master key (a new recovery code, an added passkey or wallet) and stores the new bundle. Needs a recent sign-in in the dashboard.",
+        security: [{ Session: [] }],
+        request: {
+          body: {
+            content: jsonContent(z.object({ keyBundleCid: Cid }).openapi("KeyBundleUpdate")),
+            required: true,
+          },
+        },
+        responses: {
+          200: { description: "Account", content: jsonContent(Account) },
+          ...errorResponses,
+        },
+      }),
+      async (c) => {
+        const principal = principalOf(c);
+        if (principal.via !== "session") {
+          throw forbidden("Unlock methods change in the dashboard, not with an API key.");
+        }
+        assertFreshSession(principal);
+        const accountId = accountOf(c);
+        const { keyBundleCid } = c.req.valid("json");
+        const [bundle] = await db
+          .select({ id: objects.id })
+          .from(objects)
+          .where(
+            and(
+              eq(objects.accountId, accountId),
+              eq(objects.kind, "key_bundle"),
+              eq(objects.cid, keyBundleCid),
+              ne(objects.status, "tombstoned"),
+            ),
+          )
+          .limit(1);
+        if (!bundle) {
+          throw badRequest(
+            "KEY_BUNDLE_UNKNOWN",
+            "Store the key bundle on this account before pointing to it.",
+          );
+        }
+        const [previous] = await db
+          .select({ keyBundleCid: accounts.keyBundleCid })
+          .from(accounts)
+          .where(eq(accounts.id, accountId));
+        const row = await db.transaction(async (tx) => {
+          const [updated] = await tx
+            .update(accounts)
+            .set({ keyBundleCid })
+            .where(eq(accounts.id, accountId))
+            .returning();
+          // The old bundle still opens with the old recovery code: stop renewing it.
+          if (previous?.keyBundleCid && previous.keyBundleCid !== keyBundleCid) {
+            await tombstoneObjects(
+              tx,
+              and(
+                eq(objects.accountId, accountId),
+                eq(objects.kind, "key_bundle"),
+                eq(objects.cid, previous.keyBundleCid),
+              ) as SQL,
+            );
+          }
+          return updated;
+        });
+        if (!row) throw new Error("account update returned no row");
         return c.json(serialize(row), 200);
       },
     );
