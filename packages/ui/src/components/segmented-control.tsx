@@ -45,7 +45,7 @@ export function SegmentedControl({
   const controlled = value !== undefined;
   const current = controlled ? value : internal;
   const found = options.findIndex((o) => o.value === current);
-  const index = found < 0 ? 0 : found;
+  const index = Math.max(found, 0);
 
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const emit = useRef(onValueChange);

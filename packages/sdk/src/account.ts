@@ -267,6 +267,17 @@ export class AccountApi {
     });
   }
 
+  /**
+   * Reads the PRF output of one of this site's passkeys, to wrap the key to it (one prompt, local
+   * only). Null when the passkey has no PRF.
+   */
+  async passkeyUnlockWrap(): Promise<UnlockWrap | null> {
+    const passkey = await evaluatePasskey({ allowCredentials: [] });
+    return passkey.secret
+      ? { kind: "passkey", id: passkey.credentialId, secret: passkey.secret }
+      : null;
+  }
+
   /** How this account can be unlocked: the key bundle's wraps (no secrets in them). */
   async unlockMethods(): Promise<Pick<KeyWrap, "kind" | "id">[]> {
     return (await this.keyBundle()).wraps.map(({ kind, id }) => ({ kind, id }));

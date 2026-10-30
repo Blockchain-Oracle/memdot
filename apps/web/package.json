@@ -12,6 +12,7 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@memdot/chain": "workspace:*",
     "@memdot/config": "workspace:*",
     "@memdot/sdk": "workspace:*",
     "@memdot/ui": "workspace:*",

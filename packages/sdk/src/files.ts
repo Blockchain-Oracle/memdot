@@ -6,7 +6,7 @@ import {
   storageEventsAt,
   toHex,
 } from "@memdot/chain";
-import { TINY_FILE_BYTES } from "@memdot/config";
+import { BITSWAP_TIMEOUT_MS, TINY_FILE_BYTES } from "@memdot/config";
 import {
   buildManifest,
   decryptObject,
@@ -348,7 +348,10 @@ export class FilesApi {
         let onChain = false;
         if (blob.block !== null && blob.indexInBlock !== null) {
           const hash = toHex(contentHashFromCid(blob.cid));
-          const events = await storageEventsAt(chain, blob.block);
+          const events = await withTimeout(
+            storageEventsAt(chain, blob.block),
+            BITSWAP_TIMEOUT_MS,
+          ).catch(() => []);
           onChain = events.some(
             (event) => event.index === blob.indexInBlock && toHex(event.contentHash) === hash,
           );
@@ -389,4 +392,15 @@ function toBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
+}
+
+/** Rejects when the promise takes longer than `ms` (a node that stops answering). */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }

@@ -1,3 +1,5 @@
+export { formatTpot } from "@memdot/chain";
+export { isValidRecoveryCode, normalizeRecoveryCode } from "@memdot/crypto";
 export {
   type Account,
   AccountApi,

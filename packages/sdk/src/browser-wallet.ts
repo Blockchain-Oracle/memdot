@@ -21,6 +21,11 @@ export const DAPP_NAME = "MemDot";
 
 /** The Substrate wallets named in the UI, with where to get them. */
 export const SUBSTRATE_WALLETS = [
+  {
+    id: "portaldot extension",
+    name: "Portaldot Extension",
+    url: "https://github.com/portaldotVolunteer",
+  },
   { id: "talisman", name: "Talisman", url: "https://talisman.xyz/download" },
   { id: "subwallet-js", name: "SubWallet", url: "https://www.subwallet.app/download.html" },
   { id: "polkadot-js", name: "polkadot{.js}", url: "https://polkadot.js.org/extension/" },

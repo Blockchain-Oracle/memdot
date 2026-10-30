@@ -132,6 +132,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@memdot/chain':
+        specifier: workspace:*
+        version: link:../../packages/chain
       '@memdot/config':
         specifier: workspace:*
         version: link:../../packages/config

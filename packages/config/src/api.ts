@@ -21,3 +21,6 @@ export const IDEMPOTENCY_HEADER = "idempotency-key";
 
 /** Header echoed on every response so support can trace one request. */
 export const REQUEST_ID_HEADER = "x-request-id";
+
+/** The name an account gets when sign-up gives none (the UI hides it). */
+export const DEFAULT_DISPLAY_NAME = "MemDot account";

@@ -5,6 +5,7 @@ import {
   API_KEY_LENGTH,
   API_KEY_PREFIX,
   API_KEY_VISIBLE_CHARS,
+  DEFAULT_DISPLAY_NAME,
   EVM_CHAIN_ID,
 } from "@memdot/config";
 import {
@@ -36,7 +37,6 @@ export const FRESH_SESSION_SECONDS = 15 * 60;
 /** How long a session check may be answered from the signed cookie instead of the database. */
 const SESSION_COOKIE_CACHE_SECONDS = 60;
 const DISPLAY_NAME_MAX = 64;
-const DEFAULT_DISPLAY_NAME = "MemDot account";
 
 /** WebAuthn ceremonies whose responses must never carry the PRF output (R10, D4). */
 const PASSKEY_VERIFY_PATHS = new Set([
