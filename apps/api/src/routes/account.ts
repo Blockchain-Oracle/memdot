@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { EVM_ACCOUNT_SUFFIX } from "@memdot/config";
 import { accounts, account as authAccount, user as authUser, objects, passkey } from "@memdot/db";
 import { Address, verifySignature } from "@talismn/siws";
 import { and, count, eq, isNull, ne, type SQL } from "drizzle-orm";
@@ -11,9 +12,6 @@ import { authenticated, createRouter, errorResponses, jsonContent } from "../lib
 import { Cid, Hex32 } from "../schemas.js";
 
 const RECOVERY_PROVIDER = "recovery-code";
-/** Revive maps an unmapped H160 to an AccountId32 by appending twelve 0xEE bytes. */
-const EVM_ACCOUNT_SUFFIX = "ee".repeat(12);
-
 /** What the owner signs to prove the chain account is theirs (it is bound to the user id). */
 export const ownerProofMessage = (userId: string, ownerAccount: string) =>
   `memdot:owner:v1:${userId}:${ownerAccount}`;

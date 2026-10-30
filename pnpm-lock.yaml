@@ -430,12 +430,18 @@ importers:
       '@noble/hashes':
         specifier: ^2.4.0
         version: 2.4.0
+      '@scure/base':
+        specifier: ^2.4.0
+        version: 2.4.0
       '@talismn/siws':
         specifier: ^2.1.0
         version: 2.1.0
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0
+      viem:
+        specifier: ^2.57.13
+        version: 2.57.13(typescript@6.0.3)(zod@4.6.7)
     devDependencies:
       '@scure/bip39':
         specifier: ^2.4.0

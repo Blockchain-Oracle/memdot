@@ -18,9 +18,24 @@ const KEK_INFO: Record<UnlockKind, string> = {
   recovery: "memdot/kek/recovery/v1",
 };
 
-/** PRF inputs are bound to this label and the wrap's salt (same idea as age's fido2prf). */
+/** PRF inputs are bound to this label and a salt (same idea as age's fido2prf). */
 const PRF_LABEL = "memdot/prf/v1";
 const SALT_BYTES = 32;
+
+/**
+ * The PRF salt every MemDot passkey is evaluated with. Sign-in is username-less, so the browser
+ * must send PRF inputs before anyone knows which account (and which wrap) answers; a fixed salt
+ * lets one prompt both sign in and unlock. Each wrap's own random salt still keys the KEK.
+ */
+export const PASSKEY_PRF_SALT = new Uint8Array(SALT_BYTES);
+
+/**
+ * What a wallet's `signVrf` signs to unlock: data and context are hex-encoded by the caller.
+ * Wallets bind the output to the page origin, so the canonical origin must never change.
+ */
+export const VRF_WRAP_INPUT = { data: "memdot/amk-wrap/v1", context: "amk" } as const;
+/** Only the first 32 bytes of a VRF signature are deterministic (the proof is randomized). */
+export const VRF_OUTPUT_BYTES = 32;
 
 export interface KeyWrap {
   kind: UnlockKind;

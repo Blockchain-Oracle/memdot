@@ -5,6 +5,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   deriveSpaceKey,
   INFO,
+  ownerSeed,
   recoverySecret,
   recoverySignInKey,
   userKeyPair,
@@ -27,6 +28,7 @@ const vectors = {
   spaceId: "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b",
   spaceEpoch: 3,
   spaceKey: bytesToHex(deriveSpaceKey(amk, "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b", 3).key),
+  ownerSeed: bytesToHex(ownerSeed(amk)),
 };
 
 await writeFile(

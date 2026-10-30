@@ -9,5 +9,6 @@
   "derivedPublicKey": "9b5819e9a340c4584a92dc4e62ea234a9d9e75f3d672f62f2ab22ee0335a726a",
   "spaceId": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b",
   "spaceEpoch": 3,
-  "spaceKey": "18bbe890d07ba99f109023df0312abfb6da6f817b0293855081644f4423a40f7"
+  "spaceKey": "18bbe890d07ba99f109023df0312abfb6da6f817b0293855081644f4423a40f7",
+  "ownerSeed": "98fefb80e8071ece8b2fd4098566ac2949e15d681f16706b348c6719f4519d4c"
 }

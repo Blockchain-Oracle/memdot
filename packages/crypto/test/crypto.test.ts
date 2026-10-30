@@ -21,6 +21,7 @@ import {
   openManifest,
   openSegment,
   openSpaceKeyring,
+  ownerSeed,
   padmeLength,
   parseKeyBundle,
   passkeySecret,
@@ -269,6 +270,7 @@ describe("test vectors (shared with the Python SDK)", () => {
       spaceId: string;
       spaceEpoch: number;
       spaceKey: string;
+      ownerSeed: string;
     };
     assert.equal(bytesToHex(userKeyPair(hexToBytes(vectors.amk)).publicKey), vectors.userPublicKey);
     assert.equal(bytesToHex(recoverySecret(vectors.recoveryCode)), vectors.recoverySecret);
@@ -284,5 +286,6 @@ describe("test vectors (shared with the Python SDK)", () => {
       bytesToHex(deriveSpaceKey(hexToBytes(vectors.amk), vectors.spaceId, vectors.spaceEpoch).key),
       vectors.spaceKey,
     );
+    assert.equal(bytesToHex(ownerSeed(hexToBytes(vectors.amk))), vectors.ownerSeed);
   });
 });

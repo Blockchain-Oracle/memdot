@@ -10,6 +10,8 @@ export const TPOT_DECIMALS = 14;
 export const EVM_DECIMALS = 18;
 /** Revive's NativeToEthRatio: 1 planck (14 decimals) = 10,000 wei-units (18 decimals). */
 export const NATIVE_TO_ETH_RATIO = 10_000n;
+/** pallet-revive maps an H160 to an AccountId32 by appending twelve 0xEE bytes. */
+export const EVM_ACCOUNT_SUFFIX = "ee".repeat(12);
 
 export const BLOCK_MS = 6_000;
 

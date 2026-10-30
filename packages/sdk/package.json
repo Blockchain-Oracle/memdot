@@ -27,8 +27,10 @@
     "@memdot/config": "workspace:*",
     "@memdot/crypto": "workspace:*",
     "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
     "@talismn/siws": "^2.1.0",
-    "openapi-fetch": "^0.17.0"
+    "openapi-fetch": "^0.17.0",
+    "viem": "^2.57.13"
   },
   "devDependencies": {
     "@scure/bip39": "^2.4.0",

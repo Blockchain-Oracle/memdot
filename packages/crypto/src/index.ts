@@ -6,6 +6,7 @@ export {
   type KeyBundle,
   type KeyWrap,
   newSalt,
+  PASSKEY_PRF_SALT,
   parseKeyBundle,
   passkeySecret,
   prfInputs,
@@ -13,6 +14,8 @@ export {
   serializeKeyBundle,
   type UnlockKind,
   unwrapMasterKey,
+  VRF_OUTPUT_BYTES,
+  VRF_WRAP_INPUT,
 } from "./key-bundle.js";
 export { openSpaceKeyring, type SpaceKeyring, sealSpaceKeyring } from "./keyring.js";
 export {
@@ -22,6 +25,7 @@ export {
   generateX25519,
   INFO,
   KEY_BYTES,
+  ownerSeed,
   publicKeyFromAgeRecipient,
   randomKey,
   userIdentity,

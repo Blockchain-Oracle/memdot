@@ -15,6 +15,7 @@ export const INFO = {
   space: "memdot/space-x25519/v1",
   spaceKey: "memdot/space-key/v1",
   recoverySignIn: "memdot/recovery-signin-ed25519/v1",
+  owner: "memdot/owner-sr25519/v1",
 } as const;
 
 export interface X25519KeyPair {
@@ -44,6 +45,15 @@ export function generateX25519(): X25519KeyPair {
 /** The user's sharing key: anyone can encrypt to its public half, published in the registry. */
 export function userKeyPair(accountMasterKey: Uint8Array): X25519KeyPair {
   return x25519FromSeed(accountMasterKey, INFO.user);
+}
+
+/**
+ * The chain-account seed for accounts without a wallet (passkey or recovery-code sign-up): an
+ * sr25519 mini secret only the master key can produce, so the account owns a chain identity
+ * without storing another secret.
+ */
+export function ownerSeed(accountMasterKey: Uint8Array): Uint8Array {
+  return deriveKey(accountMasterKey, INFO.owner);
 }
 
 /** The account's age recipient: what others seal shares to (its `encryptionKey`). */

@@ -16,7 +16,15 @@ export {
   renewDueAtBlock,
   retentionState,
 } from "./retention.js";
-export { type LocalSigner, signerFromMnemonic, type TxCreator } from "./signer.js";
+export {
+  type InjectedSigner,
+  type LocalSigner,
+  publicKeyOf,
+  signerFromMnemonic,
+  signerFromSeed,
+  type TxCreator,
+  txCreatorFromInjected,
+} from "./signer.js";
 export {
   type RenewResult,
   renew,

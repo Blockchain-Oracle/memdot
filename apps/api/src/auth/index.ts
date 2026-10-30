@@ -126,6 +126,9 @@ export const auth = betterAuth({
       rpID: env.RP_ID,
       rpName: "MemDot",
       origin: env.WEB_ORIGIN,
+      // Discoverable (username-less sign-in) and user-verified: PRF needs UV, and the passkey
+      // guards the key.
+      authenticatorSelection: { residentKey: "required", userVerification: "required" },
       registration: {
         // Passkey-first sign-up: no account exists until the ceremony succeeds.
         requireSession: false,
