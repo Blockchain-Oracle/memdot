@@ -13,6 +13,7 @@ export const INFO = {
   user: "memdot/user-x25519/v1",
   object: "memdot/object-x25519/v1",
   space: "memdot/space-x25519/v1",
+  spaceKey: "memdot/space-key/v1",
   recoverySignIn: "memdot/recovery-signin-ed25519/v1",
 } as const;
 
@@ -43,6 +44,16 @@ export function generateX25519(): X25519KeyPair {
 /** The user's sharing key: anyone can encrypt to its public half, published in the registry. */
 export function userKeyPair(accountMasterKey: Uint8Array): X25519KeyPair {
   return x25519FromSeed(accountMasterKey, INFO.user);
+}
+
+/** The account's age recipient: what others seal shares to (its `encryptionKey`). */
+export function userRecipient(accountMasterKey: Uint8Array): string {
+  return ageRecipient(userKeyPair(accountMasterKey).publicKey);
+}
+
+/** The account's age identity: opens anything shared with it. */
+export function userIdentity(accountMasterKey: Uint8Array): string {
+  return ageIdentity(userKeyPair(accountMasterKey).secretKey);
 }
 
 export function ageRecipient(publicKey: Uint8Array): string {

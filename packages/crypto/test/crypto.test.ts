@@ -10,6 +10,8 @@ import {
   buildManifest,
   createKeyBundle,
   decryptObject,
+  deriveSpaceKey,
+  deriveSpaceKeys,
   encryptObject,
   generateRecoveryCode,
   generateSpaceKey,
@@ -18,6 +20,7 @@ import {
   manifestObjectKey,
   openManifest,
   openSegment,
+  openSpaceKeyring,
   padmeLength,
   parseKeyBundle,
   passkeySecret,
@@ -28,12 +31,15 @@ import {
   rotateSpaceKey,
   sealManifest,
   sealSegment,
+  sealSpaceKeyring,
   serializeKeyBundle,
   signRecoveryChallenge,
   spaceIdentity,
   spaceRecipient,
   unwrapMasterKey,
+  userIdentity,
   userKeyPair,
+  userRecipient,
   verifyRecoveryChallenge,
   WrongKeyError,
   x25519FromSeed,
@@ -182,6 +188,47 @@ describe("sharing", () => {
   });
 });
 
+describe("space keys and keyrings", () => {
+  it("derives the same key per space and epoch on any device, and different keys otherwise", () => {
+    const amk = randomBytes(32);
+    assert.deepEqual(deriveSpaceKey(amk, "space-a", 0).key, deriveSpaceKey(amk, "space-a", 0).key);
+    assert.notDeepEqual(
+      deriveSpaceKey(amk, "space-a", 0).key,
+      deriveSpaceKey(amk, "space-a", 1).key,
+    );
+    assert.notDeepEqual(
+      deriveSpaceKey(amk, "space-a", 0).key,
+      deriveSpaceKey(amk, "space-b", 0).key,
+    );
+    assert.deepEqual(
+      deriveSpaceKeys(amk, "space-a", 2).map((k) => k.epoch),
+      [0, 1, 2],
+    );
+  });
+
+  it("hands a grantee every epoch so far, and only the grantee", async () => {
+    const owner = randomBytes(32);
+    const grantee = randomBytes(32);
+    const keys = deriveSpaceKeys(owner, "space-a", 1);
+    const sealed = await sealSpaceKeyring("space-a", keys, [userRecipient(grantee)]);
+    const opened = await openSpaceKeyring(sealed, userIdentity(grantee));
+    assert.equal(opened.spaceId, "space-a");
+    assert.deepEqual(
+      opened.keys.map((k) => k.key),
+      keys.map((k) => k.key),
+    );
+    await assert.rejects(openSpaceKeyring(sealed, userIdentity(randomBytes(32))), WrongKeyError);
+    // A revoked grantee keeps epochs 0–1 but cannot open what is sealed with epoch 2.
+    const next = await sealSegment(
+      [{ id: "v2", kind: "file", data: randomBytes(10) }],
+      spaceRecipient(deriveSpaceKey(owner, "space-a", 2)),
+    );
+    for (const key of opened.keys) {
+      await assert.rejects(openSegment(next, spaceIdentity(key)), WrongKeyError);
+    }
+  });
+});
+
 describe("segments", () => {
   it("packs 20 tiny files and opens them intact", async () => {
     const space = generateSpaceKey();
@@ -219,6 +266,9 @@ describe("test vectors (shared with the Python SDK)", () => {
       seed: string;
       info: string;
       derivedPublicKey: string;
+      spaceId: string;
+      spaceEpoch: number;
+      spaceKey: string;
     };
     assert.equal(bytesToHex(userKeyPair(hexToBytes(vectors.amk)).publicKey), vectors.userPublicKey);
     assert.equal(bytesToHex(recoverySecret(vectors.recoveryCode)), vectors.recoverySecret);
@@ -229,6 +279,10 @@ describe("test vectors (shared with the Python SDK)", () => {
     assert.equal(
       bytesToHex(x25519FromSeed(hexToBytes(vectors.seed), vectors.info).publicKey),
       vectors.derivedPublicKey,
+    );
+    assert.equal(
+      bytesToHex(deriveSpaceKey(hexToBytes(vectors.amk), vectors.spaceId, vectors.spaceEpoch).key),
+      vectors.spaceKey,
     );
   });
 });

@@ -14,6 +14,7 @@ export {
   type UnlockKind,
   unwrapMasterKey,
 } from "./key-bundle.js";
+export { openSpaceKeyring, type SpaceKeyring, sealSpaceKeyring } from "./keyring.js";
 export {
   ageIdentity,
   ageRecipient,
@@ -23,7 +24,9 @@ export {
   KEY_BYTES,
   publicKeyFromAgeRecipient,
   randomKey,
+  userIdentity,
   userKeyPair,
+  userRecipient,
   type X25519KeyPair,
   x25519FromSeed,
 } from "./keys.js";
@@ -61,6 +64,8 @@ export {
   unpackSegment,
 } from "./segment.js";
 export {
+  deriveSpaceKey,
+  deriveSpaceKeys,
   generateSpaceKey,
   rotateSpaceKey,
   type SpaceKey,

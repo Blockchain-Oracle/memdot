@@ -1,4 +1,4 @@
-import { ageIdentity, ageRecipient, INFO, randomKey, x25519FromSeed } from "./keys.js";
+import { ageIdentity, ageRecipient, deriveKey, INFO, randomKey, x25519FromSeed } from "./keys.js";
 
 /**
  * A space (or folder) key is symmetric; its X25519 identity is derived from it, so anything
@@ -8,6 +8,30 @@ import { ageIdentity, ageRecipient, INFO, randomKey, x25519FromSeed } from "./ke
 export interface SpaceKey {
   epoch: number;
   key: Uint8Array;
+}
+
+/**
+ * The owner's space keys are derived, not stored: the master key, the space id and the epoch give
+ * the same key on any device, so nothing extra is written to the chain or the database. Revoking
+ * a grant moves the space to the next epoch, whose key no former grantee was ever given.
+ */
+export function deriveSpaceKey(
+  accountMasterKey: Uint8Array,
+  spaceId: string,
+  epoch: number,
+): SpaceKey {
+  return { epoch, key: deriveKey(accountMasterKey, `${INFO.spaceKey}/${spaceId}/${epoch}`) };
+}
+
+/** Every epoch's key up to and including `throughEpoch`: what a space grant hands over. */
+export function deriveSpaceKeys(
+  accountMasterKey: Uint8Array,
+  spaceId: string,
+  throughEpoch: number,
+): SpaceKey[] {
+  return Array.from({ length: throughEpoch + 1 }, (_, epoch) =>
+    deriveSpaceKey(accountMasterKey, spaceId, epoch),
+  );
 }
 
 export function generateSpaceKey(epoch = 0): SpaceKey {
