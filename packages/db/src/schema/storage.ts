@@ -136,6 +136,8 @@ export const objects = pgTable(
     relayed: boolean("relayed").notNull().default(true),
     /** Quota bytes this object holds in its space; released exactly once, then zero. */
     reservedBytes: bigint("reserved_bytes", { mode: "number" }).notNull().default(0),
+    /** The space key epoch its manifest and metadata are sealed with (null for account objects). */
+    keyEpoch: integer("key_epoch"),
     createdAt: createdAt(),
     tombstonedAt: timestamp("tombstoned_at", { withTimezone: true }),
   },

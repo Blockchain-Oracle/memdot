@@ -13,6 +13,7 @@
     "smoke:auth": "tsx scripts/smoke-auth.ts",
     "walk:s04": "tsx scripts/walk-s04.ts",
     "check:guards": "tsx scripts/check-guards.ts",
+    "openapi": "tsx scripts/openapi.ts",
     "auth:generate": "auth generate --config src/auth/index.ts --output ../../packages/db/src/schema/auth.ts --yes"
   },
   "dependencies": {

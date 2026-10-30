@@ -103,12 +103,13 @@ export const StoredObject = z
     encryptedMeta: z.string().nullable(),
     segmentId: z.uuid().nullable(),
     previousVersionId: z.uuid().nullable(),
+    keyEpoch: z.number().int().nullable(),
     createdAt: z.iso.datetime(),
     tombstonedAt: z.iso.datetime().nullable(),
   })
   .openapi("Object");
 
-const ObjectDetail = StoredObject.extend({
+export const ObjectDetail = StoredObject.extend({
   blobs: z.array(Blob),
   headBlock: z.number().int().nullable(),
 }).openapi("ObjectDetail");
@@ -141,6 +142,10 @@ const NewObject = z
       .uuid()
       .optional()
       .openapi({ description: "Makes this a new version of that file" }),
+    keyEpoch: z.number().int().min(0).optional().openapi({
+      description:
+        "The space key epoch the manifest and metadata are sealed with. Required for space objects; must be the space's current epoch.",
+    }),
   })
   .openapi("NewObject");
 
@@ -158,11 +163,12 @@ export const serializeObject = (row: ObjectRow) => ({
   encryptedMeta: toBase64(row.encryptedMeta),
   segmentId: row.segmentId,
   previousVersionId: row.previousVersionId,
+  keyEpoch: row.keyEpoch,
   createdAt: row.createdAt.toISOString(),
   tombstonedAt: row.tombstonedAt?.toISOString() ?? null,
 });
 
-function serializeBlob(row: StoredItemRow, staged: boolean) {
+export function serializeBlob(row: StoredItemRow, staged: boolean) {
   return {
     role: row.role,
     index: row.chunkIndex,
@@ -184,7 +190,7 @@ const uploadUrl = (objectId: string, role: string, index: number) =>
   `/v1/objects/${objectId}/blobs/${role}/${index}`;
 
 /** Blobs in store order: data chunks first, then the root that lists them. */
-const storeOrder = (items: StoredItemRow[]) =>
+export const storeOrder = (items: StoredItemRow[]) =>
   [...items].sort((a, b) =>
     a.role === b.role ? a.chunkIndex - b.chunkIndex : a.role === "chunk" ? -1 : 1,
   );
@@ -336,6 +342,18 @@ export function objectRoutes(services: Services) {
           }
         }
         // Decided once, here: later mode switches on the space never change who pays.
+        if (space) {
+          // New writes use the current epoch: a client that missed a rotation must not keep
+          // sealing with a key a revoked grantee still holds.
+          if (body.keyEpoch !== space.keyEpoch) {
+            throw new HttpError(
+              409,
+              "KEY_EPOCH_STALE",
+              "The space key moved to a new epoch. Seal with the current one.",
+              { keyEpoch: space.keyEpoch },
+            );
+          }
+        }
         const relayed = system || space?.mode === "sponsored";
         const reservedBytes = space && relayed ? total : 0;
         if (relayed && (await sponsoredStoragePaused())) {
@@ -387,6 +405,7 @@ export function objectRoutes(services: Services) {
               previousVersionId: body.previousVersionId ?? null,
               relayed,
               reservedBytes,
+              keyEpoch: space ? space.keyEpoch : null,
             });
             await tx.insert(storedItems).values(
               blobs.map((blob) => ({
@@ -915,6 +934,7 @@ export function objectRoutes(services: Services) {
               folderId: entry.folderId ?? null,
               kind: "file" as const,
               status: segment.status,
+              keyEpoch: segment.keyEpoch,
               sizeBytes: entry.sizeBytes,
               encryptedMeta: fromBase64(entry.encryptedMeta),
               segmentId: segment.id,

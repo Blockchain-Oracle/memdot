@@ -13,7 +13,7 @@ const GATEWAY_RATE = { max: 300, windowMs: 60_000 };
 /** Content-addressed bytes never change, so clients and CDNs may keep them forever. */
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
-type Source = "staging" | "cache" | "chain";
+export type Source = "staging" | "cache" | "chain";
 
 /**
  * Ciphertext the API accepted but the chain does not hold yet. Only its owner can read it here
@@ -34,11 +34,14 @@ async function staged(cid: string, accountId: string): Promise<Uint8Array | null
   return row?.data ?? null;
 }
 
-export function gatewayRoutes(services: Services) {
+/**
+ * Reads stored bytes by CID: staged ciphertext (only when reading for its owner), then the disk
+ * cache, then `bitswap_v1_get` with the hash checked. Shared by the public gateway and the
+ * routes that hand a grantee its wrapped key.
+ */
+export function createBlobReader(services: Services) {
   const cache = services.gatewayCache;
-  const limiter = new RateLimiter(GATEWAY_RATE.max, GATEWAY_RATE.windowMs);
-
-  async function read(
+  return async function read(
     cid: string,
     accountId: string | null,
   ): Promise<{ bytes: Uint8Array; source: Source }> {
@@ -64,7 +67,12 @@ export function gatewayRoutes(services: Services) {
         "No Portaldot node returned these bytes in time. They may have expired or not be stored yet.",
       );
     }
-  }
+  };
+}
+
+export function gatewayRoutes(services: Services) {
+  const read = createBlobReader(services);
+  const limiter = new RateLimiter(GATEWAY_RATE.max, GATEWAY_RATE.windowMs);
 
   return createRouter().openapi(
     createRoute({

@@ -94,7 +94,14 @@ export function spaceRoutes() {
           body: {
             content: jsonContent(
               z
-                .object({ encryptedName: SealedText, mode: Mode.default("sponsored") })
+                .object({
+                  id: z.uuid().optional().openapi({
+                    description:
+                      "Chosen by the client so it can seal the name with the space's own key before creating it",
+                  }),
+                  encryptedName: SealedText,
+                  mode: Mode.default("sponsored"),
+                })
                 .openapi("NewSpace"),
             ),
             required: true,
@@ -127,13 +134,15 @@ export function spaceRoutes() {
         const [row] = await db
           .insert(spaces)
           .values({
+            ...(body.id ? { id: body.id } : {}),
             accountId,
             encryptedName: fromBase64(body.encryptedName),
             mode: body.mode,
             quotaBytes: env.SPONSORED_QUOTA_BYTES,
           })
+          .onConflictDoNothing()
           .returning();
-        if (!row) throw new Error("space insert returned no row");
+        if (!row) throw conflict("SPACE_ID_TAKEN", "That space id is already in use.");
         return c.json(serializeSpace(row), 201);
       },
     )

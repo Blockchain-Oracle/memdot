@@ -43,6 +43,13 @@
       "when": 1793283304833,
       "tag": "0005_review_fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793340110416,
+      "tag": "0006_key_epochs",
+      "breakpoints": true
     }
   ]
 }

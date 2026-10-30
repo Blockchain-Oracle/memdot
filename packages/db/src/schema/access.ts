@@ -31,6 +31,9 @@ export const grants = pgTable(
     scope: grantScope("scope").notNull().default("read"),
     status: grantStatus("status").notNull().default("pending"),
     wrappedKeyCid: text("wrapped_key_cid"),
+    /** For space grants: the newest epoch the wrapped keyring holds. Behind the space's epoch
+     * after a revoke, until the owner's client re-wraps it. */
+    keyEpoch: integer("key_epoch"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: createdAt(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),

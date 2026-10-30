@@ -21,6 +21,7 @@ import { jobRoutes } from "./routes/jobs.js";
 import { keyRoutes } from "./routes/keys.js";
 import { objectRoutes } from "./routes/objects.js";
 import { proofRoutes } from "./routes/proof.js";
+import { sharedRoutes } from "./routes/shared.js";
 import { spaceRoutes } from "./routes/spaces.js";
 import { usageRoutes } from "./routes/usage.js";
 import type { Services } from "./types.js";
@@ -120,6 +121,7 @@ export function createApp(services: Services) {
     .route("/", objectRoutes(services))
     .route("/", gatewayRoutes(services))
     .route("/", grantRoutes())
+    .route("/", sharedRoutes(services))
     .route("/", keyRoutes())
     .route("/", agentRoutes())
     .route("/", jobRoutes(services))
