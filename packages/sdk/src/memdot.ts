@@ -49,12 +49,7 @@ export class MemDot {
     const ctx: Context = {
       transport: this.transport,
       vault,
-      chain: () => {
-        this.chainClient ??= import("@memdot/chain").then(({ createChainClient }) =>
-          createChainClient(options.rpc ?? PORTALDOT_WSS),
-        );
-        return this.chainClient;
-      },
+      chain: () => this.chain(),
     };
     this.jobs = new JobsApi(ctx);
     this.keys = new KeysApi(ctx);
@@ -76,6 +71,17 @@ export class MemDot {
 
   usage(): Promise<Usage> {
     return unwrap(this.transport.api.GET("/v1/usage"));
+  }
+
+  /**
+   * This device's own connection to Portaldot V3, opened on first use: verify reads through it,
+   * and a UI can follow `client.finalizedBlock$` for the live head. Never routed through MemDot.
+   */
+  chain(): Promise<ChainClient> {
+    this.chainClient ??= import("@memdot/chain").then(({ createChainClient }) =>
+      createChainClient(this.options.rpc ?? PORTALDOT_WSS),
+    );
+    return this.chainClient;
   }
 
   /** Closes the chain connection, if one was opened. Keys stay until `account.lock()`. */

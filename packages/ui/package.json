@@ -16,6 +16,7 @@
     "./hooks/*": "./src/hooks/*.ts"
   },
   "dependencies": {
+    "@noble/hashes": "^2.4.0",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "cn": "^0.5.0",

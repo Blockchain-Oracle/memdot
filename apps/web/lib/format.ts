@@ -1,3 +1,5 @@
+import { TPOT_DECIMALS } from "@memdot/config";
+
 const UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 const KIB = 1024;
 
@@ -41,4 +43,12 @@ export function formatDualTime(date: string | Date): { local: string; utc: strin
     local: d.toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }),
     utc: `${d.toISOString().replace("T", " ").slice(0, 16)} UTC`,
   };
+}
+
+export const TPOT_SHOWN_DIGITS = 4;
+
+/** Planck (14 decimals) to tPOT as a number, exact to the digits shown. */
+export function planckToTpot(planck: string | bigint): number {
+  const scale = 10n ** BigInt(TPOT_DECIMALS - TPOT_SHOWN_DIGITS);
+  return Number(BigInt(planck) / scale) / 10 ** TPOT_SHOWN_DIGITS;
 }
