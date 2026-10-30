@@ -1,0 +1,79 @@
+{
+  "stage": "S05",
+  "spaceId": "9ffc61fd-73e1-444b-ba76-a2ce6b0a6c9d",
+  "evidence": [
+    {
+      "step": "v1 stored",
+      "job": {
+        "id": "224e69bb-7651-4d8f-aab4-26d684a7b66a",
+        "accountId": "ddb2bd3e-9669-413f-98ca-e91b2598c4e2",
+        "kind": "store_object",
+        "status": "finalized",
+        "txHash": "0xa8ea0731271c2e56e231e1867a98b2730edcac07417dae60dfb2b0b1b3586c6b",
+        "block": 248852,
+        "error": null,
+        "progress": {
+          "done": 1,
+          "total": 1
+        },
+        "updatedAt": "2026-10-30T06:16:55.448Z"
+      }
+    },
+    {
+      "step": "v1 verified",
+      "verified": {
+        "ok": true,
+        "blobs": [
+          {
+            "cid": "bafk2bzacebyeyfjxkdqkbuqqrlqvhipse2cv5u2ymjec27xu2q6r54tewu3ys",
+            "retrievable": true,
+            "onChain": true,
+            "block": 248852,
+            "index": 0
+          }
+        ]
+      }
+    },
+    {
+      "step": "v2 stored",
+      "job": {
+        "id": "78831012-9e98-4439-8230-5642aa1b5daa",
+        "accountId": "ddb2bd3e-9669-413f-98ca-e91b2598c4e2",
+        "kind": "store_object",
+        "status": "finalized",
+        "txHash": "0xd762c1ddb51f678c56160eedcb53e05be3eda497823b2678d379aeca3225c92b",
+        "block": 248862,
+        "error": null,
+        "progress": {
+          "done": 2,
+          "total": 2
+        },
+        "updatedAt": "2026-10-30T06:17:55.520Z"
+      }
+    },
+    {
+      "step": "usage",
+      "usage": {
+        "spaces": [
+          {
+            "id": "9ffc61fd-73e1-444b-ba76-a2ce6b0a6c9d",
+            "mode": "sponsored",
+            "quotaBytes": 1048576,
+            "usedBytes": 1155
+          }
+        ],
+        "blobs": {
+          "stored": 4,
+          "pending": 0,
+          "expiredServed": 0,
+          "lost": 0
+        },
+        "storedBytes": 1374,
+        "renewals": 0,
+        "spentPlanck": "18182283229060",
+        "nextRenewalBlock": 329489,
+        "headBlock": 248862
+      }
+    }
+  ]
+}

@@ -19,6 +19,15 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm build
+      - name: The OpenAPI document and the SDK's types match the API
+        env:
+          # Only to satisfy the API's config parsing; nothing connects.
+          DATABASE_URL: postgres://ci:ci@127.0.0.1:1/ci
+          BETTER_AUTH_SECRET: ci-only-placeholder-not-a-secret-value
+        run: |
+          pnpm --filter @memdot/api openapi
+          git diff --exit-code packages/sdk/openapi.json
+          pnpm --filter @memdot/sdk generate:check
       - run: pnpm test
 
   contracts:

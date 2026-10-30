@@ -1,0 +1,41 @@
+{
+  "name": "@memdot/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MemDot for TypeScript: encrypted storage on Portaldot V3 for apps, files and agent memory.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --dts",
+    "dev": "tsdown src/index.ts --dts --watch",
+    "typecheck": "tsc -p tsconfig.json",
+    "generate": "openapi-typescript openapi.json -o src/schema.ts",
+    "generate:check": "openapi-typescript openapi.json -o src/schema.ts --check",
+    "journey": "tsx scripts/journey-s05.ts"
+  },
+  "dependencies": {
+    "@memdot/chain": "workspace:*",
+    "@memdot/config": "workspace:*",
+    "@memdot/crypto": "workspace:*",
+    "@noble/hashes": "^2.4.0",
+    "@talismn/siws": "^2.1.0",
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "@scure/bip39": "^2.4.0",
+    "@types/node": "catalog:",
+    "openapi-typescript": "7.13.0",
+    "tsdown": "catalog:",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}
