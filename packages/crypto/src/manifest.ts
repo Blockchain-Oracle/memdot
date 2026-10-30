@@ -36,7 +36,7 @@ export function sealManifest(manifest: FileManifest, recipients: string[]): Prom
 
 export async function openManifest(
   ciphertext: Uint8Array,
-  identity: string,
+  identity: string | string[],
 ): Promise<FileManifest> {
   const manifest = JSON.parse(
     new TextDecoder().decode(await openWith(ciphertext, identity, "the manifest")),

@@ -31,7 +31,7 @@ export function sealSpaceKeyring(
 
 export async function openSpaceKeyring(
   ciphertext: Uint8Array,
-  identity: string,
+  identity: string | string[],
 ): Promise<{ spaceId: string; keys: SpaceKey[] }> {
   const keyring = JSON.parse(
     new TextDecoder().decode(await openWith(ciphertext, identity, "the space keyring")),

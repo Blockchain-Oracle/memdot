@@ -10,6 +10,8 @@ export interface LocalSigner {
   address: string;
   publicKey: Uint8Array;
   txCreator: TxCreator;
+  /** Raw sr25519 signature over the bytes, for sign-in messages and owner proofs. */
+  sign: (message: Uint8Array) => Uint8Array;
 }
 
 /**
@@ -24,5 +26,6 @@ export function signerFromMnemonic(mnemonic: string, derivationPath = ""): Local
     address: AccountId(SS58_PREFIX).dec(keyPair.publicKey),
     publicKey: keyPair.publicKey,
     txCreator: getTxCreator(keyPair.publicKey, "Sr25519", keyPair.sign),
+    sign: keyPair.sign,
   };
 }

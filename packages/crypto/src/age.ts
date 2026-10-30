@@ -9,13 +9,14 @@ export async function sealTo(data: Uint8Array, recipients: string[]): Promise<Ui
   return encrypter.encrypt(data);
 }
 
+/** Decrypts with any of the identities (for example every epoch of a space key, newest first). */
 export async function openWith(
   ciphertext: Uint8Array,
-  identity: string,
+  identity: string | string[],
   what?: string,
 ): Promise<Uint8Array> {
   const decrypter = new Decrypter();
-  decrypter.addIdentity(identity);
+  for (const id of Array.isArray(identity) ? identity : [identity]) decrypter.addIdentity(id);
   try {
     return await decrypter.decrypt(ciphertext);
   } catch {

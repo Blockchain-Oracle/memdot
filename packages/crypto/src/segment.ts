@@ -72,7 +72,7 @@ export async function sealSegment(entries: SegmentEntry[], recipient: string): P
 
 export async function openSegment(
   ciphertext: Uint8Array,
-  identity: string,
+  identity: string | string[],
 ): Promise<SegmentEntry[]> {
   return unpackSegment(await openWith(ciphertext, identity, "the segment"));
 }
