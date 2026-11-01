@@ -55,3 +55,10 @@ export function planckToTpot(planck: string | bigint): number {
   const scale = 10n ** BigInt(TPOT_DECIMALS - TPOT_SHOWN_DIGITS);
   return Number(BigInt(planck) / scale) / 10 ** TPOT_SHOWN_DIGITS;
 }
+
+/** A sponsored space has a quota; a self-signed one holds whatever its wallet pays for. */
+export function spaceUsage(space: { mode: string; usedBytes: number; quotaBytes: number }): string {
+  return space.mode === "sponsored"
+    ? `${formatBytes(space.usedBytes)} of ${formatBytes(space.quotaBytes)}`
+    : "No quota";
+}

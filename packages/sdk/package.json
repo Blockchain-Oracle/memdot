@@ -21,7 +21,8 @@
     "generate": "openapi-typescript openapi.json -o src/schema.ts",
     "generate:check": "openapi-typescript openapi.json -o src/schema.ts --check",
     "journey": "tsx scripts/journey-s05.ts",
-    "seed:demo": "tsx scripts/seed-demo.ts"
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "seed:self-signed": "tsx scripts/self-signed-demo.ts"
   },
   "dependencies": {
     "@memdot/chain": "workspace:*",

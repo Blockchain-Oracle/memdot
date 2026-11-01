@@ -14,7 +14,13 @@ import { CheckIcon } from "lucide-react";
 import Link from "next/link";
 import { Page, PageHeader } from "@/components/page-header";
 import { Stat, StatRow } from "@/components/stat";
-import { formatBytes, formatNumber, planckToTpot, TPOT_SHOWN_DIGITS } from "@/lib/format";
+import {
+  formatBytes,
+  formatNumber,
+  planckToTpot,
+  spaceUsage,
+  TPOT_SHOWN_DIGITS,
+} from "@/lib/format";
 import { useSpaces, useUsage } from "@/lib/queries";
 
 const VARIANTS = ["default", "secondary", "muted"] as const;
@@ -146,7 +152,10 @@ export default function UsagePage() {
         )}
         <ul className="overflow-hidden rounded-xl border border-border bg-surface-1">
           {spaces?.map((space) => {
-            const ratio = space.quotaBytes ? space.usedBytes / space.quotaBytes : 0;
+            const ratio =
+              space.mode === "sponsored" && space.quotaBytes
+                ? space.usedBytes / space.quotaBytes
+                : 0;
             return (
               <li
                 key={space.id}
@@ -157,8 +166,7 @@ export default function UsagePage() {
                     {space.name ?? "Encrypted space"}
                   </Link>
                   <span className="shrink-0 font-mono text-ui-sm text-text-2 tabular">
-                    {formatBytes(space.usedBytes)} / {formatBytes(space.quotaBytes)} ·{" "}
-                    {Math.round(ratio * 100)}%
+                    {spaceUsage(space)} · {Math.round(ratio * 100)}%
                   </span>
                 </div>
                 <span className="h-1 overflow-hidden rounded-full bg-border">

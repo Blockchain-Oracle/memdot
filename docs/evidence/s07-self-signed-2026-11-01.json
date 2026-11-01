@@ -1,0 +1,48 @@
+{
+  "stage": "S07",
+  "at": "2026-11-01T20:33:30.874Z",
+  "app": "https://app.84.46.247.92.sslip.io",
+  "api": "https://api.84.46.247.92.sslip.io",
+  "spaceId": "a1956233-c258-4b48-8c27-c2ff902ea84c",
+  "wallet": "5CvoSbcEWZQNR8MAfMkkK2BQugSf686Co1RGtk32qRVQ1Bxs",
+  "small": {
+    "cid": "bafk2bzacebi7eouao3n4sf7rx5vu4wf2zyquhkkgrcqr42zvjehgr3wju34cq",
+    "txHash": "0x393269a9787060df0c4f7c96957141a6819793ca626caac15d8c9cb1d236c692",
+    "block": 282189
+  },
+  "large": {
+    "cid": "bafk2bzacedtritbfcnyykkoupnzvejiculbwa7mfqcyf5s5iiqbmtktbxrw3s",
+    "txHash": "0xbf696ed31fc441dc49ccf94c0ba382d5f35c7f9390b15a944e88720827782d00",
+    "block": 282199
+  },
+  "verified": {
+    "small": [
+      {
+        "cid": "bafk2bzacebi7eouao3n4sf7rx5vu4wf2zyquhkkgrcqr42zvjehgr3wju34cq",
+        "retrievable": true,
+        "onChain": true,
+        "answered": true,
+        "block": 282189,
+        "index": 0
+      }
+    ],
+    "large": [
+      {
+        "cid": "bafk2bzacedtritbfcnyykkoupnzvejiculbwa7mfqcyf5s5iiqbmtktbxrw3s",
+        "retrievable": true,
+        "onChain": true,
+        "answered": true,
+        "block": 282199,
+        "index": 0
+      },
+      {
+        "cid": "bafk2bzaceahvztccxe627emlcqyy5ahnclsv72fq4n6unqhgwkrmb2fjgjkjq",
+        "retrievable": true,
+        "onChain": true,
+        "answered": true,
+        "block": 282196,
+        "index": 0
+      }
+    ]
+  }
+}

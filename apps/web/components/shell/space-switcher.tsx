@@ -15,13 +15,16 @@ import { cn } from "@memdot/ui/lib/utils";
 import { CheckIcon, ChevronsUpDownIcon, PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { formatBytes } from "@/lib/format";
+import { spaceUsage } from "@/lib/format";
 import { useCurrentSpace, useSpaces } from "@/lib/queries";
 import { NewSpaceDialog } from "./new-space-dialog";
 
 /** A 2px usage bar: neutral until 80% of the quota, then warn. */
 function UsageBar({ space, className }: { space: Space; className?: string }) {
-  const ratio = space.quotaBytes > 0 ? Math.min(1, space.usedBytes / space.quotaBytes) : 0;
+  const ratio =
+    space.mode === "sponsored" && space.quotaBytes > 0
+      ? Math.min(1, space.usedBytes / space.quotaBytes)
+      : 0;
   return (
     <span className={cn("block h-0.5 w-full overflow-hidden rounded-full bg-border", className)}>
       <span
@@ -86,7 +89,7 @@ export function SpaceSwitcher() {
                   <span className="grid min-w-0 flex-1 gap-1">
                     <span className="truncate">{space.name ?? "Encrypted space"}</span>
                     <span className="font-mono text-ui-sm text-text-3 tabular">
-                      {formatBytes(space.usedBytes)} of {formatBytes(space.quotaBytes)}
+                      {spaceUsage(space)}
                       {space.mode === "self_signed" ? " · self-signed" : ""}
                     </span>
                     <UsageBar space={space} />

@@ -36,7 +36,7 @@ import { UploadSheet } from "@/components/files/upload-sheet";
 import { Page, PageHeader } from "@/components/page-header";
 import { ShareDialog, type ShareTarget } from "@/components/share/share-dialog";
 import { describeError } from "@/lib/errors";
-import { formatBytes } from "@/lib/format";
+import { spaceUsage } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
 import { useSpaces } from "@/lib/queries";
 import { retentionOf } from "@/lib/retention";
@@ -197,7 +197,7 @@ function SpaceFiles() {
         description={
           space ? (
             <span className="font-mono tabular">
-              {formatBytes(space.usedBytes)} of {formatBytes(space.quotaBytes)} ·{" "}
+              {spaceUsage(space)} ·{" "}
               {space.mode === "sponsored" ? "sponsored by MemDot" : "self-signed"} · key epoch{" "}
               {space.keyEpoch}
             </span>

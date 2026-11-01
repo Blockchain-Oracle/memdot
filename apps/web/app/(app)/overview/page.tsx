@@ -15,6 +15,7 @@ import {
   formatNumber,
   formatRelative,
   planckToTpot,
+  spaceUsage,
   TPOT_SHOWN_DIGITS,
 } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
@@ -175,7 +176,10 @@ export default function OverviewPage() {
           ) : (
             <ul className="grid gap-3 sm:grid-cols-2">
               {spaces.data?.map((space) => {
-                const ratio = space.quotaBytes ? space.usedBytes / space.quotaBytes : 0;
+                const ratio =
+                  space.mode === "sponsored" && space.quotaBytes
+                    ? space.usedBytes / space.quotaBytes
+                    : 0;
                 return (
                   <li key={space.id}>
                     <Link
@@ -199,7 +203,7 @@ export default function OverviewPage() {
                           />
                         </span>
                         <span className="font-mono text-ui-sm text-text-3 tabular">
-                          {formatBytes(space.usedBytes)} of {formatBytes(space.quotaBytes)} ·{" "}
+                          {spaceUsage(space)} ·{" "}
                           {space.mode === "sponsored" ? "sponsored" : "self-signed"}
                         </span>
                       </div>

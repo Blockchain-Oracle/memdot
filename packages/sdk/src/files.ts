@@ -63,6 +63,8 @@ export interface PutOptions {
   previousVersionId?: string;
   /** Self-signed spaces: the wallet signs each store. */
   wallet?: Wallet;
+  /** Self-signed spaces: how many of this upload's blobs the wallet has stored so far. */
+  onBlob?: (done: number, total: number) => void;
   /** Retry-safe key; one is generated if omitted. */
   idempotencyKey?: string;
   /** Wait until every blob is finalized on chain (default true). */
@@ -201,6 +203,7 @@ export class FilesApi {
         ...(options.previousVersionId ? { previousVersionId: options.previousVersionId } : {}),
         ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
         ...(wallet ? { wallet } : {}),
+        ...(options.onBlob ? { onBlob: options.onBlob } : {}),
       });
       fileId = declared.object.id;
       jobId = declared.job.id;
@@ -292,7 +295,7 @@ export class FilesApi {
     space: RawSpace,
     recipient: string,
     files: { data: Uint8Array; meta: FileMeta; encryptedMeta: Uint8Array }[],
-    options: Pick<PutOptions, "folderId" | "idempotencyKey" | "wallet">,
+    options: Pick<PutOptions, "folderId" | "idempotencyKey" | "wallet" | "onBlob">,
   ): Promise<{ entryIds: string[]; jobId: string }> {
     const entryIds = files.map(() => crypto.randomUUID());
     const segment = await sealSegment(
@@ -314,6 +317,7 @@ export class FilesApi {
       ...(options.folderId ? { folderId: options.folderId } : {}),
       ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
       ...(options.wallet ? { wallet: options.wallet } : {}),
+      ...(options.onBlob ? { onBlob: options.onBlob } : {}),
     });
     for (let start = 0; start < files.length; start += MAX_SEGMENT_ENTRIES) {
       await unwrap(

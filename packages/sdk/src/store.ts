@@ -1,4 +1,5 @@
 import { cidOf, storeChunk } from "@memdot/chain";
+import { BLOCK_MS } from "@memdot/config";
 import type { Context, Schemas } from "./context.js";
 import { MemDotError } from "./errors.js";
 import { unwrap } from "./transport.js";
@@ -6,6 +7,9 @@ import type { Wallet } from "./wallet.js";
 
 export type StoredObject = Schemas["Object"];
 export type DeclaredObject = Schemas["DeclaredObject"];
+
+/** The API can see a finalized block a moment after the wallet does; retry for a few blocks. */
+const RECORD_ATTEMPTS = 5;
 
 export interface StoreInput {
   kind: StoredObject["kind"] & Schemas["NewObject"]["kind"];
@@ -65,7 +69,17 @@ export async function storeObject(ctx: Context, input: StoreInput): Promise<Decl
   );
 
   if (input.wallet) {
-    await storeWithWallet(ctx, declared, blobs, input.wallet, input.onBlob);
+    await storeWithWallet(ctx, declared, blobs, input.wallet, input.onBlob).catch(
+      async (error: unknown) => {
+        // With a key the caller can retry and resume. Without one nothing can, so let go of it.
+        if (!input.idempotencyKey) {
+          await ctx.transport.api.DELETE("/v1/objects/{id}", {
+            params: { path: { id: declared.object.id } },
+          });
+        }
+        throw error;
+      },
+    );
   } else {
     let done = 0;
     for (const slot of declared.uploads) {
@@ -112,16 +126,58 @@ async function storeWithWallet(
   );
   const recorded = new Set(detail.blobs.filter((b) => b.status !== "pending").map((b) => b.cid));
   let done = recorded.size;
+  onBlob?.(done, declared.uploads.length);
   for (const slot of declared.uploads) {
     if (recorded.has(slot.cid)) continue;
     const bytes = blobs.get(slot.cid);
     if (!bytes) throw new Error(`no bytes for ${slot.cid}`);
-    const stored = await storeChunk(chain.api, wallet.txCreator, bytes);
-    await ctx.transport.json("POST", `${slot.url}/stored`, {
-      block: stored.location.block,
-      indexInBlock: stored.location.index,
-    });
+    const stored = await storeChunk(chain.api, wallet.txCreator, bytes).catch(walletFailure);
+    await recordStored(ctx, slot.url, stored.location);
     done += 1;
     onBlob?.(done, declared.uploads.length);
   }
+}
+
+/** Tells the API where the wallet's store landed. The wallet has already paid, so be patient. */
+async function recordStored(
+  ctx: Context,
+  url: string,
+  location: { block: number; index: number },
+): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await ctx.transport.json("POST", `${url}/stored`, {
+        block: location.block,
+        indexInBlock: location.index,
+      });
+      return;
+    } catch (error) {
+      const early = error instanceof MemDotError && error.code === "NOT_FINALIZED";
+      if (!early || attempt >= RECORD_ATTEMPTS) throw error;
+      await new Promise((resolve) => setTimeout(resolve, BLOCK_MS));
+    }
+  }
+}
+
+function walletFailure(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/cancel|reject|denied/i.test(message)) {
+    throw new MemDotError(
+      400,
+      "WALLET_CANCELLED",
+      "The wallet request was cancelled.",
+      null,
+      error,
+    );
+  }
+  if (/payment|insufficient|inability/i.test(message)) {
+    throw new MemDotError(
+      402,
+      "WALLET_NO_FUNDS",
+      "This wallet doesn't hold enough tPOT to pay for the store.",
+      null,
+      error,
+    );
+  }
+  throw error;
 }

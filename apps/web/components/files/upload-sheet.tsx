@@ -12,12 +12,16 @@ import {
   SheetTitle,
 } from "@memdot/ui/components/sheet";
 import { cn } from "@memdot/ui/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 import { LockIcon, TrashIcon, UploadIcon } from "lucide-react";
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
+import { toast } from "sonner";
+import { describeError, isCancelled } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
 import { FileTypeIcon } from "./file-icon";
+import { linkWalletIfNone, SigningWallet, useWalletBalance } from "./signing-wallet";
 import { useUploads } from "./uploads";
 
 /**
@@ -38,8 +42,12 @@ export function UploadSheet({
   folderName?: string | null;
 }) {
   const memdot = useMemDot();
-  const { enqueue } = useUploads();
+  const queryClient = useQueryClient();
+  const { enqueue, wallet, setWallet } = useUploads();
+  const { data: walletFree } = useWalletBalance(wallet);
   const [files, setFiles] = useState<File[]>([]);
+  const [switching, setSwitching] = useState(false);
+  const [busy, setBusy] = useState(false);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (accepted) =>
       setFiles((current) => [
@@ -61,11 +69,32 @@ export function UploadSheet({
   const free = Math.max(0, space.quotaBytes - space.usedBytes);
   const sponsored = space.mode === "sponsored";
   const overQuota = sponsored && total > free;
+  const walletReady = sponsored || (wallet !== null && (walletFree ?? 0n) >= planck);
 
   const store = () => {
-    enqueue(files, { spaceId: space.id, folderId });
+    enqueue(files, {
+      spaceId: space.id,
+      folderId,
+      ...(!sponsored && wallet ? { wallet } : {}),
+    });
     setFiles([]);
     onOpenChange(false);
+  };
+
+  // Over the sponsored quota, the way forward is paying for it yourself.
+  const payWithWallet = async () => {
+    if (!wallet) return;
+    setBusy(true);
+    try {
+      await linkWalletIfNone(memdot, wallet);
+      await memdot.spaces.setMode(space.id, "self_signed");
+      await queryClient.invalidateQueries({ queryKey: ["spaces"] });
+      setSwitching(false);
+    } catch (error) {
+      if (!isCancelled(error)) toast.error(describeError(error).title);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -80,7 +109,7 @@ export function UploadSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5">
+        <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5 [&>*]:shrink-0">
           <div
             {...getRootProps()}
             className={cn(
@@ -131,6 +160,14 @@ export function UploadSheet({
             </ul>
           )}
 
+          {!sponsored && (
+            <SigningWallet
+              wallet={wallet}
+              onChange={setWallet}
+              {...(files.length > 0 ? { needs: planck } : {})}
+            />
+          )}
+
           {files.length > 0 && (
             <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border font-mono text-ui-sm">
               {[
@@ -154,8 +191,25 @@ export function UploadSheet({
           )}
           {overQuota && (
             <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger-fg">
-              That is {formatBytes(total - free)} more than this space has left. Remove some files.
+              That is {formatBytes(total - free)} more than this space has left. Remove some files,
+              or{" "}
+              <button
+                type="button"
+                className="underline underline-offset-2"
+                onClick={() => setSwitching(true)}
+              >
+                pay with your wallet
+              </button>{" "}
+              from now on.
             </p>
+          )}
+          {overQuota && switching && (
+            <div className="flex flex-col gap-3">
+              <SigningWallet wallet={wallet} onChange={setWallet} needs={planck} />
+              <Button disabled={!wallet || busy} onClick={payWithWallet}>
+                Use this wallet for this space
+              </Button>
+            </div>
           )}
         </div>
 
@@ -163,7 +217,7 @@ export function UploadSheet({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={files.length === 0 || overQuota} onClick={store}>
+          <Button disabled={files.length === 0 || overQuota || !walletReady} onClick={store}>
             {files.length === 0
               ? "Store"
               : `Store ${files.length} file${files.length > 1 ? "s" : ""} · ≈ ${formatTpot(planck)}`}

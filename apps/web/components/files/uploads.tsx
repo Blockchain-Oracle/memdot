@@ -1,7 +1,7 @@
 "use client";
 
 import { TINY_FILE_BYTES } from "@memdot/config";
-import type { FileInfo, Job } from "@memdot/sdk";
+import type { BrowserWallet, FileInfo, Job } from "@memdot/sdk";
 import { Button } from "@memdot/ui/components/button";
 import { ChainProgress } from "@memdot/ui/components/chain-progress";
 import { cn } from "@memdot/ui/lib/utils";
@@ -20,6 +20,8 @@ export interface Upload {
   folderId: string | null;
   state: "waiting" | "storing" | "done" | "failed";
   job: Job | null;
+  /** Self-signed spaces: how far the wallet has got with this upload's blobs. */
+  signing: { done: number; total: number } | null;
   file: FileInfo | null;
   error: string | null;
 }
@@ -27,8 +29,14 @@ export interface Upload {
 interface UploadsValue {
   uploads: Upload[];
   /** Queues files; they are encrypted and stored one at a time (one relayer, one nonce line). */
-  enqueue: (files: File[], target: { spaceId: string; folderId: string | null }) => void;
+  enqueue: (
+    files: File[],
+    target: { spaceId: string; folderId: string | null; wallet?: BrowserWallet },
+  ) => void;
   clearFinished: () => void;
+  /** The wallet paying for self-signed spaces, chosen once per tab. */
+  wallet: BrowserWallet | null;
+  setWallet: (wallet: BrowserWallet | null) => void;
 }
 
 const UploadsContext = createContext<UploadsValue | null>(null);
@@ -47,8 +55,14 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
   const memdot = useMemDot();
   const queryClient = useQueryClient();
   const [uploads, setUploads] = useState<Upload[]>([]);
+  const [wallet, setWallet] = useState<BrowserWallet | null>(null);
   const pending = useRef<
-    { items: { upload: Upload; file: File }[]; spaceId: string; folderId: string | null }[]
+    {
+      items: { upload: Upload; file: File }[];
+      spaceId: string;
+      folderId: string | null;
+      wallet?: BrowserWallet;
+    }[]
   >([]);
   const running = useRef(false);
 
@@ -90,6 +104,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
       const target = {
         spaceId: batch.spaceId,
         ...(batch.folderId ? { folderId: batch.folderId } : {}),
+        ...(batch.wallet ? { wallet: batch.wallet } : {}),
       };
       // Small files of one batch share a segment: one blob on chain, renewed together.
       const tiny = batch.items.filter((i) => i.file.size <= TINY_FILE_BYTES);
@@ -108,6 +123,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
           const results = await memdot.files.putMany(files, {
             ...target,
             onProgress: follow(ids, batch.spaceId),
+            onBlob: (done, total) => patch(ids, { signing: { done, total } }),
           });
           results.forEach((result, i) => {
             const id = ids[i];
@@ -126,6 +142,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
             name: file.name,
             mime: file.type || "application/octet-stream",
             onProgress: follow([upload.id], batch.spaceId),
+            onBlob: (done, total) => patch([upload.id], { signing: { done, total } }),
           });
           patch([upload.id], { state: "done", job: result.job, file: result.file });
         } catch (error) {
@@ -148,12 +165,18 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
           folderId: target.folderId,
           state: "waiting" as const,
           job: null,
+          signing: null,
           file: null,
           error: null,
         },
         file,
       }));
-      pending.current.push({ items, spaceId: target.spaceId, folderId: target.folderId });
+      pending.current.push({
+        items,
+        spaceId: target.spaceId,
+        folderId: target.folderId,
+        ...(target.wallet ? { wallet: target.wallet } : {}),
+      });
       setUploads((list) => [...items.map((i) => i.upload), ...list]);
       void drain();
     },
@@ -166,7 +189,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <UploadsContext value={{ uploads, enqueue, clearFinished }}>
+    <UploadsContext value={{ uploads, enqueue, clearFinished, wallet, setWallet }}>
       {children}
       <UploadsPanel />
     </UploadsContext>
@@ -187,6 +210,11 @@ export function UploadRow({ upload }: { upload: Upload }) {
         <span className="text-ui-sm text-text-3">Waiting</span>
       ) : upload.state === "failed" ? (
         <ChainProgress stage="failed" error={upload.error} />
+      ) : upload.signing && !upload.job ? (
+        <span className="text-ui-sm text-text-2">
+          Your wallet stores blob {Math.min(upload.signing.done + 1, upload.signing.total)} of{" "}
+          {upload.signing.total}. Approve it there.
+        </span>
       ) : (
         <ChainProgress
           stage={upload.job?.status ?? "running"}

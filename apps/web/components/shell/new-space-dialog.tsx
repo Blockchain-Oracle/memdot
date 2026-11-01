@@ -1,5 +1,6 @@
 "use client";
 
+import { SPONSORED_QUOTA_BYTES } from "@memdot/config";
 import { Button } from "@memdot/ui/components/button";
 import {
   Dialog,
@@ -11,15 +12,23 @@ import {
 } from "@memdot/ui/components/dialog";
 import { Input } from "@memdot/ui/components/input";
 import { Label } from "@memdot/ui/components/label";
+import { SegmentedControl } from "@memdot/ui/components/segmented-control";
 import { Spinner } from "@memdot/ui/components/spinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { toast } from "sonner";
-import { describeError } from "@/lib/errors";
+import { linkWalletIfNone, SigningWallet } from "@/components/files/signing-wallet";
+import { useUploads } from "@/components/files/uploads";
+import { describeError, isCancelled } from "@/lib/errors";
+import { formatBytes } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
 
 const NAME_MAX = 64;
+const PAYERS = [
+  { value: "sponsored", label: "MemDot" },
+  { value: "self_signed", label: "My wallet" },
+];
 
 export function NewSpaceDialog({
   open,
@@ -31,9 +40,12 @@ export function NewSpaceDialog({
   const memdot = useMemDot();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { wallet, setWallet } = useUploads();
   const id = useId();
   const [name, setName] = useState("");
+  const [mode, setMode] = useState<"sponsored" | "self_signed">("sponsored");
   const [busy, setBusy] = useState(false);
+  const selfSigned = mode === "self_signed";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -44,13 +56,15 @@ export function NewSpaceDialog({
             event.preventDefault();
             setBusy(true);
             try {
-              const space = await memdot.spaces.create({ name: name.trim() });
+              if (selfSigned && wallet) await linkWalletIfNone(memdot, wallet);
+              const space = await memdot.spaces.create({ name: name.trim(), mode });
               await queryClient.invalidateQueries({ queryKey: ["spaces"] });
               setName("");
+              setMode("sponsored");
               onOpenChange(false);
               router.push(`/spaces/${space.id}`);
             } catch (error) {
-              toast.error(describeError(error).title);
+              if (!isCancelled(error)) toast.error(describeError(error).title);
             } finally {
               setBusy(false);
             }
@@ -75,11 +89,26 @@ export function NewSpaceDialog({
               onChange={(event) => setName(event.target.value)}
             />
           </div>
+          <div className="flex flex-col gap-2">
+            <span className="eyebrow">Who pays to store</span>
+            <SegmentedControl
+              label="Who pays to store"
+              options={PAYERS}
+              value={mode}
+              onValueChange={(value) => setMode(value as typeof mode)}
+            />
+            <p className="text-ui-sm text-text-3">
+              {selfSigned
+                ? "Your wallet signs and pays for each store, with no quota. MemDot still renews them."
+                : `MemDot signs and pays, up to ${formatBytes(SPONSORED_QUOTA_BYTES)}.`}
+            </p>
+          </div>
+          {selfSigned && <SigningWallet wallet={wallet} onChange={setWallet} />}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy || !name.trim()}>
+            <Button type="submit" disabled={busy || !name.trim() || (selfSigned && !wallet)}>
               {busy && <Spinner data-icon="inline-start" />}
               Create space
             </Button>
