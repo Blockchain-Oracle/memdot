@@ -27,9 +27,6 @@ export {
   txCreatorFromInjected,
 } from "./signer.js";
 export {
-  type ContractCallResult,
-  ContractRevertedError,
-  callContract,
   type RenewResult,
   renew,
   type StorageLocation,
@@ -37,4 +34,5 @@ export {
   storeChunk,
   type TxOptions,
   type TxStage,
+  transfer,
 } from "./storage.js";

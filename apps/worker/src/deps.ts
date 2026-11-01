@@ -2,6 +2,7 @@ import type { ChainClient, LocalSigner } from "@memdot/chain";
 import type { Database } from "@memdot/db";
 import type { PgBoss } from "pg-boss";
 import type { Env } from "./env.js";
+import type { EvmClients } from "./evm.js";
 
 /** Everything a handler needs; built once in main.ts. */
 export interface Deps {
@@ -9,6 +10,7 @@ export interface Deps {
   boss: PgBoss;
   chain: ChainClient;
   signer: LocalSigner;
+  evm: EvmClients;
   env: Env;
 }
 

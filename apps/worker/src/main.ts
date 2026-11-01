@@ -6,6 +6,7 @@ import { type AlertMessage, deliverAlert } from "./alerts.js";
 import { StoreBreaker } from "./breaker.js";
 import { type Deps, freeBalance } from "./deps.js";
 import { env } from "./env.js";
+import { createEvmClients } from "./evm.js";
 import { indexChain } from "./handlers/indexer.js";
 import { keeperScan } from "./handlers/keeper.js";
 import { maintenance } from "./handlers/maintenance.js";
@@ -24,7 +25,7 @@ await migrateDatabase(database, MIGRATIONS_FOLDER);
 const boss = await startBoss(env.DATABASE_URL, "worker");
 const chain = createChainClient(env.PORTALDOT_WSS);
 const signer = signerFromMnemonic(env.SIGNER_MNEMONIC);
-const deps: Deps = { db: database.db, boss, chain, signer, env };
+const deps: Deps = { db: database.db, boss, chain, signer, evm: createEvmClients(env), env };
 
 async function runChainTx([job]: JobWithMetadata<unknown>[]): Promise<void> {
   if (!job) return;

@@ -87,6 +87,8 @@ export function createApp(services: Services) {
   app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
   app.route("/", healthRoutes(services));
+  // Someone opening the API's address by hand wants its reference.
+  app.get("/", (c) => c.redirect("/docs"));
 
   app.use("/v1/*", resolvePrincipal);
   app.use(

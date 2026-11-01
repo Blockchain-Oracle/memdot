@@ -8,6 +8,7 @@ import { createDatabase } from "@memdot/db";
 import { startBoss } from "@memdot/jobs";
 import type { Deps } from "../src/deps.js";
 import { env } from "../src/env.js";
+import { createEvmClients } from "../src/evm.js";
 import { indexBlock } from "../src/handlers/indexer.js";
 
 const { values } = parseArgs({ options: { from: { type: "string" }, to: { type: "string" } } });

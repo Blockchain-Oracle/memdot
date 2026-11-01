@@ -1,10 +1,9 @@
 import { extrinsicHashes, type StorageEvent, storageEventsAt, toHex } from "@memdot/chain";
-import { EVM_CHAIN_ID } from "@memdot/config";
 import { actionName, decodeRecord, memDotRegistryAbi } from "@memdot/contracts";
 import { blobStaging, chainCursors, chainEvents, renewals, storedItems } from "@memdot/db";
 import { openJobsOf, settleObject } from "@memdot/jobs";
 import { and, eq, lt, sql } from "drizzle-orm";
-import { createPublicClient, defineChain, http, type Log } from "viem";
+import type { Log } from "viem";
 import type { Deps } from "../deps.js";
 
 const STORAGE_CURSOR = "transaction_storage";
@@ -162,15 +161,7 @@ export async function indexChain(deps: Deps): Promise<void> {
  */
 async function indexRegistry(deps: Deps): Promise<void> {
   const address = deps.env.REGISTRY_ADDRESS as `0x${string}`;
-  const client = createPublicClient({
-    chain: defineChain({
-      id: EVM_CHAIN_ID,
-      name: "Portaldot V3",
-      nativeCurrency: { name: "tPOT", symbol: "tPOT", decimals: 18 },
-      rpcUrls: { default: { http: [deps.env.PORTALDOT_EVM_RPC] } },
-    }),
-    transport: http(deps.env.PORTALDOT_EVM_RPC),
-  });
+  const client = deps.evm.publicClient;
   const head = Number(await client.getBlockNumber());
   const saved = await cursorOf(deps, REGISTRY_CURSOR);
   const from =
