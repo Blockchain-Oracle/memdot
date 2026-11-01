@@ -16,7 +16,8 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "probe": "pnpm --filter @memdot/chain probe",
-    "changeset": "changeset"
+    "changeset": "changeset",
+    "evidence": "node scripts/readme-evidence.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",

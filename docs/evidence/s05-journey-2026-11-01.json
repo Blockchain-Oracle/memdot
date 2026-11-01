@@ -1,0 +1,79 @@
+{
+  "stage": "S05",
+  "spaceId": "a77b968d-b93c-472e-80d1-5f9121d0741e",
+  "evidence": [
+    {
+      "step": "v1 stored",
+      "job": {
+        "id": "823a4326-dc79-4ecd-89eb-fa2548b32db2",
+        "accountId": "3e986308-9ac3-459c-a02d-2a956fb8ebb8",
+        "kind": "store_object",
+        "status": "finalized",
+        "txHash": "0xa2e81f1e487db62a1ca85571942420486809e6cafdfc46ccb2c37e290dc31d0f",
+        "block": 279422,
+        "error": null,
+        "progress": {
+          "done": 1,
+          "total": 1
+        },
+        "updatedAt": "2026-11-01T15:53:32.075Z"
+      }
+    },
+    {
+      "step": "v1 verified",
+      "verified": {
+        "ok": true,
+        "blobs": [
+          {
+            "cid": "bafk2bzacea2jxkxusvh4ehx5yb7gtc2jrc7hqj54pc3cow5wsoxv54ktx7z2k",
+            "retrievable": true,
+            "onChain": true,
+            "block": 279422,
+            "index": 0
+          }
+        ]
+      }
+    },
+    {
+      "step": "v2 stored",
+      "job": {
+        "id": "2ba7e859-61a3-40dc-87ec-ce0321d262b9",
+        "accountId": "3e986308-9ac3-459c-a02d-2a956fb8ebb8",
+        "kind": "store_object",
+        "status": "finalized",
+        "txHash": "0x2a19fa37ac6ce4a607da82eafe56347b6ef1f7d66ebfdfe7d0b58ce27dc2e8d4",
+        "block": 279434,
+        "error": null,
+        "progress": {
+          "done": 2,
+          "total": 2
+        },
+        "updatedAt": "2026-11-01T15:54:42.828Z"
+      }
+    },
+    {
+      "step": "usage",
+      "usage": {
+        "spaces": [
+          {
+            "id": "a77b968d-b93c-472e-80d1-5f9121d0741e",
+            "mode": "sponsored",
+            "quotaBytes": 131072,
+            "usedBytes": 1155
+          }
+        ],
+        "blobs": {
+          "stored": 4,
+          "pending": 0,
+          "expiredServed": 0,
+          "lost": 0
+        },
+        "storedBytes": 1374,
+        "renewals": 0,
+        "spentPlanck": "18182147073531",
+        "nextRenewalBlock": 360059,
+        "headBlock": 279434
+      }
+    }
+  ]
+}
