@@ -140,19 +140,21 @@ Track: **Modular Cloud & Middleware**, "focusing on decentralized middleware, st
 | Three files stored in one segment | [`0x08d10550…0d4ae1`](https://app.84.46.247.92.sslip.io/proof/tx/0x08d105506d8c43c51c82184bdcc66047c2eb2c984c51a93c742ee853870d4ae1) | [#279,559](https://app.84.46.247.92.sslip.io/proof/block/279559) | [`bafk2bzacea2…mxzjiw`](https://app.84.46.247.92.sslip.io/proof/cid/bafk2bzacea2kazemqyee67qptsnvqlthptuweqrzx6677lmnab4g25pmxzjiw) |
 | Larger file stored (chunk + sealed manifest) | [`0xf2db5b24…658b3a`](https://app.84.46.247.92.sslip.io/proof/tx/0xf2db5b24b71a9a249820b72095c368d5937387e8574dc049a7287dd01d658b3a) | [#279,566](https://app.84.46.247.92.sslip.io/proof/block/279566) | [`bafk2bzacedl…yafdh2`](https://app.84.46.247.92.sslip.io/proof/cid/bafk2bzacedlazejtcpok7yfl56xwbdxf47f4fepjnxqmsynowekw3zryafdh2) |
 | Segment renewed: same CID, moved from block 279,559 | [`0x1955b32e…0da189`](https://app.84.46.247.92.sslip.io/proof/tx/0x1955b32e13e157f8bbf7f5a27f4edbeae0990cef85d23bd041009db7810da189) | [#280,474](https://app.84.46.247.92.sslip.io/proof/block/280474) | [`bafk2bzacea2…mxzjiw`](https://app.84.46.247.92.sslip.io/proof/cid/bafk2bzacea2kazemqyee67qptsnvqlthptuweqrzx6677lmnab4g25pmxzjiw) |
+| File signed and paid for by the user's own wallet | [`0x393269a9…36c692`](https://app.84.46.247.92.sslip.io/proof/tx/0x393269a9787060df0c4f7c96957141a6819793ca626caac15d8c9cb1d236c692) | [#282,189](https://app.84.46.247.92.sslip.io/proof/block/282189) | [`bafk2bzacebi…ju34cq`](https://app.84.46.247.92.sslip.io/proof/cid/bafk2bzacebi7eouao3n4sf7rx5vu4wf2zyquhkkgrcqr42zvjehgr3wju34cq) |
+| Larger file signed and paid for by the same wallet | [`0xbf696ed3…782d00`](https://app.84.46.247.92.sslip.io/proof/tx/0xbf696ed31fc441dc49ccf94c0ba382d5f35c7f9390b15a944e88720827782d00) | [#282,199](https://app.84.46.247.92.sslip.io/proof/block/282199) | [`bafk2bzacedt…bxrw3s`](https://app.84.46.247.92.sslip.io/proof/cid/bafk2bzacedtritbfcnyykkoupnzvejiculbwa7mfqcyf5s5iiqbmtktbxrw3s) |
 | Registry record: Space created | `0x43dc7871…a86cf0` | [#279,570](https://app.84.46.247.92.sslip.io/proof/block/279570) | [view](https://app.84.46.247.92.sslip.io/proof/registry) |
 | Registry record: Object recorded | `0x9cd18679…867ed8` | [#279,571](https://app.84.46.247.92.sslip.io/proof/block/279571) | [view](https://app.84.46.247.92.sslip.io/proof/registry) |
 | Registry record: Object recorded | `0x7c18bd1c…0387b7` | [#279,572](https://app.84.46.247.92.sslip.io/proof/block/279572) | [view](https://app.84.46.247.92.sslip.io/proof/registry) |
 | Registry record: Space shared | `0x52e8b74d…87d9c5` | [#279,580](https://app.84.46.247.92.sslip.io/proof/block/279580) | [view](https://app.84.46.247.92.sslip.io/proof/registry) |
 
-Recorded by [`docs/evidence/s07-seed-2026-11-01.json`](docs/evidence/s07-seed-2026-11-01.json) on 2026-11-01. Registry transaction hashes are the EVM hashes Revive's RPC reports.
+Recorded by [`docs/evidence/s07-seed-2026-11-01.json`](docs/evidence/s07-seed-2026-11-01.json) and [`docs/evidence/s07-self-signed-2026-11-01.json`](docs/evidence/s07-self-signed-2026-11-01.json) on 2026-11-01. Registry transaction hashes are the EVM hashes Revive's RPC reports.
 <!-- evidence:end -->
 
 Earlier runs are in [`docs/evidence/`](docs/evidence): the first store and renew round trip, the service walk and the SDK journey.
 
 ## What's in the product today
 
-- **Dashboard:** passkey and wallet sign-in, recovery codes, spaces, files with preview, versions, Verify and Renew now, sharing and revoking, API keys with roles, activity, renewals, usage, settings, and a command palette, on desktop and phone, in light and dark.
+- **Dashboard:** passkey and wallet sign-in, recovery codes, spaces paid for by MemDot or by your own wallet, files with preview, versions, Verify and Renew now, sharing and revoking, API keys with roles, activity, renewals, usage, settings, and a command palette, on desktop and phone, in light and dark.
 - **TypeScript SDK:** [`packages/sdk`](packages/sdk) covers accounts, spaces, folders, files, sharing, jobs, and self-signed stores with a wallet.
 - **REST API:** OpenAPI 3.1 and a [reference](https://api.84.46.247.92.sslip.io/docs), with API keys and per-key rate limits.
 - **Service:** relayer and keeper on one signer queue, a chain indexer, a CID gateway with a ciphertext cache, a low-balance breaker that pauses stores and never renewals, and alerts.
@@ -186,8 +188,8 @@ Production images: [`apps/api/Dockerfile`](apps/api/Dockerfile), [`apps/worker/D
 ## Honest limits
 
 - **Testnet only.** Everything here runs on Portaldot V3 testnet, and the app is on a temporary address until its own domain is live. Accounts made on this address will need their recovery code after the move, because passkeys are tied to a domain.
-- **Sponsored storage is small.** The relayer pays about 105 tPOT per MiB from a testnet budget of a few hundred tPOT, so a sponsored space holds 128 KiB, up to 5 spaces per account. Stores pause if the relayer runs low; renewals keep going. Self-signed spaces have no quota, and the wallet pays.
-- **Unlock methods still being walked.** Touch ID passkey unlock and Talisman or SubWallet unlock need a real authenticator and wallet, and haven't been walked on the live site yet. The recovery code works everywhere.
+- **Sponsored storage is small.** The relayer pays about 105 tPOT per MiB from a testnet budget of a few hundred tPOT, so a sponsored space holds 128 KiB, up to 5 spaces per account. Stores pause if the relayer runs low; renewals keep going. A space can move to your own wallet at any point: it then has no quota, and the wallet pays for each store.
+- **Real extensions still being walked.** Wallet sign-in, MetaMask sign-in and wallet-paid stores ran in the dashboard on a local build against live V3, using test wallets that sign the way an extension does. Touch ID passkey unlock and Talisman or SubWallet unlock need a real authenticator and extension, and haven't been walked on the live site yet. The recovery code works everywhere.
 - **Not built yet:** agent memory, the CLI, the MCP server, the Python SDK, agent plugins and the docs site. They're next in the build order, on the layer described here.
 - **Rebuilding from the chain is partial.** Stored items and renewals rebuild from chain events. Rebuilding spaces and objects from registry records is not written yet, though the records are on-chain.
 - **A record follows its upload.** Registry records are submitted after the store they describe and never block it, so one can lag or, if the relayer fails, be missing. Stored bytes are unaffected.

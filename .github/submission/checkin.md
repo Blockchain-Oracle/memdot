@@ -23,7 +23,7 @@ The event's written requirements: current progress; outstanding items; a public 
 - **Contract:** `MemDotRegistry` at `0x24ee3a18c64954d979b7475ccdf58ce4750fb5d1`
 - **Deploy transaction:** `0xa536122257fe17de91dd2f85e16f2618f70d5e3b54b0a248854657a814f890d6`, block 279,265
 - **Explorer:** https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Ftest-node-v3.portaldot.dev#/explorer/query/279265
-- **Other transactions:** the README's [Proof](../../README.md#proof) section lists stores, renewals and registry records, each from a recorded run in `docs/evidence/`.
+- **Other transactions:** the README's [Proof](https://github.com/Blockchain-Oracle/memdot#proof) section lists stores, renewals and registry records, each from a recorded run in `docs/evidence/`.
 
 ## Current progress
 
@@ -31,7 +31,7 @@ Working live on V3 today:
 
 - Sign-in with a passkey or a Portaldot wallet (Portaldot Extension, Talisman, SubWallet, polkadot.js), or MetaMask, plus recovery codes. The master key is made on the device and never reaches the server.
 - Files and app data encrypted on the device and stored with `TransactionStorage.store`. Small files share one encrypted segment; larger files become chunks plus a sealed manifest.
-- A keeper that renews every stored item before its 7-day window ends. A relayer signs for sponsored spaces, and a user's wallet signs for self-signed spaces.
+- A keeper that renews every stored item before its 7-day window ends. A relayer signs for sponsored spaces, and a user's wallet signs and pays for self-signed spaces.
 - Sharing with one address and revoking, with key rotation for new writes.
 - `MemDotRegistry`, a Solidity contract on Revive. Each record is signed by the owner and checked on-chain with the `sr25519Verify` precompile, and space ids are derived with `hashBlake256`.
 - Verify and public proof pages that read directly from a Portaldot node in the browser.
@@ -40,6 +40,7 @@ Working live on V3 today:
 
 ## Outstanding items
 
+- Walking real extensions and Touch ID on the live site. Wallet sign-in, MetaMask sign-in and wallet-paid stores have run in the dashboard on a local build against live V3 with test wallets; passkey and recovery-code flows have run end to end
 - Agent memory on this storage layer (remember and recall), in Private and Assisted modes
 - CLI and MCP server
 - Python SDK

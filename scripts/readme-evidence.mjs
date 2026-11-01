@@ -3,13 +3,17 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const read = (path) => JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), "utf8"));
-const latestSeed = readdirSync(new URL("../docs/evidence/", import.meta.url))
-  .filter((name) => name.startsWith("s07-seed-"))
-  .sort()
-  .at(-1);
+const latest = (prefix) =>
+  readdirSync(new URL("../docs/evidence/", import.meta.url))
+    .filter((name) => name.startsWith(prefix))
+    .sort()
+    .at(-1);
+const latestSeed = latest("s07-seed-");
 if (!latestSeed) throw new Error("no seed evidence yet: run the seed script first");
+const latestSelfSigned = latest("s07-self-signed-");
 
 const seed = read(`docs/evidence/${latestSeed}`);
+const selfSigned = latestSelfSigned ? read(`docs/evidence/${latestSelfSigned}`) : null;
 const registry = read("packages/contracts/deployments/portaldot-v3.json");
 const block = (n) => `[#${n.toLocaleString("en-US")}](${seed.app}/proof/block/${n})`;
 const tx = (hash) => `[\`${hash.slice(0, 10)}…${hash.slice(-6)}\`](${seed.app}/proof/tx/${hash})`;
@@ -51,6 +55,22 @@ const rows = [
         ],
       ]
     : []),
+  ...(selfSigned
+    ? [
+        [
+          "File signed and paid for by the user's own wallet",
+          tx(selfSigned.small.txHash),
+          block(selfSigned.small.block),
+          cid(selfSigned.small.cid),
+        ],
+        [
+          "Larger file signed and paid for by the same wallet",
+          tx(selfSigned.large.txHash),
+          block(selfSigned.large.block),
+          cid(selfSigned.large.cid),
+        ],
+      ]
+    : []),
   ...seed.records.map((record) => [
     `Registry record: ${LABEL[record.action] ?? record.action}`,
     `\`${record.txHash.slice(0, 10)}…${record.txHash.slice(-6)}\``,
@@ -63,7 +83,7 @@ const table = [
   "|---|---|---|---|",
   ...rows.map((row) => `| ${row.join(" | ")} |`),
   "",
-  `Recorded by [\`docs/evidence/${latestSeed}\`](docs/evidence/${latestSeed}) on ${seed.at.slice(0, 10)}. Registry transaction hashes are the EVM hashes Revive's RPC reports.`,
+  `Recorded by [\`docs/evidence/${latestSeed}\`](docs/evidence/${latestSeed})${latestSelfSigned ? ` and [\`docs/evidence/${latestSelfSigned}\`](docs/evidence/${latestSelfSigned})` : ""} on ${seed.at.slice(0, 10)}. Registry transaction hashes are the EVM hashes Revive's RPC reports.`,
 ].join("\n");
 
 const readmeUrl = new URL("../README.md", import.meta.url);
