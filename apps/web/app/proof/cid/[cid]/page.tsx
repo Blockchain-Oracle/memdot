@@ -1,6 +1,13 @@
 "use client";
 
-import { bitswapGet, contentHashFromCid, storageEventsAt, toHex } from "@memdot/chain";
+import {
+  bitswapGet,
+  contentHashFromCid,
+  NodeTimeoutError,
+  storageEventsAt,
+  toHex,
+  withNodeTimeout,
+} from "@memdot/chain";
 import { CidText } from "@memdot/ui/components/cid-text";
 import { RetentionMeter } from "@memdot/ui/components/retention-meter";
 import { Skeleton } from "@memdot/ui/components/skeleton";
@@ -22,6 +29,13 @@ const KIND: Record<string, string> = {
   index_snapshot: "Index snapshot",
 };
 
+const NO_ANSWER_LABEL =
+  "A Portaldot node didn't answer in time. That says nothing about the data. Reload to ask again.";
+
+/** A slow node gets one more chance; a real answer, even a bad one, is final. */
+const askOnceMore = (failures: number, error: Error) =>
+  error instanceof NodeTimeoutError && failures < 1;
+
 export default function CidProofPage() {
   const memdot = useMemDot();
   const { cid } = useParams<{ cid: string }>();
@@ -33,7 +47,7 @@ export default function CidProofPage() {
   const bytes = useQuery({
     queryKey: ["proof", "cid", cid, "bitswap"],
     queryFn: async () => (await bitswapGet((await memdot.chain()).client, cid)).length,
-    retry: false,
+    retry: askOnceMore,
     staleTime: Number.POSITIVE_INFINITY,
   });
   const current = proof.data?.current;
@@ -43,10 +57,13 @@ export default function CidProofPage() {
     queryFn: async () => {
       if (!current) return false;
       const hash = toHex(contentHashFromCid(cid));
-      const events = await storageEventsAt(await memdot.chain(), current.block);
+      const events = await withNodeTimeout(
+        memdot.chain().then((chain) => storageEventsAt(chain, current.block)),
+        `events of block ${current.block}`,
+      );
       return events.some((e) => e.index === current.index && toHex(e.contentHash) === hash);
     },
-    retry: false,
+    retry: askOnceMore,
     staleTime: Number.POSITIVE_INFINITY,
   });
   const retention = retentionOf(
@@ -68,31 +85,45 @@ export default function CidProofPage() {
 
       <Checks>
         <Check
-          state={bytes.isPending ? "running" : bytes.isSuccess ? "ok" : "failed"}
+          state={
+            bytes.isPending
+              ? "running"
+              : bytes.isSuccess
+                ? "ok"
+                : bytes.error instanceof NodeTimeoutError
+                  ? "unknown"
+                  : "failed"
+          }
           label={
             bytes.isPending
               ? "Fetching the bytes from a Portaldot node…"
               : bytes.isSuccess
                 ? "A node returned the bytes and they hash to this CID"
-                : "No node returned these bytes"
+                : bytes.error instanceof NodeTimeoutError
+                  ? NO_ANSWER_LABEL
+                  : "No node returned these bytes"
           }
           detail={
             bytes.isSuccess
               ? `${formatBytes(bytes.data)} via bitswap_v1_get`
-              : bytes.isError
+              : bytes.isError && !(bytes.error instanceof NodeTimeoutError)
                 ? describeError(bytes.error).title
                 : undefined
           }
         />
         {current && (
           <Check
-            state={event.isPending ? "running" : event.data ? "ok" : "failed"}
+            state={
+              event.isPending ? "running" : event.isError ? "unknown" : event.data ? "ok" : "failed"
+            }
             label={
               event.isPending
                 ? `Reading block #${formatNumber(current.block)}…`
-                : event.data
-                  ? `Block #${formatNumber(current.block)} records this content hash at index ${current.index}`
-                  : `Block #${formatNumber(current.block)} does not record it at index ${current.index}`
+                : event.isError
+                  ? NO_ANSWER_LABEL
+                  : event.data
+                    ? `Block #${formatNumber(current.block)} records this content hash at index ${current.index}`
+                    : `Block #${formatNumber(current.block)} does not record it at index ${current.index}`
             }
           />
         )}

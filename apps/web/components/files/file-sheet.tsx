@@ -23,6 +23,7 @@ import { Spinner } from "@memdot/ui/components/spinner";
 import { cn } from "@memdot/ui/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  CircleAlertIcon,
   CircleCheckIcon,
   CircleXIcon,
   DownloadIcon,
@@ -311,17 +312,25 @@ export function FileSheet({
                 <p
                   className={cn(
                     "flex items-start gap-2 text-ui-sm",
-                    verified.ok ? "text-ok-fg" : "text-danger-fg",
+                    verified.ok
+                      ? "text-ok-fg"
+                      : verified.inconclusive
+                        ? "text-warn-fg"
+                        : "text-danger-fg",
                   )}
                 >
                   {verified.ok ? (
                     <CircleCheckIcon className="mt-0.5 size-4 shrink-0" />
+                  ) : verified.inconclusive ? (
+                    <CircleAlertIcon className="mt-0.5 size-4 shrink-0" />
                   ) : (
                     <CircleXIcon className="mt-0.5 size-4 shrink-0" />
                   )}
                   {verified.ok
                     ? `Hash matches. Read from Portaldot by this browser, recorded in block #${formatNumber(verified.blobs[0]?.block ?? 0)}.`
-                    : `${verified.blobs.filter((b) => !b.retrievable || !b.onChain).length} blob(s) did not verify: the bytes or the chain record do not match.`}
+                    : verified.inconclusive
+                      ? "A Portaldot node didn't answer in time. That says nothing about this file. Verify again."
+                      : `${verified.blobs.filter((b) => b.answered && (!b.retrievable || !b.onChain)).length} blob(s) did not verify: the bytes or the chain record do not match.`}
                 </p>
               ) : (
                 <p className="text-ui-sm text-text-3">

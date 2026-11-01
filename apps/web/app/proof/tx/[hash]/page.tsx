@@ -1,6 +1,6 @@
 "use client";
 
-import { extrinsicHashes } from "@memdot/chain";
+import { extrinsicHashes, withNodeTimeout } from "@memdot/chain";
 import { CidText } from "@memdot/ui/components/cid-text";
 import { Skeleton } from "@memdot/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
@@ -24,8 +24,13 @@ export default function TxProofPage() {
     queryKey: ["proof", "tx", hash, "included", block],
     enabled: block !== undefined,
     queryFn: async () =>
-      (await extrinsicHashes(await memdot.chain(), block as number)).includes(hash.toLowerCase()),
-    retry: false,
+      (
+        await withNodeTimeout(
+          memdot.chain().then((chain) => extrinsicHashes(chain, block as number)),
+          `block ${block}`,
+        )
+      ).includes(hash.toLowerCase()),
+    retry: 1,
     staleTime: Number.POSITIVE_INFINITY,
   });
 
@@ -45,13 +50,23 @@ export default function TxProofPage() {
         <>
           <Checks>
             <Check
-              state={included.isPending ? "running" : included.data ? "ok" : "failed"}
+              state={
+                included.isPending
+                  ? "running"
+                  : included.isError
+                    ? "unknown"
+                    : included.data
+                      ? "ok"
+                      : "failed"
+              }
               label={
                 included.isPending
                   ? `Reading block #${formatNumber(proof.data.location.block)}…`
-                  : included.data
-                    ? `Block #${formatNumber(proof.data.location.block)} contains this transaction`
-                    : `This hash is not among block #${formatNumber(proof.data.location.block)}'s transactions`
+                  : included.isError
+                    ? "A Portaldot node didn't answer in time. That says nothing about the data. Reload to ask again."
+                    : included.data
+                      ? `Block #${formatNumber(proof.data.location.block)} contains this transaction`
+                      : `This hash is not among block #${formatNumber(proof.data.location.block)}'s transactions`
               }
             />
           </Checks>

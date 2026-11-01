@@ -18,6 +18,7 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { createPublicClient, defineChain, http } from "viem";
 import { MemDot, MemDotError, walletFromMnemonic } from "../src/index.js";
 
+const VERIFY_ATTEMPTS = 3;
 const baseUrl = process.env.API_URL ?? "http://localhost:8787";
 const origin = process.env.WEB_ORIGIN ?? "http://localhost:3100";
 const client = () => MemDot.create({ baseUrl, origin, client: "seed-demo" });
@@ -132,9 +133,18 @@ if (!received) throw new Error("the recipient sees no grant");
 const opened = await recipient.sharing.get(received.id, firstNote.id);
 console.log(`Shared and opened by the recipient: ${opened.name}`);
 
-const verifiedNote = await owner.files.verify(firstNote.id);
-const verifiedBanner = await owner.files.verify(banner.id);
-if (!verifiedNote.ok || !verifiedBanner.ok) throw new Error("verification failed");
+// A node can stall on a read; "inconclusive" means ask again, anything else is a real answer.
+const verifyPatiently = async (id: string) => {
+  for (let attempt = 1; ; attempt += 1) {
+    const result = await owner.files.verify(id);
+    if (result.ok) return result;
+    if (!result.inconclusive || attempt >= VERIFY_ATTEMPTS) {
+      throw new Error(`verification failed: ${JSON.stringify(result)}`);
+    }
+  }
+};
+const verifiedNote = await verifyPatiently(firstNote.id);
+const verifiedBanner = await verifyPatiently(banner.id);
 console.log("Verified over this machine's own V3 connection.");
 
 // Records land after the stores they follow, so wait for them to reach the chain.

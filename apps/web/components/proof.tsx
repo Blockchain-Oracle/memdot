@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@memdot/ui/lib/utils";
-import { CircleCheckIcon, CircleXIcon, LoaderCircleIcon } from "lucide-react";
+import { CircleAlertIcon, CircleCheckIcon, CircleXIcon, LoaderCircleIcon } from "lucide-react";
 
 /** A labelled fact row on a proof page. */
 export function Fact({ label, children }: { label: string; children: React.ReactNode }) {
@@ -25,7 +25,8 @@ export function Check({
   label,
   detail,
 }: {
-  state: "running" | "ok" | "failed";
+  /** `unknown`: a node did not answer, which says nothing about the data. */
+  state: "running" | "ok" | "failed" | "unknown";
   label: string;
   detail?: string;
 }) {
@@ -35,6 +36,8 @@ export function Check({
         <LoaderCircleIcon className="mt-0.5 size-4 shrink-0 animate-spin text-text-3" />
       ) : state === "ok" ? (
         <CircleCheckIcon className="mt-0.5 size-4 shrink-0 text-ok" />
+      ) : state === "unknown" ? (
+        <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-warn" />
       ) : (
         <CircleXIcon className="mt-0.5 size-4 shrink-0 text-danger" />
       )}

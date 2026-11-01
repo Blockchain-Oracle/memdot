@@ -1,4 +1,4 @@
-export { bitswapGet, IntegrityError } from "./bitswap.js";
+export { bitswapGet, IntegrityError, NodeTimeoutError, withNodeTimeout } from "./bitswap.js";
 export {
   cidFromContentHash,
   cidOf,

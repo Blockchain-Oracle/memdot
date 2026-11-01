@@ -2,16 +2,14 @@ import {
   bitswapGet,
   cidOf,
   contentHashFromCid,
+  IntegrityError,
+  NodeTimeoutError,
   quoteStoreFee,
   storageEventsAt,
   toHex,
+  withNodeTimeout,
 } from "@memdot/chain";
-import {
-  BITSWAP_TIMEOUT_MS,
-  MAX_SEGMENT_ENTRIES,
-  SEGMENT_PACK_BYTES,
-  TINY_FILE_BYTES,
-} from "@memdot/config";
+import { MAX_SEGMENT_ENTRIES, SEGMENT_PACK_BYTES, TINY_FILE_BYTES } from "@memdot/config";
 import {
   buildManifest,
   decryptObject,
@@ -79,16 +77,23 @@ export interface PutResult {
 
 export interface VerifyResult {
   ok: boolean;
+  /** Not ok, but nothing mismatched: a node did not answer in time. Try again. */
+  inconclusive: boolean;
   blobs: {
     cid: string;
     /** The bytes a node returned hash to the CID. */
     retrievable: boolean;
     /** The block's TransactionStorage events hold this content hash at this location. */
     onChain: boolean;
+    /** False when a node never answered, so the two checks above say nothing either way. */
+    answered: boolean;
     block: number | null;
     index: number | null;
   }[];
 }
+
+/** How many times Verify asks a node before reporting that it did not answer. */
+const NODE_ATTEMPTS = 2;
 
 /** Bytes of a typical sealed manifest; only used to estimate fees before encrypting. */
 const MANIFEST_ESTIMATE_BYTES = 700;
@@ -455,24 +460,45 @@ export class FilesApi {
     const chain = await this.ctx.chain();
     const blobs = await Promise.all(
       target.blobs.map(async (blob) => {
-        const retrievable = await bitswapGet(chain.client, blob.cid)
-          .then(() => true)
-          .catch(() => false);
+        // Wrong bytes, or a node saying it has none, is an answer; a dropped connection is not.
+        const fetched = await askNode(() => bitswapGet(chain.client, blob.cid)).catch(
+          (error: unknown) =>
+            error instanceof IntegrityError || (error as { code?: unknown }).code !== undefined
+              ? null
+              : NO_ANSWER,
+        );
+        let answered = fetched !== NO_ANSWER;
         let onChain = false;
-        if (blob.block !== null && blob.indexInBlock !== null) {
+        const { block, indexInBlock } = blob;
+        if (block !== null && indexInBlock !== null) {
           const hash = toHex(contentHashFromCid(blob.cid));
-          const events = await withTimeout(
-            storageEventsAt(chain, blob.block),
-            BITSWAP_TIMEOUT_MS,
-          ).catch(() => []);
-          onChain = events.some(
-            (event) => event.index === blob.indexInBlock && toHex(event.contentHash) === hash,
-          );
+          // Failing to read a block is not evidence that the block lacks the event.
+          const events = await askNode(() =>
+            withNodeTimeout(storageEventsAt(chain, block), `events of block ${block}`),
+          ).catch((): typeof NO_ANSWER => NO_ANSWER);
+          if (events === NO_ANSWER) answered = false;
+          else {
+            onChain = events.some(
+              (event) => event.index === indexInBlock && toHex(event.contentHash) === hash,
+            );
+          }
         }
-        return { cid: blob.cid, retrievable, onChain, block: blob.block, index: blob.indexInBlock };
+        return {
+          cid: blob.cid,
+          retrievable: fetched !== NO_ANSWER && fetched !== null,
+          onChain,
+          answered,
+          block,
+          index: indexInBlock,
+        };
       }),
     );
-    return { ok: blobs.every((b) => b.retrievable && b.onChain), blobs };
+    const passed = (b: (typeof blobs)[number]) => b.retrievable && b.onChain;
+    return {
+      ok: blobs.every(passed),
+      inconclusive: blobs.some((b) => !passed(b)) && blobs.every((b) => passed(b) || !b.answered),
+      blobs,
+    };
   }
 
   /**
@@ -507,13 +533,17 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/** Rejects when the promise takes longer than `ms` (a node that stops answering). */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms);
-    }),
-  ]).finally(() => clearTimeout(timer));
+/** A read that no node answered; it says nothing about the data. */
+const NO_ANSWER = Symbol("no answer");
+
+/** Asks once more when a node is slow: a busy node or a cold connection is not a failed check. */
+async function askNode<T>(read: () => Promise<T>): Promise<T | typeof NO_ANSWER> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await read();
+    } catch (error) {
+      if (!(error instanceof NodeTimeoutError)) throw error;
+      if (attempt >= NODE_ATTEMPTS) return NO_ANSWER;
+    }
+  }
 }

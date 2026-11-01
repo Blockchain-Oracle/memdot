@@ -8,7 +8,13 @@ import { CidText } from "@memdot/ui/components/cid-text";
 import { Spinner } from "@memdot/ui/components/spinner";
 import { cn } from "@memdot/ui/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { CircleCheckIcon, CircleXIcon, ShieldCheckIcon, UploadIcon } from "lucide-react";
+import {
+  CircleAlertIcon,
+  CircleCheckIcon,
+  CircleXIcon,
+  ShieldCheckIcon,
+  UploadIcon,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { describeError } from "@/lib/errors";
@@ -140,7 +146,13 @@ export function StepFirstFile({ spaceId, onDone }: { spaceId: string; onDone: ()
                   together.
                 </p>
               )}
-              {verified ? (
+              {verified?.inconclusive && (
+                <p className="flex items-center gap-2 text-ui-sm text-warn-fg">
+                  <CircleAlertIcon className="size-4 shrink-0" aria-hidden="true" />A Portaldot node
+                  didn&apos;t answer in time. That says nothing about this file. Verify again.
+                </p>
+              )}
+              {verified && !verified.inconclusive ? (
                 <p
                   className={cn(
                     "flex items-center gap-2 text-ui-sm",

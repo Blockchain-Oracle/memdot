@@ -840,12 +840,14 @@ export function objectRoutes(services: Services) {
       }),
       async (c) => {
         const object = await loadObject(c, c.req.valid("param").id);
+        // A small file has no blob of its own: renewing it renews the segment that holds it.
+        const blobOwnerId = object.segmentId ?? object.id;
         const [open] = await db
           .select()
           .from(jobs)
           .where(
             and(
-              eq(jobs.objectId, object.id),
+              eq(jobs.objectId, blobOwnerId),
               eq(jobs.kind, JOB_KIND.renew),
               notInArray(jobs.status, ["finalized", "failed"]),
             ),
@@ -862,7 +864,7 @@ export function objectRoutes(services: Services) {
             .from(storedItems)
             .where(
               and(
-                eq(storedItems.objectId, object.id),
+                eq(storedItems.objectId, blobOwnerId),
                 eq(storedItems.status, "stored"),
                 // Freshly stored or renewed blobs have nearly all their 7 days left.
                 lte(storedItems.block, head - RENEW_NOW_MIN_AGE_BLOCKS),
@@ -880,9 +882,9 @@ export function objectRoutes(services: Services) {
             .insert(jobs)
             .values({
               accountId: object.accountId,
-              objectId: object.id,
+              objectId: blobOwnerId,
               kind: JOB_KIND.renew,
-              payload: { objectId: object.id },
+              payload: { objectId: blobOwnerId },
               result: { progress: { done: 0, total: items.length } },
             })
             .returning();
