@@ -55,6 +55,7 @@ export class SpacesApi {
         body: { id, encryptedName, mode: input.mode ?? "sponsored" },
       }),
     );
+    await this.ctx.registry.createSpace(raw.id, raw.mode);
     return this.open(raw);
   }
 
@@ -97,8 +98,12 @@ export class SpacesApi {
   }
 
   /** Tombstones everything in it and stops renewing; bytes expire from the chain within 7 days. */
-  delete(id: string) {
-    return unwrap(this.ctx.transport.api.DELETE("/v1/spaces/{id}", { params: { path: { id } } }));
+  async delete(id: string) {
+    const deleted = await unwrap(
+      this.ctx.transport.api.DELETE("/v1/spaces/{id}", { params: { path: { id } } }),
+    );
+    await this.ctx.registry.deleteSpace(id);
+    return deleted;
   }
 
   private async open(raw: RawSpace): Promise<Space> {

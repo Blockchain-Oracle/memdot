@@ -73,5 +73,6 @@ export async function enqueueChainTx(
     });
     return;
   }
-  await boss.send(QUEUE.chainTx, payload, { priority: PRIORITY.renew, db });
+  const priority = payload.action === "registry" ? PRIORITY.registry : PRIORITY.renew;
+  await boss.send(QUEUE.chainTx, payload, { priority, db });
 }

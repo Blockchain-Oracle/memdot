@@ -3,7 +3,9 @@ export { JobEventHub } from "./listen.js";
 export {
   type ChainTxPayload,
   chainTxPayload,
+  type RegistryPayload,
   type RenewBatchPayload,
+  registryPayload,
   renewBatchPayload,
   type StoreBlobPayload,
   storeBlobPayload,

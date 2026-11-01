@@ -470,6 +470,7 @@ export class AccountApi {
         body: { keyBundleCid: declared.object.cid ?? "" },
       }),
     );
+    if (declared.object.cid) await this.ctx.registry.registerKey(declared.object.cid);
   }
 }
 

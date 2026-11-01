@@ -4915,6 +4915,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/registry/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit an owner-signed registry record
+         * @description MemDot's relayer submits the record to MemDotRegistry on Portaldot V3 and pays the fee. The contract checks the owner's signature, so the API cannot forge or alter a record. Spaces named in a record must belong to the caller.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description ABI-encoded MemDotRegistry.record(...) call */
+                        calldata: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Queued for the relayer */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {boolean} */
+                            queued: true;
+                        };
+                    };
+                };
+                /** @description The request is not valid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Sign in or pass an API key. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The API key lacks this permission or space. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Conflicts with the current state. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limited. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4956,6 +5059,8 @@ export interface components {
             /** @description X25519 sharing key (age recipient) */
             encryptionKey: string | null;
             keyBundleCid: string | null;
+            /** @description The key that signs this account's MemDotRegistry records */
+            registryOwner: string | null;
             /** Format: date-time */
             createdAt: string;
         } | null;
@@ -5420,6 +5525,11 @@ export interface components {
             }[];
             expiresAtBlock: number | null;
             headBlock: number | null;
+            /** @description The owner-signed MemDotRegistry record naming this blob */
+            registry: {
+                block: number;
+                txHash: string | null;
+            } | null;
         };
         TxProof: {
             txHash: string;

@@ -8,6 +8,7 @@ import { FilesApi } from "./files.js";
 import { JobsApi } from "./jobs.js";
 import { KeysApi } from "./keys.js";
 import { ProofApi } from "./proof.js";
+import { RegistryLog } from "./registry.js";
 import { SharingApi } from "./sharing.js";
 import { FoldersApi, SpacesApi } from "./spaces.js";
 import { Transport, type TransportOptions, unwrap } from "./transport.js";
@@ -45,14 +46,17 @@ export class MemDot {
   readonly proof: ProofApi;
 
   private readonly transport: Transport;
+  private readonly registry: RegistryLog;
   private chainClient: Promise<ChainClient> | null = null;
 
   private constructor(private readonly options: MemDotOptions) {
     this.transport = new Transport(options);
     const vault = new Vault();
+    this.registry = new RegistryLog({ transport: this.transport, vault });
     const ctx: Context = {
       transport: this.transport,
       vault,
+      registry: this.registry,
       chain: () => this.chain(),
     };
     this.jobs = new JobsApi(ctx);
@@ -98,6 +102,7 @@ export class MemDot {
   }
 
   private async afterUnlock(): Promise<void> {
+    await this.registry.ensureRegistered();
     if (this.options.completeGrantsOnUnlock === false) return;
     try {
       await this.sharing.completeReady();

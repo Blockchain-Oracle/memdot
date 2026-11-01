@@ -25,6 +25,7 @@
   "dependencies": {
     "@memdot/chain": "workspace:*",
     "@memdot/config": "workspace:*",
+    "@memdot/contracts": "workspace:*",
     "@memdot/crypto": "workspace:*",
     "@noble/hashes": "^2.4.0",
     "@scure/base": "^2.4.0",

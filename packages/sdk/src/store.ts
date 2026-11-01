@@ -66,18 +66,27 @@ export async function storeObject(ctx: Context, input: StoreInput): Promise<Decl
 
   if (input.wallet) {
     await storeWithWallet(ctx, declared, blobs, input.wallet, input.onBlob);
-    return declared;
+  } else {
+    let done = 0;
+    for (const slot of declared.uploads) {
+      const bytes = blobs.get(slot.cid);
+      if (!bytes) throw new Error(`no bytes for ${slot.cid}`);
+      await ctx.transport.send("PUT", slot.url, {
+        body: bytes as Uint8Array<ArrayBuffer>,
+        headers: { "content-type": "application/octet-stream" },
+      });
+      done += 1;
+      input.onBlob?.(done, declared.uploads.length);
+    }
   }
-  let done = 0;
-  for (const slot of declared.uploads) {
-    const bytes = blobs.get(slot.cid);
-    if (!bytes) throw new Error(`no bytes for ${slot.cid}`);
-    await ctx.transport.send("PUT", slot.url, {
-      body: bytes as Uint8Array<ArrayBuffer>,
-      headers: { "content-type": "application/octet-stream" },
+  // A key bundle is recorded by the account's RegisterKey record instead.
+  if (input.kind !== "key_bundle") {
+    await ctx.registry.addObject({
+      kind: input.kind,
+      rootCid: root.cid,
+      size: root.size,
+      ...(input.spaceId ? { spaceId: input.spaceId } : {}),
     });
-    done += 1;
-    input.onBlob?.(done, declared.uploads.length);
   }
   return declared;
 }

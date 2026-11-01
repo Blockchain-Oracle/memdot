@@ -1,8 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { contentHashFromCid, toHex } from "@memdot/chain";
 import { RETENTION_BLOCKS } from "@memdot/config";
-import { objects, renewals, storedItems } from "@memdot/db";
-import { count, desc, eq, isNotNull, sum } from "drizzle-orm";
+import { chainEvents, objects, renewals, storedItems } from "@memdot/db";
+import { and, count, desc, eq, isNotNull, sql, sum } from "drizzle-orm";
 import { db } from "../db.js";
 import { notFound } from "../lib/errors.js";
 import { clientIp, RateLimiter, rateLimit } from "../lib/rate-limit.js";
@@ -73,6 +73,10 @@ const CidProof = z
     renewals: z.array(Renewal),
     expiresAtBlock: z.number().int().nullable(),
     headBlock: z.number().int().nullable(),
+    registry: z
+      .object({ block: z.number().int(), txHash: z.string().nullable() })
+      .nullable()
+      .openapi({ description: "The owner-signed MemDotRegistry record naming this blob" }),
   })
   .openapi("CidProof");
 
@@ -144,8 +148,20 @@ export function proofRoutes(services: Services) {
           .where(eq(renewals.storedItemId, row.item.id))
           .orderBy(renewals.createdAt);
         const { item } = row;
+        const [record] = await db
+          .select({ block: chainEvents.block, txHash: chainEvents.txHash })
+          .from(chainEvents)
+          .where(
+            and(
+              eq(chainEvents.source, "registry"),
+              sql`jsonb_exists(${chainEvents.payload}->'record'->'contentHashes', ${hash})`,
+            ),
+          )
+          .orderBy(chainEvents.block)
+          .limit(1);
         return c.json(
           {
+            registry: record ?? null,
             cid: item.cid,
             contentHash: item.contentHash,
             sizeBytes: item.sizeBytes,

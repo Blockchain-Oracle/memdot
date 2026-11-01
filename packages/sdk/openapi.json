@@ -166,6 +166,13 @@
               "null"
             ]
           },
+          "registryOwner": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key that signs this account's MemDotRegistry records"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -177,6 +184,7 @@
           "evmAddress",
           "encryptionKey",
           "keyBundleCid",
+          "registryOwner",
           "createdAt"
         ],
         "description": "Null until setup is finished"
@@ -1371,7 +1379,7 @@
               "format": "uuid"
             },
             "minItems": 1,
-            "maxItems": 10,
+            "maxItems": 5,
             "default": null
           },
           "agentId": {
@@ -1783,6 +1791,28 @@
               "integer",
               "null"
             ]
+          },
+          "registry": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "block": {
+                "type": "integer"
+              },
+              "txHash": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "block",
+              "txHash"
+            ],
+            "description": "The owner-signed MemDotRegistry record naming this blob"
           }
         },
         "required": [
@@ -1796,7 +1826,8 @@
           "firstStore",
           "renewals",
           "expiresAtBlock",
-          "headBlock"
+          "headBlock",
+          "registry"
         ]
       },
       "TxProof": {
@@ -7681,6 +7712,127 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProofRecent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/registry/records": {
+      "post": {
+        "tags": [
+          "Registry"
+        ],
+        "summary": "Submit an owner-signed registry record",
+        "description": "MemDot's relayer submits the record to MemDotRegistry on Portaldot V3 and pays the fee. The contract checks the owner's signature, so the API cannot forge or alter a record. Spaces named in a record must belong to the caller.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "calldata": {
+                    "type": "string",
+                    "maxLength": 16384,
+                    "pattern": "^0x[0-9a-fA-F]+$",
+                    "description": "ABI-encoded MemDotRegistry.record(...) call"
+                  }
+                },
+                "required": [
+                  "calldata"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued for the relayer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "queued": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "queued"
+                  ]
                 }
               }
             }

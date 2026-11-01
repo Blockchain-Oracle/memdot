@@ -18,10 +18,13 @@ export default function ProofLayout({ children }: { children: React.ReactNode })
         >
           <Wordmark />
         </Link>
-        <span className="flex items-center gap-2 text-ui-sm text-text-3">
+        <Link
+          href="/proof/registry"
+          className="flex items-center gap-2 rounded-lg text-ui-sm text-text-3 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
           <span className="size-1.5 rounded-full bg-ember" aria-hidden="true" />
-          Proof on Portaldot V3
-        </span>
+          Registry on Portaldot V3
+        </Link>
       </header>
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6">
         {children}

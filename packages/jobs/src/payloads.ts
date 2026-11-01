@@ -23,8 +23,19 @@ export const renewBatchPayload = z.object({
   jobId: z.uuid().optional(),
 });
 
-export const chainTxPayload = z.discriminatedUnion("action", [storeBlobPayload, renewBatchPayload]);
+/** Submit one owner-signed `MemDotRegistry.record` call, already checked by the API. */
+export const registryPayload = z.object({
+  action: z.literal("registry"),
+  calldata: z.string().regex(/^0x[0-9a-f]+$/i),
+});
+
+export const chainTxPayload = z.discriminatedUnion("action", [
+  storeBlobPayload,
+  renewBatchPayload,
+  registryPayload,
+]);
 
 export type StoreBlobPayload = z.infer<typeof storeBlobPayload>;
 export type RenewBatchPayload = z.infer<typeof renewBatchPayload>;
+export type RegistryPayload = z.infer<typeof registryPayload>;
 export type ChainTxPayload = z.infer<typeof chainTxPayload>;

@@ -24,6 +24,7 @@
     "@hono/zod-openapi": "^1.6.3",
     "@memdot/chain": "workspace:*",
     "@memdot/config": "workspace:*",
+    "@memdot/contracts": "workspace:*",
     "@memdot/crypto": "workspace:*",
     "@memdot/db": "workspace:*",
     "@memdot/jobs": "workspace:*",

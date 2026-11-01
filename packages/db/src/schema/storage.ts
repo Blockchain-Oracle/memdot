@@ -48,8 +48,13 @@ export const accounts = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id),
-    /** AccountId32 as 0x-hex: the sr25519 public key that owns registry records. */
+    /** AccountId32 as 0x-hex: the wallet (or derived key) that owns this account. */
     ownerAccount: text("owner_account").notNull(),
+    /**
+     * The sr25519 key derived from the master key that signs this account's registry records, so
+     * records never need a wallet prompt and work for EVM owners too. Set by the first record.
+     */
+    registryOwner: text("registry_owner"),
     evmAddress: text("evm_address"),
     /** X25519 sharing key published in the registry. */
     encryptionKey: text("encryption_key"),

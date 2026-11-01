@@ -1,6 +1,6 @@
 import { extrinsicHashes, type StorageEvent, storageEventsAt, toHex } from "@memdot/chain";
 import { EVM_CHAIN_ID } from "@memdot/config";
-import { memDotRegistryAbi } from "@memdot/contracts";
+import { actionName, decodeRecord, memDotRegistryAbi } from "@memdot/contracts";
 import { blobStaging, chainCursors, chainEvents, renewals, storedItems } from "@memdot/db";
 import { openJobsOf, settleObject } from "@memdot/jobs";
 import { and, eq, lt, sql } from "drizzle-orm";
@@ -9,6 +9,14 @@ import type { Deps } from "../deps.js";
 
 const STORAGE_CURSOR = "transaction_storage";
 const REGISTRY_CURSOR = "registry";
+
+interface RecordedArgs {
+  owner: `0x${string}`;
+  spaceId: `0x${string}`;
+  action: number;
+  nonce: bigint;
+  data: `0x${string}`;
+}
 /** A fresh database starts one hour (600 blocks) before the head unless told otherwise. */
 const BOOTSTRAP_BLOCKS = 600;
 /** Blocks one run reads; at ~2 RPCs a block a run stays well under the 1-minute schedule. */
@@ -153,8 +161,7 @@ export async function indexChain(deps: Deps): Promise<void> {
  * Revive's RPC has no filters. Raw decoded events land in chain_events for rebuilds and proof pages.
  */
 async function indexRegistry(deps: Deps): Promise<void> {
-  const address = deps.env.REGISTRY_ADDRESS as `0x${string}` | undefined;
-  if (!address) return;
+  const address = deps.env.REGISTRY_ADDRESS as `0x${string}`;
   const client = createPublicClient({
     chain: defineChain({
       id: EVM_CHAIN_ID,
@@ -176,15 +183,30 @@ async function indexRegistry(deps: Deps): Promise<void> {
     fromBlock: BigInt(from),
     toBlock: BigInt(to),
   });
-  for (const log of logs as (Log & { eventName: string; args: Record<string, unknown> })[]) {
+  for (const log of logs as (Log & { eventName: string; args: RecordedArgs })[]) {
+    const { owner, spaceId, action, nonce, data } = log.args;
+    // Readers apply an (owner, nonce) pair once: a replayed signed record changes nothing.
+    const [seen] = await deps.db
+      .select({ id: chainEvents.id })
+      .from(chainEvents)
+      .where(
+        and(
+          eq(chainEvents.source, REGISTRY_CURSOR),
+          sql`${chainEvents.payload}->>'owner' = ${owner}`,
+          sql`${chainEvents.payload}->>'nonce' = ${nonce.toString()}`,
+        ),
+      )
+      .limit(1);
+    if (seen) continue;
     await deps.db.insert(chainEvents).values({
       source: REGISTRY_CURSOR,
-      name: log.eventName,
+      name: actionName(action) ?? `Action${action}`,
       block: Number(log.blockNumber),
       txHash: log.transactionHash,
       payload: JSON.parse(
-        JSON.stringify({ ...log.args, logIndex: log.logIndex }, (_k, v) =>
-          typeof v === "bigint" ? v.toString() : v,
+        JSON.stringify(
+          { owner, spaceId, action, nonce, record: decodeRecord(action, data) },
+          (_k, v) => (typeof v === "bigint" ? v.toString() : v),
         ),
       ),
     });

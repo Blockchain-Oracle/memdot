@@ -115,6 +115,13 @@ export default function CidProofPage() {
               <span className="font-mono tabular">{formatBytes(proof.data.sizeBytes)}</span>
             </Fact>
             <Fact label="Status">{proof.data.status}</Fact>
+            {proof.data.registry && (
+              <Fact label="Owner's record">
+                <Link href="/proof/registry" className="font-mono tabular hover:underline">
+                  Registry, block #{formatNumber(proof.data.registry.block)}
+                </Link>
+              </Fact>
+            )}
             {current && (
               <Fact label="Lives at">
                 <Link

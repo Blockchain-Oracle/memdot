@@ -76,10 +76,19 @@ export class SharingApi {
       );
     }
     const recipientKey = await this.recipientKey(to);
-    if (!recipientKey) return this.create({ spaceId: detail.spaceId, objectId, to, options });
+    if (!recipientKey) {
+      return this.create({ spaceId: detail.spaceId, objectId, objectCid: detail.cid, to, options });
+    }
     const manifest = await this.ownManifest(detail);
     const wrappedKeyCid = await this.storeGrantKey(await sealManifest(manifest, [recipientKey]));
-    return this.create({ spaceId: detail.spaceId, objectId, to, options, wrappedKeyCid });
+    return this.create({
+      spaceId: detail.spaceId,
+      objectId,
+      objectCid: detail.cid,
+      to,
+      options,
+      wrappedKeyCid,
+    });
   }
 
   list(direction: "given" | "received" = "given", spaceId?: string) {
@@ -91,10 +100,14 @@ export class SharingApi {
   }
 
   /** Stops future access and moves the space to a new key epoch. */
-  revoke(grantId: string) {
-    return unwrap(
+  async revoke(grantId: string) {
+    const { items } = await this.list("given");
+    const revoked = await unwrap(
       this.ctx.transport.api.DELETE("/v1/grants/{id}", { params: { path: { id: grantId } } }),
     );
+    const grant = items.find((item) => item.id === grantId);
+    if (grant) await this.ctx.registry.revokeGrant(grant.spaceId, grant.id);
+    return revoked;
   }
 
   /**
@@ -244,15 +257,16 @@ export class SharingApi {
     return declared.object.cid;
   }
 
-  private create(input: {
+  private async create(input: {
     spaceId: string;
     objectId?: string;
+    objectCid?: string | null;
     to: ShareTarget;
     options: ShareOptions;
     wrappedKeyCid?: string;
     keyEpoch?: number;
   }): Promise<Grant> {
-    return unwrap(
+    const grant = await unwrap(
       this.ctx.transport.api.POST("/v1/grants", {
         body: {
           spaceId: input.spaceId,
@@ -268,6 +282,16 @@ export class SharingApi {
         },
       }),
     );
+    await this.ctx.registry.grant({
+      grantId: grant.id,
+      spaceId: input.spaceId,
+      objectCid: input.objectCid,
+      grantee: grant.grantee,
+      scope: grant.scope,
+      expiresAt: grant.expiresAt,
+      wrappedKeyCid: input.wrappedKeyCid,
+    });
+    return grant;
   }
 
   private complete(grantId: string, body: { wrappedKeyCid: string; keyEpoch?: number }) {

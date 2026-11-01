@@ -28,6 +28,10 @@ const Account = z
       .nullable()
       .openapi({ description: "X25519 sharing key (age recipient)" }),
     keyBundleCid: z.string().nullable(),
+    registryOwner: z
+      .string()
+      .nullable()
+      .openapi({ description: "The key that signs this account's MemDotRegistry records" }),
     createdAt: z.iso.datetime(),
   })
   .openapi("Account");
@@ -73,6 +77,7 @@ const serialize = (row: AccountRow) => ({
   evmAddress: row.evmAddress,
   encryptionKey: row.encryptionKey,
   keyBundleCid: row.keyBundleCid,
+  registryOwner: row.registryOwner,
   createdAt: row.createdAt.toISOString(),
 });
 

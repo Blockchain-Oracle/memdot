@@ -1,0 +1,1 @@
+ALTER TABLE "accounts" ADD COLUMN "registry_owner" text;

@@ -81,6 +81,66 @@ function submitFinalized(
   });
 }
 
+export interface ContractCallResult {
+  txHash: string;
+  block: number;
+  feePlanck: bigint | null;
+}
+
+/** A contract rejected the call in its dry run, so nothing was submitted or paid. */
+export class ContractRevertedError extends Error {}
+
+const REVIVE_REVERT_FLAG = 1;
+const WEIGHT_HEADROOM_PERCENT = 120n;
+
+/**
+ * Calls a Revive contract: dry-runs it, then submits with the measured weight and deposit. A revert
+ * in the dry run throws ContractRevertedError before anything is signed.
+ */
+export async function callContract(
+  api: PortaldotApi,
+  txCreator: TxCreator,
+  origin: string,
+  contract: string,
+  data: Uint8Array,
+  options: TxOptions = {},
+): Promise<ContractCallResult> {
+  const dry = await api.apis.ReviveApi.call(
+    origin,
+    contract as never,
+    0n,
+    undefined,
+    undefined,
+    data,
+  );
+  if (!dry.result.success) {
+    throw new ContractRevertedError(`dry run failed: ${JSON.stringify(dry.result.value)}`);
+  }
+  if (dry.result.value.flags & REVIVE_REVERT_FLAG) {
+    throw new ContractRevertedError("the contract reverted");
+  }
+  const finalized = await submitFinalized(
+    api.tx.Revive.call({
+      dest: contract as never,
+      value: 0n,
+      weight_limit: {
+        ref_time: (dry.weight_required.ref_time * WEIGHT_HEADROOM_PERCENT) / 100n,
+        proof_size: (dry.weight_required.proof_size * WEIGHT_HEADROOM_PERCENT) / 100n,
+      },
+      storage_deposit_limit:
+        dry.max_storage_deposit.type === "Charge" ? dry.max_storage_deposit.value : 0n,
+      data,
+    }),
+    txCreator,
+    options,
+  );
+  return {
+    txHash: finalized.txHash,
+    block: finalized.block.number,
+    feePlanck: feeOf(api, finalized),
+  };
+}
+
 /** Stores one chunk with `TransactionStorage.store`. Never wrap this call (batch, proxy, EVM). */
 export async function storeChunk(
   api: PortaldotApi,

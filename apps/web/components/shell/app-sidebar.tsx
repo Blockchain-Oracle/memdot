@@ -14,7 +14,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "@memdot/ui/components/sidebar";
-import { ArrowUpRightIcon, BookOpenIcon } from "lucide-react";
+import { ArrowUpRightIcon, BookOpenIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -75,6 +75,14 @@ export function AppSidebar() {
       <SidebarFooter className="gap-1">
         <NetworkStatus />
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="On-chain registry" className="text-text-2">
+              <Link href="/proof/registry">
+                <ShieldCheckIcon />
+                <span>On-chain registry</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="API reference" className="text-text-2">
               <a href={DOCS_URL} target="_blank" rel="noreferrer">

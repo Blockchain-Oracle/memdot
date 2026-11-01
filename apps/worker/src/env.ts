@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { PORTALDOT_EVM_RPC, PORTALDOT_WSS, TPOT_DECIMALS } from "@memdot/config";
+import { PORTALDOT_EVM_RPC, PORTALDOT_WSS, REGISTRY_ADDRESS, TPOT_DECIMALS } from "@memdot/config";
 import { z } from "zod";
 
 // In development the repo-root .env is the single source; in production Coolify injects env.
@@ -15,11 +15,11 @@ const schema = z.object({
   SIGNER_MNEMONIC: z.string().min(1),
   PORTALDOT_WSS: z.string().default(PORTALDOT_WSS),
   PORTALDOT_EVM_RPC: z.url().default(PORTALDOT_EVM_RPC),
-  /** MemDotRegistry address once deployed; the indexer follows its logs when set. */
+  /** The registry the indexer follows and records go to. */
   REGISTRY_ADDRESS: z
     .string()
     .regex(/^0x[0-9a-fA-F]{40}$/)
-    .optional(),
+    .default(REGISTRY_ADDRESS),
   /** Below this free balance new stores pause (renewals continue) and ops get an alert. */
   LOW_BALANCE_TPOT: z.coerce.number().positive().default(2),
   /** Override when the keeper renews (blocks since the last store/renew), e.g. to force a renewal in a test. */

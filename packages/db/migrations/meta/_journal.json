@@ -50,6 +50,13 @@
       "when": 1793340110416,
       "tag": "0006_key_epochs",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793547584213,
+      "tag": "0007_registry_owner",
+      "breakpoints": true
     }
   ]
 }

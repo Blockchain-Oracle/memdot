@@ -9,6 +9,7 @@ import { env } from "./env.js";
 import { indexChain } from "./handlers/indexer.js";
 import { keeperScan } from "./handlers/keeper.js";
 import { maintenance } from "./handlers/maintenance.js";
+import { handleRegistry } from "./handlers/registry.js";
 import { handleRenew } from "./handlers/renew.js";
 import { handleStore } from "./handlers/store.js";
 import { startHealthServer } from "./health.js";
@@ -29,6 +30,7 @@ async function runChainTx([job]: JobWithMetadata<unknown>[]): Promise<void> {
   if (!job) return;
   const payload = chainTxPayload.parse(job.data);
   if (payload.action === "store") await handleStore(deps, { ...job, data: payload });
+  else if (payload.action === "registry") await handleRegistry(deps, payload);
   else await handleRenew(deps, { ...job, data: payload });
 }
 

@@ -27,6 +27,9 @@ export {
   txCreatorFromInjected,
 } from "./signer.js";
 export {
+  type ContractCallResult,
+  ContractRevertedError,
+  callContract,
   type RenewResult,
   renew,
   type StorageLocation,

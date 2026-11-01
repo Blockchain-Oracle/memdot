@@ -21,6 +21,7 @@ import { jobRoutes } from "./routes/jobs.js";
 import { keyRoutes } from "./routes/keys.js";
 import { objectRoutes } from "./routes/objects.js";
 import { proofRoutes } from "./routes/proof.js";
+import { registryRoutes } from "./routes/registry.js";
 import { sharedRoutes } from "./routes/shared.js";
 import { spaceRoutes } from "./routes/spaces.js";
 import { usageRoutes } from "./routes/usage.js";
@@ -127,7 +128,8 @@ export function createApp(services: Services) {
     .route("/", jobRoutes(services))
     .route("/", usageRoutes(services))
     .route("/", activityRoutes())
-    .route("/", proofRoutes(services));
+    .route("/", proofRoutes(services))
+    .route("/", registryRoutes(services));
 
   app.openAPIRegistry.registerComponent("securitySchemes", "ApiKey", {
     type: "http",

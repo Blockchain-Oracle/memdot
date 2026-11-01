@@ -14,9 +14,9 @@ export const QUEUE = {
 
 /**
  * Higher runs first on `chain-tx`. A missed renewal loses data; a late store only waits, so
- * renewals always jump the queue.
+ * renewals always jump the queue. Registry records follow what they describe.
  */
-export const PRIORITY = { renew: 30, store: 10 } as const;
+export const PRIORITY = { renew: 30, store: 10, registry: 5 } as const;
 
 /** Renewals one keeper job submits back to back with explicit nonces before awaiting them. */
 export const RENEW_BATCH_SIZE = 20;

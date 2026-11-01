@@ -11,12 +11,13 @@ export const DEFAULT_MAX_FILE_BYTES = 16 * 1024 * 1024;
 export const BITSWAP_TIMEOUT_MS = 30_000;
 
 /**
- * Ciphertext a sponsored space may hold (the relayer pays ≈105 tPOT per MiB stored, plus
- * renewals). Provisional until the testnet tPOT budget is known; the API reads an env override.
+ * Ciphertext a sponsored space may hold. The relayer pays ≈105 tPOT per MiB stored, plus renewals,
+ * from a testnet budget of a few hundred tPOT, so this is about 13 tPOT per full space. Self-signed
+ * spaces have no quota; the API reads an env override.
  */
-export const SPONSORED_QUOTA_BYTES = 1024 * 1024;
+export const SPONSORED_QUOTA_BYTES = 128 * 1024;
 
-export const MAX_SPACES_PER_ACCOUNT = 10;
+export const MAX_SPACES_PER_ACCOUNT = 5;
 
 /** Encrypted names and file metadata (name + MIME sealed to the space key). */
 export const MAX_ENCRYPTED_META_BYTES = 4_096;

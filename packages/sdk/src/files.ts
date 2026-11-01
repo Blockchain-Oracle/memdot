@@ -406,8 +406,16 @@ export class FilesApi {
   }
 
   /** Tombstones and stops renewing; the bytes expire from the chain within 7 days. */
-  delete(id: string) {
-    return unwrap(this.ctx.transport.api.DELETE("/v1/objects/{id}", { params: { path: { id } } }));
+  async delete(id: string) {
+    const detail = await this.detail(id);
+    const deleted = await unwrap(
+      this.ctx.transport.api.DELETE("/v1/objects/{id}", { params: { path: { id } } }),
+    );
+    // A file inside a segment has no blob of its own; the segment's record stays true.
+    if (detail.cid && !detail.segmentId) {
+      await this.ctx.registry.tombstoneObject(detail.spaceId, detail.cid);
+    }
+    return deleted;
   }
 
   async versions(id: string): Promise<FileInfo[]> {
