@@ -14,9 +14,13 @@ contract SigningVectorsTest is Test {
         vm.etch(registryAddr, address(new MemDotRegistry()).code);
         MemDotRegistry registry = MemDotRegistry(registryAddr);
 
-        bytes32 salt = vm.parseJsonBytes32(json, ".salt");
-        MemDotRegistry.SpaceMode mode = MemDotRegistry.SpaceMode(vm.parseJsonUint(json, ".mode"));
-        bytes32 action = keccak256(abi.encode("createSpace", salt, mode));
+        bytes32 action = keccak256(
+            abi.encode(
+                vm.parseJsonBytes32(json, ".salt"),
+                uint8(vm.parseJsonUint(json, ".action")),
+                keccak256(vm.parseJsonBytes(json, ".data"))
+            )
+        );
         assertEq(action, vm.parseJsonBytes32(json, ".actionHash"));
 
         bytes memory message = registry.signingMessage(

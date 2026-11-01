@@ -4,6 +4,9 @@
 export const PORTALDOT_WSS = "wss://test-node-v3.portaldot.dev";
 export const PORTALDOT_EVM_RPC = "https://test-evm-rpc-v3.portaldot.dev";
 export const EVM_CHAIN_ID = 420_420_777;
+/** MemDotRegistry on Portaldot V3 (packages/contracts/deployments/portaldot-v3.json). */
+export const REGISTRY_ADDRESS = "0x24ee3a18c64954d979b7475ccdf58ce4750fb5d1";
+export const REGISTRY_DEPLOY_BLOCK = 279_265;
 export const SS58_PREFIX = 42;
 
 export const TPOT_DECIMALS = 14;

@@ -3,14 +3,16 @@
 import { writeFile } from "node:fs/promises";
 import { EVM_CHAIN_ID } from "@memdot/config";
 import { type Hex, keccak256 } from "viem";
-import { actionHash, SpaceMode, signingMessage } from "../src/signing.js";
+import { Action, encodeRecord, SpaceMode } from "../src/actions.js";
+import { actionHash, signingMessage } from "../src/signing.js";
 
 const registry: Hex = "0x000000000000000000000000000000000000abcd";
 const owner: Hex = "0x1111111111111111111111111111111111111111111111111111111111111111";
 const salt: Hex = "0x2222222222222222222222222222222222222222222222222222222222222222";
 const nonce = 7n;
 
-const action = actionHash.createSpace(salt, SpaceMode.SelfSigned);
+const data = encodeRecord.createSpace(SpaceMode.SelfSigned);
+const action = actionHash(salt, Action.CreateSpace, data);
 const message = signingMessage(registry, owner, nonce, action, EVM_CHAIN_ID);
 
 const vectors = {
@@ -18,7 +20,8 @@ const vectors = {
   chainId: EVM_CHAIN_ID,
   owner,
   salt,
-  mode: SpaceMode.SelfSigned,
+  action: Action.CreateSpace,
+  data,
   nonce: Number(nonce),
   actionHash: action,
   messageHash: keccak256(message),
