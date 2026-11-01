@@ -74,7 +74,7 @@ export interface PasskeySignIn {
 }
 
 export interface SignInOptions {
-  /** The dashboard origin the sign-in message names (defaults to the client's origin option). */
+  /** The dashboard origin the sign-in message names (defaults to the client's option, or this page). */
   origin?: string;
   /** Display name for a new account. */
   name?: string;
@@ -107,7 +107,7 @@ export class AccountApi {
 
   /** Sign-In with Substrate: the wallet signs a one-use message for this site. */
   async signInWithWallet(wallet: Wallet, options: SignInOptions = {}): Promise<{ userId: string }> {
-    const origin = new URL(options.origin ?? this.defaultOrigin ?? requireOrigin());
+    const origin = new URL(options.origin ?? this.defaultOrigin ?? pageOrigin());
     const { nonce } = await this.ctx.transport.json<{ nonce: string }>(
       "POST",
       "/api/auth/siws/nonce",
@@ -153,7 +153,7 @@ export class AccountApi {
 
   /** Sign-In with Ethereum (MetaMask and other EVM wallets). */
   async signInWithEvm(wallet: EvmWallet, options: SignInOptions = {}): Promise<{ userId: string }> {
-    const origin = new URL(options.origin ?? this.defaultOrigin ?? requireOrigin());
+    const origin = new URL(options.origin ?? this.defaultOrigin ?? pageOrigin());
     const { nonce } = await this.ctx.transport.json<{ nonce: string }>(
       "POST",
       "/api/auth/siwe/nonce",
@@ -503,7 +503,10 @@ async function ownerProof(
   };
 }
 
-function requireOrigin(): never {
+/** In a browser the sign-in message names this page; a script has to say which dashboard it means. */
+function pageOrigin(): string {
+  const page = (globalThis as { location?: { origin: string } }).location;
+  if (page) return page.origin;
   throw new MemDotError(
     400,
     "ORIGIN_REQUIRED",
