@@ -44,7 +44,7 @@ const rows = [
   ...(seed.renew
     ? [
         [
-          "Segment renewed: same CID, new location",
+          `Segment renewed: same CID, moved from block ${seed.renew.from.toLocaleString("en-US")}`,
           tx(seed.renew.txHash),
           block(seed.renew.block),
           cid(seed.renew.cid),

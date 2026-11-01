@@ -59,7 +59,16 @@ export async function handleRenew(deps: Deps, job: JobWithMetadata<RenewBatchPay
           deps.signer.txCreator,
           { block: row.block ?? 0, index: row.idx ?? 0 },
           { nonce: nonce + k },
-        ).then((result) => record(deps, row, result)),
+        ).then(async (result) => {
+          await record(deps, row, result);
+          // Someone pressed "Renew now" and is waiting to hear where it landed.
+          if (jobId) {
+            await updateJob(deps.db, jobId, {
+              txHash: result.txHash,
+              block: result.location.block,
+            });
+          }
+        }),
       ),
     );
 

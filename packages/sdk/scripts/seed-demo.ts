@@ -122,7 +122,7 @@ const renewedJob = await owner.files.renew(firstNote.id).catch((error: unknown) 
   if (error instanceof MemDotError && error.code === "NOTHING_DUE") return null;
   throw error;
 });
-console.log(renewedJob ? `Renewed: #${renewedJob.block}` : "Renewal not due yet; re-run later.");
+console.log(renewedJob ? `Renewed: #${renewedJob.block}` : "No renewal due right now.");
 
 const given = (await owner.sharing.list("given", space.id)).items;
 const grant =
@@ -186,6 +186,8 @@ const firstStoreOf = async (cid: string) => {
   return { cid, txHash: proof.firstStore?.txHash, block: proof.firstStore?.block };
 };
 
+const latestRenewal = (await owner.proof.cid(segmentCid)).renewals.at(-1);
+
 const evidence = {
   stage: "S07",
   at: new Date().toISOString(),
@@ -194,8 +196,13 @@ const evidence = {
   registry: REGISTRY_ADDRESS,
   segment: { ...(await firstStoreOf(segmentCid)), files: 3 },
   file: await firstStoreOf(bannerCid),
-  renew: renewedJob
-    ? { cid: segmentCid, txHash: renewedJob.txHash, block: renewedJob.block }
+  renew: latestRenewal
+    ? {
+        cid: segmentCid,
+        txHash: latestRenewal.txHash,
+        block: latestRenewal.to.block,
+        from: latestRenewal.from.block,
+      }
     : null,
   grant: { id: grant.id, status: grant.status },
   verified: { segment: verifiedNote.blobs, file: verifiedBanner.blobs },
