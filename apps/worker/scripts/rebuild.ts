@@ -22,6 +22,7 @@ const deps: Deps = {
   boss,
   chain,
   signer: signerFromMnemonic(env.SIGNER_MNEMONIC),
+  evm: createEvmClients(env),
   env,
 };
 
