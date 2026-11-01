@@ -66,6 +66,13 @@ Revoking a share stops future access: the space moves to a new key epoch for new
 
 ## See it live
 
+<p align="center">
+  <a href="https://app.84.46.247.92.sslip.io/proof/cid/bafk2bzacea2kazemqyee67qptsnvqlthptuweqrzx6677lmnab4g25pmxzjiw">
+    <img src=".github/assets/proof-cid.png" width="720" alt="MemDot's public proof page for the demo segment: this browser fetched the bytes from a Portaldot node, the hash matches the CID, and the block records it." />
+  </a>
+</p>
+<p align="center"><i>A stored object's public proof page. Your browser runs the checks, not MemDot.</i></p>
+
 1. Open [the app](https://app.84.46.247.92.sslip.io) and create an account with a passkey or wallet. Setup walks through the recovery code, a first space, an API key and a first file.
 2. Upload something small. The upload sheet shows the fee and who pays before you confirm, and the tray follows it to finalized.
 3. Open the file and press **Verify**. Your browser fetches the bytes from a Portaldot node and hashes them.
@@ -179,6 +186,7 @@ Production images: [`apps/api/Dockerfile`](apps/api/Dockerfile), [`apps/worker/D
 
 - **Testnet only.** Everything here runs on Portaldot V3 testnet, and the app is on a temporary address until its own domain is live. Accounts made on this address will need their recovery code after the move, because passkeys are tied to a domain.
 - **Sponsored storage is small.** The relayer pays about 105 tPOT per MiB from a testnet budget of a few hundred tPOT, so a sponsored space holds 128 KiB, up to 5 spaces per account. Stores pause if the relayer runs low; renewals keep going. Self-signed spaces have no quota, and the wallet pays.
+- **Unlock methods still being walked.** Touch ID passkey unlock and Talisman or SubWallet unlock need a real authenticator and wallet, and haven't been walked on the live site yet. The recovery code works everywhere.
 - **Not built yet:** agent memory, the CLI, the MCP server, the Python SDK, agent plugins and the docs site. They're next in the build order, on the layer described here.
 - **Rebuilding from the chain is partial.** Stored items and renewals rebuild from chain events. Rebuilding spaces and objects from registry records is not written yet, though the records are on-chain.
 - **A record follows its upload.** Registry records are submitted after the store they describe and never block it, so one can lag or, if the relayer fails, be missing. Stored bytes are unaffected.
