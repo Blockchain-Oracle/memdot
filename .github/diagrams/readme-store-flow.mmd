@@ -1,0 +1,17 @@
+sequenceDiagram
+  participant D as Your device
+  participant M as MemDot
+  participant T as TransactionStorage
+  participant R as MemDotRegistry
+
+  D->>D: Encrypt, and compute the CID
+  D->>M: Upload ciphertext
+  M->>T: store
+  T-->>D: Stored at block and index, finalized
+  D->>M: Record signed with the owner's key
+  M->>R: EVM transaction
+  R->>R: sr25519Verify the owner
+  R-->>D: Recorded event, readable by anyone
+  Note over M,T: By day 5.6 of the 7-day window
+  M->>T: renew, same CID, new location
+  D->>T: Verify, fetch by CID and hash the bytes

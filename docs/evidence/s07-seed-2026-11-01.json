@@ -1,0 +1,72 @@
+{
+  "stage": "S07",
+  "at": "2026-11-01T16:09:53.673Z",
+  "app": "https://app.84.46.247.92.sslip.io",
+  "api": "https://api.84.46.247.92.sslip.io",
+  "registry": "0x24ee3a18c64954d979b7475ccdf58ce4750fb5d1",
+  "segment": {
+    "cid": "bafk2bzacea2kazemqyee67qptsnvqlthptuweqrzx6677lmnab4g25pmxzjiw",
+    "txHash": "0x08d105506d8c43c51c82184bdcc66047c2eb2c984c51a93c742ee853870d4ae1",
+    "block": 279559,
+    "files": 3
+  },
+  "file": {
+    "cid": "bafk2bzacedlazejtcpok7yfl56xwbdxf47f4fepjnxqmsynowekw3zryafdh2",
+    "txHash": "0xf2db5b24b71a9a249820b72095c368d5937387e8574dc049a7287dd01d658b3a",
+    "block": 279566
+  },
+  "renew": null,
+  "grant": {
+    "id": "eefb5c4c-e7d3-482d-9760-14b1c4a1736a",
+    "status": "active"
+  },
+  "verified": {
+    "segment": [
+      {
+        "cid": "bafk2bzacea2kazemqyee67qptsnvqlthptuweqrzx6677lmnab4g25pmxzjiw",
+        "retrievable": true,
+        "onChain": true,
+        "block": 279559,
+        "index": 0
+      }
+    ],
+    "file": [
+      {
+        "cid": "bafk2bzacedlazejtcpok7yfl56xwbdxf47f4fepjnxqmsynowekw3zryafdh2",
+        "retrievable": true,
+        "onChain": true,
+        "block": 279566,
+        "index": 0
+      },
+      {
+        "cid": "bafk2bzacec4skrgz7xkyzxasd4csnsvacuakkukm6tkxwawhfywlb6m7ngplm",
+        "retrievable": true,
+        "onChain": true,
+        "block": 279563,
+        "index": 0
+      }
+    ]
+  },
+  "records": [
+    {
+      "action": "CreateSpace",
+      "block": 279570,
+      "txHash": "0x43dc7871f232e32437d0513ceccb401fbdecd8c282f7c9986999f0efdda86cf0"
+    },
+    {
+      "action": "AddObjects",
+      "block": 279571,
+      "txHash": "0x9cd18679231d84366fad6dca433d1ae0b0caf36ea1f15473d497ce60cd867ed8"
+    },
+    {
+      "action": "AddObjects",
+      "block": 279572,
+      "txHash": "0x7c18bd1c846db2e7d3777ff9e47136fda611d15a20419241df49bfb8490387b7"
+    },
+    {
+      "action": "Grant",
+      "block": 279580,
+      "txHash": "0x52e8b74dc5e7f4fc3a15ea4ffa88ca6081ad074c14ba7831eae31900c287d9c5"
+    }
+  ]
+}

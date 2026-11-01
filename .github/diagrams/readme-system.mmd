@@ -1,0 +1,27 @@
+flowchart LR
+  subgraph YOU["Your device"]
+    APP["Dashboard or SDK<br/>encrypts and decrypts here"]
+    KEY["Master key<br/>never leaves the device"]
+  end
+
+  subgraph MD["MemDot services"]
+    API["API<br/>quotas · gateway"]
+    PG[("Postgres<br/>an index, not the source of truth")]
+    WORKER["Worker<br/>one signer, one queue"]
+    KEEPER["Keeper<br/>renews before day 7"]
+  end
+
+  subgraph V3["Portaldot V3 testnet"]
+    STORE["TransactionStorage<br/>store · renew · bitswap"]
+    REG["MemDotRegistry on Revive<br/>sr25519Verify · hashBlake256"]
+  end
+
+  KEY --> APP
+  APP -->|"ciphertext + owner-signed record"| API
+  API --> PG
+  PG --> WORKER
+  KEEPER --> WORKER
+  WORKER -->|"store · renew"| STORE
+  WORKER -->|"EVM transaction"| REG
+  APP -.->|"Verify over its own connection"| STORE
+  APP -.->|"reads records directly"| REG

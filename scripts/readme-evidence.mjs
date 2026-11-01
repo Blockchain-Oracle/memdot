@@ -31,22 +31,26 @@ const rows = [
   ],
   [
     "Three files stored in one segment",
-    tx(seed.store.segment.txHash),
-    block(seed.store.segment.block),
-    cid(seed.store.segment.cid),
+    tx(seed.segment.txHash),
+    block(seed.segment.block),
+    cid(seed.segment.cid),
   ],
   [
     "Larger file stored (chunk + sealed manifest)",
-    tx(seed.store.file.txHash),
-    block(seed.store.file.block),
-    cid(seed.store.file.cid),
+    tx(seed.file.txHash),
+    block(seed.file.block),
+    cid(seed.file.cid),
   ],
-  [
-    "Segment renewed: same CID, new location",
-    tx(seed.renew.txHash),
-    block(seed.renew.block),
-    cid(seed.renew.cid),
-  ],
+  ...(seed.renew
+    ? [
+        [
+          "Segment renewed: same CID, new location",
+          tx(seed.renew.txHash),
+          block(seed.renew.block),
+          cid(seed.renew.cid),
+        ],
+      ]
+    : []),
   ...seed.records.map((record) => [
     `Registry record: ${LABEL[record.action] ?? record.action}`,
     `\`${record.txHash.slice(0, 10)}…${record.txHash.slice(-6)}\``,
