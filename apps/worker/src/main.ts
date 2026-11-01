@@ -11,6 +11,7 @@ import { keeperScan } from "./handlers/keeper.js";
 import { maintenance } from "./handlers/maintenance.js";
 import { handleRenew } from "./handlers/renew.js";
 import { handleStore } from "./handlers/store.js";
+import { startHealthServer } from "./health.js";
 
 const BREAKER_CHECK_MS = 60_000;
 const CHAIN_TX_POLL_SECONDS = 2;
@@ -77,6 +78,8 @@ console.log(
   `[worker] relayer ${signer.address} with ${formatTpot(await freeBalance(deps))}; stores ${breaker.open ? "paused (low balance)" : "running"}`,
 );
 
+const healthServer = startHealthServer(env.HEALTH_PORT);
+
 let stopping = false;
 async function shutdown(signal: string) {
   if (stopping) return;
@@ -85,6 +88,7 @@ async function shutdown(signal: string) {
   const force = setTimeout(() => process.exit(1), SHUTDOWN_GRACE_MS);
   force.unref();
   clearInterval(breakerTimer);
+  healthServer.close();
   await boss.stop({ graceful: true });
   chain.destroy();
   await database.close();

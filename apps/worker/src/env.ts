@@ -28,6 +28,8 @@ const schema = z.object({
   INDEXER_START_BLOCK: z.coerce.number().int().positive().optional(),
   /** Discord webhook for ops alerts (low balance, renewal at risk, lost items). */
   DISCORD_ALERT_WEBHOOK_URL: z.url().optional(),
+  /** Internal liveness probe for the container; never routed publicly. */
+  HEALTH_PORT: z.coerce.number().int().positive().default(8788),
 });
 
 const parsed = schema.parse(process.env);

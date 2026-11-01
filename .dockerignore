@@ -1,0 +1,34 @@
+# Secrets and local notes never enter a build context.
+.env
+.env.*
+!.env.example
+.claude
+context
+refs
+.firecrawl
+
+# Rebuilt inside the image.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.cache
+**/*.tsbuildinfo
+
+packages/chain/.papi/descriptors/generated.json
+
+# Not needed to build any service.
+.git
+.github
+.changeset
+assets
+docs
+examples
+python
+skills
+integrations
+packages/contracts/cache
+packages/contracts/lib
+packages/contracts/out
+packages/contracts/test
+**/Dockerfile
