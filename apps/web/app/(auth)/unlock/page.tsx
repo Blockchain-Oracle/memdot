@@ -16,7 +16,7 @@ import { WalletPicker } from "@/components/auth/wallet-picker";
 import { clearAuthFlow, useAuthFlow } from "@/lib/auth-flow";
 import { describeError, isCancelled } from "@/lib/errors";
 import { useMemDot } from "@/lib/memdot";
-import { ME_KEY, safeNext, useGate } from "@/lib/session";
+import { ME_KEY, safeNext, setupFor, useGate } from "@/lib/session";
 
 export default function UnlockPage() {
   return (
@@ -42,8 +42,9 @@ function Unlock() {
   const autoTried = useRef(false);
 
   useEffect(() => {
-    if (gate === "sign-in") router.replace("/sign-in");
-    else if (gate === "setup") router.replace("/setup");
+    if (gate === "sign-in")
+      router.replace(`/sign-in${next ? `?next=${encodeURIComponent(next)}` : ""}`);
+    else if (gate === "setup") router.replace(setupFor(next));
     else if (gate === "ready") {
       clearAuthFlow();
       router.replace(safeNext(next));

@@ -10,10 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@memdot/ui/components/select";
+import Link from "next/link";
 import { useId } from "react";
 import type { ROLES } from "@/components/keys/role-choice";
 import { RoleChoice } from "@/components/keys/role-choice";
 import { ModeBadge } from "@/components/memory/mode-badge";
+import { hereWithQuery, setupFor } from "@/lib/session";
 
 const NEW_NAMESPACE = "new";
 const NAMESPACE_MAX = 64;
@@ -125,9 +127,16 @@ export function AccessChooser({
         <legend className="eyebrow mb-1">What it can reach</legend>
         {reachable.length === 0 ? (
           <p className="rounded-xl border border-border bg-surface-1 p-4 text-ui-sm text-text-2">
-            {hosted
-              ? "A hosted connection needs a sponsored space. Your spaces are all self-signed."
-              : "You have no spaces yet."}
+            {spaces.length > 0
+              ? "A hosted connection needs a sponsored space. Your spaces are all self-signed. "
+              : "You have no spaces yet. "}
+            {/* It comes straight back here: the request is still waiting. */}
+            <Link
+              href={setupFor(hereWithQuery())}
+              className="font-medium text-foreground underline"
+            >
+              Create one
+            </Link>
           </p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-surface-1">

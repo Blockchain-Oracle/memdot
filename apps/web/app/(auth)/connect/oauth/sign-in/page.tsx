@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { AuthFrame } from "@/components/auth/auth-frame";
 import { API_URL } from "@/lib/env";
-import { hereWithQuery, useGate } from "@/lib/session";
+import { hereWithQuery, setupFor, useGate } from "@/lib/session";
 
 /** Added by the OAuth server to sign what it sends here; a fresh request gets its own. */
 const SIGNING_PARAMS = ["sig", "exp", "ba_iat", "ba_param", "ba_pl"];
@@ -25,7 +25,7 @@ export default function OAuthSignInPage() {
       return;
     }
     if (gate === "setup") {
-      router.replace("/setup");
+      router.replace(setupFor(hereWithQuery()));
       return;
     }
     const request = new URLSearchParams(window.location.search);

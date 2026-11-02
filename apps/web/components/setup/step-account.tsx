@@ -8,7 +8,7 @@ import { Spinner } from "@memdot/ui/components/spinner";
 import { useQueryClient } from "@tanstack/react-query";
 import { KeyRoundIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import { OrDivider } from "@/components/auth/auth-frame";
@@ -25,6 +25,7 @@ const NAME_MAX = 64;
 export function StepAccount({ onDone }: { onDone: () => void }) {
   const memdot = useMemDot();
   const router = useRouter();
+  const next = useSearchParams().get("next");
   const queryClient = useQueryClient();
   const nameId = useId();
   const [name, setName] = useState("");
@@ -36,8 +37,9 @@ export function StepAccount({ onDone }: { onDone: () => void }) {
   const continueAfterSignIn = async () => {
     const me = await memdot.account.me();
     await queryClient.invalidateQueries({ queryKey: ME_KEY });
-    if (me.account?.keyBundleCid) router.replace("/unlock");
-    else onDone();
+    if (me.account?.keyBundleCid) {
+      router.replace(`/unlock${next ? `?next=${encodeURIComponent(next)}` : ""}`);
+    } else onDone();
   };
 
   const withPasskey = async () => {

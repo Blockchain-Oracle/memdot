@@ -46,6 +46,11 @@ export function hereWithQuery(): string {
   return `${window.location.pathname}${window.location.search}`;
 }
 
+/** Setup, remembering what the person came for: a new account shouldn't lose it on the way. */
+export function setupFor(next: string | null): string {
+  return next ? `/setup?next=${encodeURIComponent(next)}` : "/setup";
+}
+
 /** A same-site path to return to after unlocking (never an open redirect). */
 export function safeNext(next: string | null): string {
   return next?.startsWith("/") && !next.startsWith("//") ? next : HOME;

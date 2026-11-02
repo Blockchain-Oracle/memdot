@@ -21,7 +21,7 @@ import { useNamespaces } from "@/components/memory/queries";
 import { describeError } from "@/lib/errors";
 import { useMemDot } from "@/lib/memdot";
 import { useSpaces } from "@/lib/queries";
-import { hereWithQuery, useGate } from "@/lib/session";
+import { hereWithQuery, setupFor, useGate } from "@/lib/session";
 
 export default function OAuthConsentPage() {
   return (
@@ -63,7 +63,7 @@ function Consent() {
   useEffect(() => {
     const next = `?next=${encodeURIComponent(hereWithQuery())}`;
     if (gate === "sign-in") router.replace(`/sign-in${next}`);
-    else if (gate === "setup") router.replace("/setup");
+    else if (gate === "setup") router.replace(setupFor(hereWithQuery()));
     else if (gate === "unlock") router.replace(`/unlock${next}`);
   }, [gate, router]);
 

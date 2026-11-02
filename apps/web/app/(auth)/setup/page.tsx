@@ -12,8 +12,8 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRightIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { StepAccount } from "@/components/setup/step-account";
 import { StepApiKey } from "@/components/setup/step-api-key";
 import { StepConnectAgent } from "@/components/setup/step-connect-agent";
@@ -24,7 +24,7 @@ import { StepSpace } from "@/components/setup/step-space";
 import { clearAuthFlow } from "@/lib/auth-flow";
 import { DOCS_URL } from "@/lib/env";
 import { useMemDot, useUnlocked } from "@/lib/memdot";
-import { HOME, useGate } from "@/lib/session";
+import { HOME, safeNext, setupFor, useGate } from "@/lib/session";
 
 const STEPS = [
   { title: "Account", description: "Passkey or wallet" },
@@ -36,12 +36,25 @@ const STEPS = [
   { title: "First memory", description: "Remember a fact" },
 ] as const;
 
+/** A new account that came for something: enough to have a key and a space, then back to it. */
+const STEPS_BEFORE_RETURNING = 3;
+
 export default function SetupPage() {
+  return (
+    <Suspense>
+      <Setup />
+    </Suspense>
+  );
+}
+
+function Setup() {
   const memdot = useMemDot();
   const router = useRouter();
   const unlocked = useUnlocked();
   const queryClient = useQueryClient();
   const { gate } = useGate();
+  const next = useSearchParams().get("next");
+  const steps = next ? STEPS.slice(0, STEPS_BEFORE_RETURNING) : STEPS;
   const [step, setStep] = useState<number | null>(null);
   const [spaceId, setSpaceId] = useState<string | null>(null);
 
@@ -56,16 +69,18 @@ export default function SetupPage() {
     if (step !== null || gate === "loading") return;
     if (gate === "sign-in") setStep(1);
     else if (gate === "setup") setStep(2);
-    else if (gate === "unlock") router.replace("/unlock?next=/setup");
+    else if (gate === "unlock")
+      router.replace(`/unlock?next=${encodeURIComponent(setupFor(next))}`);
     else if (spaces.data) {
       const first = spaces.data[0];
       if (!first) setStep(3);
+      else if (next) router.replace(safeNext(next));
       else {
         setSpaceId(first.id);
         setStep(4);
       }
     }
-  }, [gate, spaces.data, step, router]);
+  }, [gate, spaces.data, step, next, router]);
 
   const finish = () => router.replace(HOME);
   const signOut = async () => {
@@ -83,7 +98,7 @@ export default function SetupPage() {
             <Wordmark />
           </Link>
           <Stepper orientation="vertical" value={step ?? 1}>
-            {STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <StepperItem
                 key={s.title}
                 step={i + 1}
@@ -96,7 +111,7 @@ export default function SetupPage() {
                     <StepperDescription>{s.description}</StepperDescription>
                   </div>
                 </div>
-                {i < STEPS.length - 1 && (
+                {i < steps.length - 1 && (
                   <StepperSeparator className="absolute top-7 left-3 -order-1 m-0 h-[calc(100%-2rem)]" />
                 )}
               </StepperItem>
@@ -129,7 +144,7 @@ export default function SetupPage() {
           <Wordmark />
           {step !== null && (
             <span className="eyebrow">
-              Step {step} of {STEPS.length}
+              Step {step} of {steps.length}
             </span>
           )}
         </header>
@@ -140,13 +155,17 @@ export default function SetupPage() {
             ) : (
               <>
                 <p className="eyebrow mb-3 hidden lg:block">
-                  Step {step} of {STEPS.length}
+                  Step {step} of {steps.length}
                 </p>
                 {step === 1 && <StepAccount onDone={() => setStep(2)} />}
                 {step === 2 && <StepSecure onDone={() => setStep(3)} />}
                 {step === 3 && unlocked && (
                   <StepSpace
                     onDone={(id) => {
+                      if (next) {
+                        router.replace(safeNext(next));
+                        return;
+                      }
                       setSpaceId(id);
                       setStep(4);
                     }}

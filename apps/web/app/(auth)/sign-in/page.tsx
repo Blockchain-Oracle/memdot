@@ -14,7 +14,7 @@ import { WalletPicker } from "@/components/auth/wallet-picker";
 import { setAuthFlow } from "@/lib/auth-flow";
 import { describeError, isCancelled } from "@/lib/errors";
 import { useMemDot } from "@/lib/memdot";
-import { ME_KEY, safeNext, useGate } from "@/lib/session";
+import { ME_KEY, safeNext, setupFor, useGate } from "@/lib/session";
 
 export default function SignInPage() {
   return (
@@ -37,7 +37,7 @@ function SignIn() {
 
   useEffect(() => setSupported(passkeysSupported()), []);
   useEffect(() => {
-    if (gate === "setup") router.replace("/setup");
+    if (gate === "setup") router.replace(setupFor(next));
     else if (gate === "unlock")
       router.replace(`/unlock${next ? `?next=${encodeURIComponent(next)}` : ""}`);
     else if (gate === "ready") router.replace(safeNext(next));
@@ -83,7 +83,7 @@ function SignIn() {
           </p>
         )}
         <Button asChild variant="ghost" className="w-full text-text-2">
-          <Link href="/setup">New to MemDot? Create an account</Link>
+          <Link href={setupFor(next)}>New to MemDot? Create an account</Link>
         </Button>
       </div>
 
