@@ -30,7 +30,21 @@ export default function OAuthSignInPage() {
     }
     const request = new URLSearchParams(window.location.search);
     for (const name of SIGNING_PARAMS) request.delete(name);
-    window.location.replace(`${API_URL}/api/auth/oauth2/authorize?${request}`);
+    // Asked for rather than navigated to: a full page load would forget the key just unlocked, and
+    // ask for the passkey a second time.
+    void fetch(`${API_URL}/api/auth/oauth2/authorize?${request}`, {
+      credentials: "include",
+      headers: { accept: "application/json" },
+    })
+      .then((response) => response.json() as Promise<{ url?: string }>)
+      .then(({ url }) => {
+        if (!url) throw new Error("no redirect");
+        const next = new URL(url);
+        if (next.origin === window.location.origin)
+          router.replace(`${next.pathname}${next.search}`);
+        else window.location.assign(url);
+      })
+      .catch(() => window.location.replace(`${API_URL}/api/auth/oauth2/authorize?${request}`));
   }, [gate, router]);
 
   return (

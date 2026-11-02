@@ -1,0 +1,20 @@
+{
+  "stage": "S09",
+  "at": "2026-11-02T15:01:30.865Z",
+  "app": "https://app.84.46.247.92.sslip.io",
+  "api": "https://api.84.46.247.92.sslip.io",
+  "mcp": "https://api.84.46.247.92.sslip.io/mcp",
+  "spaceId": "070dbd73-b7db-46d8-9683-f54cdda736fd",
+  "grant": {
+    "agentKey": "age1ln342l9vhgrem4zctflu8hngcx62sw2wduth0a7fd4cps6p6qvzsqlmsvz",
+    "wrappedKeyCid": "bafk2bzaceayppj7oiqondvogc2g2trxgvin7epfmorpezcvfw35dnjp5eqt3c",
+    "txHash": "0x4e47b19c964d83ef2524f6600e44fb2fc692705329c311b95b95d42a47b89289",
+    "block": 293223
+  },
+  "agentMemory": {
+    "namespaceId": "9881db2e-386d-41a3-b3d0-7ca59b62f6ef",
+    "cid": "bafk2bzacecry3czm6diawgsfv5rgylfhto7t7t3esh7ny7vasi3m6c5pwyx6o",
+    "txHash": "0x77e333a62589818eb20b43cc3a3c97414c58c0a4b3c3e1992689aa584890e2cc",
+    "block": 293226
+  }
+}
