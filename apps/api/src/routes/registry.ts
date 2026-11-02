@@ -13,7 +13,7 @@ import { authenticated, createRouter, errorResponses, jsonContent } from "../lib
 import type { Services } from "../types.js";
 
 /** Large enough for one object list; the relayer pays for every byte of calldata. */
-const MAX_CALLDATA_HEX_CHARS = 16_384;
+export const MAX_CALLDATA_HEX_CHARS = 16_384;
 const SPACE_ID_BYTES = 32;
 
 /** Records about the account itself rather than a space: key bundles, sharing keys, grant keys. */

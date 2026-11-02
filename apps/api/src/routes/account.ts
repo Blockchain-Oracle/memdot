@@ -36,10 +36,7 @@ import {
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { Cid, Hex32 } from "../schemas.js";
 import type { Services } from "../types.js";
-import { decodeRecordCall } from "./registry.js";
-
-/** A closing record is one short signed call. */
-const MAX_CLOSING_RECORD_CHARS = 4_096;
+import { decodeRecordCall, MAX_CALLDATA_HEX_CHARS } from "./registry.js";
 
 const RECOVERY_PROVIDER = "recovery-code";
 /** What the owner signs to prove the chain account is theirs (it is bound to the user id). */
@@ -361,7 +358,7 @@ export function accountRoutes(services: Services) {
               z.object({
                 record: z
                   .string()
-                  .max(MAX_CLOSING_RECORD_CHARS)
+                  .max(MAX_CALLDATA_HEX_CHARS)
                   .regex(/^0x[0-9a-fA-F]+$/)
                   .optional()
                   .openapi({
