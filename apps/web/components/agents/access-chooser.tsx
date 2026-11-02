@@ -132,7 +132,7 @@ export function AccessChooser({
               : "You have no spaces yet. "}
             {/* It comes straight back here: the request is still waiting. */}
             <Link
-              href={setupFor(hereWithQuery())}
+              href={setupFor(hereWithQuery(), { newSpace: spaces.length > 0 })}
               className="font-medium text-foreground underline"
             >
               Create one

@@ -102,7 +102,7 @@ def sync_key(key: str) -> list[str]:
     file it can't read or parse is left alone.
     """
     # This goes into shell files, and the server chose it: anything but a key is refused here.
-    if not API_KEY_FORMAT.match(key):
+    if not API_KEY_FORMAT.fullmatch(key):
         return []
     home = Path.home()
     attempts: list[tuple[Path, Callable[[Path, str], bool]]] = [
@@ -139,7 +139,7 @@ def _finish_login(
     collected: dict[str, Any],
 ) -> list[str]:
     """Saves the key and agent the device collected, and updates the key where it's already kept."""
-    rest = {k: v for k, v in (file or {}).items() if k != "pending"}
+    rest = {k: v for k, v in creds.for_api(file, api_url).items() if k != "pending"}
     saved = {
         **rest,
         "version": 1,
@@ -202,7 +202,7 @@ def _save_api_key(api_url: str, key: str, namespace: str | None) -> list[str]:
         if error.status == 401:
             raise CliError("That API key isn't valid.", EXIT["auth"], "BAD_KEY") from error
         raise
-    file = creds.load_credentials() or {}
+    file = creds.for_api(creds.load_credentials(), api_url)
     rest = {k: v for k, v in file.items() if k not in ("agent", "pending")}
     saved = {**rest, "version": 1, "api_url": api_url, "api_key": key, "created_at": iso_now()}
     if namespace:
@@ -289,7 +289,9 @@ def _run_login(
         "public_key": public_key,
         "label": label,
     }
-    creds.save_credentials({**(file or {}), "version": 1, "api_url": api_url, "pending": pending})
+    creds.save_credentials(
+        {**creds.for_api(file, api_url), "version": 1, "api_url": api_url, "pending": pending}
+    )
 
     # A coding agent's shell shows nothing until the command ends, so it gets the address first and
     # collects afterwards.
@@ -514,7 +516,9 @@ def register(root: click.Group) -> None:
             "version": 1,
             "api_url": creds.resolve_credentials(None).api_url,
         }
-        if key in ("api_url", "namespace_id"):
+        if key == "api_url":
+            file = {**creds.for_api(file, value), "api_url": value}
+        elif key == "namespace_id":
             file[key] = value
         else:
             file["defaults"] = {**(file.get("defaults") or {}), key: value}

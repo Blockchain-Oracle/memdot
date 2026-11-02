@@ -3,6 +3,7 @@ import { hostname, userInfo } from "node:os";
 import { type ConnectStart, MemDot, MemDotError, newAgentIdentity } from "@memdot/sdk";
 import {
   type Credentials,
+  credentialsForApi,
   credentialsPath,
   loadCredentials,
   removeCredentials,
@@ -49,7 +50,7 @@ async function finishLogin(
   pending: NonNullable<Credentials["pending"]>,
   collected: { apiKey: string; agentId: string | null; namespaceId: string | null },
 ): Promise<string[]> {
-  const { pending: _done, ...rest } = file ?? ({} as Credentials);
+  const { pending: _done, ...rest } = credentialsForApi(file, apiUrl);
   await saveCredentials({
     ...rest,
     version: 1,
@@ -138,7 +139,7 @@ async function saveApiKey(apiUrl: string, key: string, namespace: string | undef
     throw error;
   });
   const file = await loadCredentials();
-  const { agent: _replaced, pending: _dropped, ...rest } = file ?? ({} as Credentials);
+  const { agent: _replaced, pending: _dropped, ...rest } = credentialsForApi(file, apiUrl);
   await saveCredentials({
     ...rest,
     version: 1,
@@ -212,7 +213,12 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
     client: clientName(),
   });
   const pending = pendingFrom(started, key, options.label);
-  await saveCredentials({ ...file, version: 1, api_url: apiUrl, pending });
+  await saveCredentials({
+    ...credentialsForApi(file, apiUrl),
+    version: 1,
+    api_url: apiUrl,
+    pending,
+  });
 
   // A coding agent's shell shows nothing until the command ends, so it gets the address first and
   // collects afterwards.
@@ -477,10 +483,12 @@ export function setupCommands(program: Command): void {
           "BAD_KEY",
         );
       }
-      const file: Credentials = (await loadCredentials()) ?? {
+      const saved: Credentials = (await loadCredentials()) ?? {
         version: 1,
         api_url: resolveCredentials(null).apiUrl,
       };
+      // Moving to another address leaves this one's key behind, or the next command would send it.
+      const file = (key === "api_url" ? credentialsForApi(saved, value) : saved) as Credentials;
       set(file, value);
       await saveCredentials(file);
       emit({ data: { key, value }, text: () => console.log(`${key} = ${value}`) });

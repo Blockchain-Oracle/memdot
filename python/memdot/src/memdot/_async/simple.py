@@ -11,6 +11,7 @@ from .._concurrency import asleep
 from ..errors import JobFailedError, MemDotError
 from ..models import ApiKey, Job, NewApiKey
 from .context import AsyncContext
+from .transport import seg
 
 _TERMINAL = {"finalized", "failed"}
 _POLL_SECONDS = 2.0
@@ -24,7 +25,7 @@ class AsyncJobs:
         self._ctx = ctx
 
     async def get(self, job_id: str) -> Job:
-        return Job.model_validate(await self._ctx.transport.json("GET", f"/v1/jobs/{job_id}"))
+        return Job.model_validate(await self._ctx.transport.json("GET", f"/v1/jobs/{seg(job_id)}"))
 
     async def list(
         self,
@@ -76,7 +77,7 @@ class AsyncJobs:
     async def events(self, job_id: str) -> list[dict[str, Any]]:
         """What the job's stream holds now, for tools that want the raw updates."""
         response = await self._ctx.transport.send(
-            "GET", f"/v1/jobs/{job_id}/events", headers={"accept": "text/event-stream"}
+            "GET", f"/v1/jobs/{seg(job_id)}/events", headers={"accept": "text/event-stream"}
         )
         return [
             jsonlib.loads(line[len("data: ") :])
@@ -113,11 +114,11 @@ class AsyncKeys:
 
     async def rotate(self, key_id: str) -> NewApiKey:
         """Revokes the key first, then mints a new one with the same name, role and spaces."""
-        answer = await self._ctx.transport.json("POST", f"/v1/keys/{key_id}/rotate")
+        answer = await self._ctx.transport.json("POST", f"/v1/keys/{seg(key_id)}/rotate")
         return NewApiKey.model_validate(answer)
 
     async def revoke(self, key_id: str) -> Any:
-        return await self._ctx.transport.json("DELETE", f"/v1/keys/{key_id}")
+        return await self._ctx.transport.json("DELETE", f"/v1/keys/{seg(key_id)}")
 
 
 class AsyncActivity:
@@ -146,10 +147,10 @@ class AsyncProof:
         self._ctx = ctx
 
     async def cid(self, cid: str) -> Any:
-        return await self._ctx.transport.json("GET", f"/v1/proof/cid/{cid}")
+        return await self._ctx.transport.json("GET", f"/v1/proof/cid/{seg(cid)}")
 
     async def tx(self, tx_hash: str) -> Any:
-        return await self._ctx.transport.json("GET", f"/v1/proof/tx/{tx_hash}")
+        return await self._ctx.transport.json("GET", f"/v1/proof/tx/{seg(tx_hash)}")
 
     async def stats(self) -> Any:
         return await self._ctx.transport.json("GET", "/v1/proof/stats")

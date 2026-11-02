@@ -47,6 +47,7 @@ from .context import Context
 from .files import SEGMENT_PACK_BYTES, require_sponsored, store_object
 from .simple import Jobs
 from .spaces import Spaces
+from .transport import seg
 
 log = logging.getLogger("memdot")
 
@@ -91,7 +92,7 @@ class PrivateNamespace:
         self._sync()
 
     def _state(self) -> dict[str, Any]:
-        return self._ctx.transport.json("GET", f"/v1/namespaces/{self.id}/private")
+        return self._ctx.transport.json("GET", f"/v1/namespaces/{seg(self.id)}/private")
 
     def _identities(self) -> list[str]:
         space = self._deps.spaces.raw(self.space_id)
@@ -148,10 +149,9 @@ class PrivateNamespace:
         self._embed_into(changed)
 
     def _new_index(self) -> LocalIndex:
+        embedder = self._deps.embedder()
         return LocalIndex(
-            str(LOCAL_EMBEDDING_MODEL["id"]),
-            str(LOCAL_EMBEDDING_MODEL["dtype"]),
-            int(LOCAL_EMBEDDING_MODEL["dimensions"]),
+            embedder.model_id, str(LOCAL_EMBEDDING_MODEL["dtype"]), embedder.dimensions
         )
 
     def _build_index(self, snapshot: dict[str, Any] | None, identities: list[str]) -> None:
@@ -167,7 +167,7 @@ class PrivateNamespace:
                     dtype=index.dtype,
                     dimensions=index.dimensions,
                 )
-            except (MemDotError, WrongKeyError, ValueError) as error:
+            except Exception as error:
                 log.warning("index snapshot skipped: %s", error)
         missing = []
         for entry in self._entries.values():
@@ -298,7 +298,7 @@ class PrivateNamespace:
                     for result, score in zip(results, scores, strict=True):
                         result["rerankScore"] = score
                     results.sort(key=lambda result: -result["rerankScore"])
-                except llm.ModelError as error:
+                except Exception as error:
                     log.warning("rerank skipped: %s", error)
         return results
 
@@ -355,7 +355,8 @@ class PrivateNamespace:
                 observed_at=occurred_at or iso_now(),
                 agent_scoped=bool(agent_id and not user_id),
             )
-        except llm.ModelError as error:
+        except Exception as error:
+            # Whatever went wrong with the model, what the person said isn't lost.
             log.warning("extraction failed, keeping the raw text: %s", error)
             note = "The model couldn't read this, so it was stored as written."
             return [{**draft, "raw": True} for draft in as_written()], note
@@ -516,7 +517,7 @@ class PrivateNamespace:
             rows.append(row)
         self._ctx.transport.json(
             "POST",
-            f"/v1/namespaces/{self.id}/private/entries",
+            f"/v1/namespaces/{seg(self.id)}/private/entries",
             {"segment_id": declared["object"]["id"], "entries": rows},
         )
         if wait:
@@ -601,7 +602,7 @@ class PrivateNamespace:
         if moving:
             self._write_entries(moving, True)
         for segment in targets.values():
-            self._ctx.transport.json("DELETE", f"/v1/objects/{segment['id']}")
+            self._ctx.transport.json("DELETE", f"/v1/objects/{seg(segment['id'])}")
             self._ctx.registry.tombstone_object(self.space_id, segment["cid"])
             self._opened.pop(segment["cid"], None)
         return {"segments": len(targets), "moved": len(moving)}
@@ -633,7 +634,7 @@ class PrivateNamespace:
         if wait:
             self._deps.jobs.wait_for(declared["job"]["id"])
         if previous:
-            self._ctx.transport.json("DELETE", f"/v1/objects/{previous['id']}")
+            self._ctx.transport.json("DELETE", f"/v1/objects/{seg(previous['id'])}")
         self._dirty = 0
         return declared["object"]["cid"]
 

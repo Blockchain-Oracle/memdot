@@ -55,10 +55,11 @@ class AsyncMemDot:
         rpc: str | None = None,
         embedder: Embedder | None = None,
         identity: str | None = None,
+        namespace_id: str | None = None,
         complete_grants_on_unlock: bool = True,
         http: httpx.AsyncClient | None = None,
     ) -> None:
-        resolved = creds.from_environment(api_key, base_url, identity)
+        resolved = creds.from_environment(api_key, base_url, identity, namespace_id)
         self._rpc = rpc or PORTALDOT_RPC_URL
         self._complete_grants = complete_grants_on_unlock
         self._chain: AsyncChainClient | None = None
@@ -87,7 +88,9 @@ class AsyncMemDot:
         self.folders = AsyncFolders(ctx, self.spaces)
         self.files = AsyncFiles(ctx, self.spaces, self.jobs)
         self.sharing = AsyncSharing(ctx, self.spaces)
-        self.memories = AsyncMemories(ctx, self.spaces, self.folders, self.jobs, embedder)
+        self.memories = AsyncMemories(
+            ctx, self.spaces, self.folders, self.jobs, embedder, resolved["namespace_id"]
+        )
         self.data = AsyncData(ctx, self.spaces, self.folders, self.files, self.memories)
         self.agents = AsyncAgents(ctx, self.sharing)
         self.account = AsyncAccount(ctx, origin or creds.dashboard_origin(url), self._after_unlock)
@@ -111,6 +114,7 @@ class AsyncMemDot:
             client=client,
             embedder=embedder,
             identity=resolved.identity,
+            namespace_id=resolved.namespace_id,
             complete_grants_on_unlock=False,
         )
         if resolved.recovery_code:
@@ -144,6 +148,7 @@ class AsyncMemDot:
     async def aclose(self) -> None:
         """Closes the connections. Keys stay until `account.lock()`."""
         await self._transport.aclose()
+        await self.memories.aclose()
         if self._chain is not None:
             await self._chain.aclose()
             self._chain = None

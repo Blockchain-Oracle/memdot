@@ -173,8 +173,10 @@ def _add_to_settings(path: Path, server: dict[str, Any]) -> None:
         settings = json.loads(raw)
         mode = path.stat().st_mode & 0o777
         backup = path.with_name(f"{path.name}.bak")
-        backup.write_text(raw, "utf8")
-        backup.chmod(mode)
+        descriptor = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        with os.fdopen(descriptor, "w", encoding="utf8") as file:
+            os.fchmod(file.fileno(), mode)
+            file.write(raw)
     except FileNotFoundError:
         path.parent.mkdir(parents=True, exist_ok=True)
     except (OSError, ValueError) as error:

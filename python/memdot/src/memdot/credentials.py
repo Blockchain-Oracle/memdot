@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -15,6 +15,8 @@ _DIR_MODE = 0o700
 _FILE_MODE = 0o600
 _FILE_NAME = "credentials.json"
 _LOCAL_DASHBOARD = "http://localhost:3100"
+_LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
+_DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 def _env(name: str) -> str | None:
@@ -66,31 +68,54 @@ def remove_credentials() -> None:
     credentials_path().unlink(missing_ok=True)
 
 
-def _origin(url: str) -> tuple[str, str]:
+def _origin(url: str) -> tuple[str, str, int | None] | None:
+    """As a browser compares them: case and a default port don't count. None if it isn't a URL."""
     parts = urlsplit(url)
-    return parts.scheme, parts.netloc
+    try:
+        port = parts.port
+    except ValueError:
+        return None
+    if not parts.scheme or not parts.hostname:
+        return None
+    scheme = parts.scheme.lower()
+    return scheme, parts.hostname.lower(), port or _DEFAULT_PORTS.get(scheme)
 
 
-def _same_origin(a: str, b: str) -> bool:
-    return _origin(a) == _origin(b)
+def same_origin(a: str, b: str) -> bool:
+    origin = _origin(a)
+    return origin is not None and origin == _origin(b)
 
 
-def dashboard_origin(api_url: str) -> str:
-    """Where the dashboard lives, for what's sent to the auth routes and the links it prints."""
-    scheme, host = _origin(api_url)
+def for_api(file: dict[str, Any] | None, api_url: str) -> dict[str, Any]:
+    """What's saved, going to this API. A key and an agent belong to the address they came from."""
+    if not file:
+        return {}
+    if same_origin(api_url, file.get("api_url", "")):
+        return dict(file)
+    return {k: v for k, v in file.items() if k not in ("api_key", "agent", "namespace_id")}
+
+
+def dashboard_origin(api_url: str) -> str | None:
+    """Where the dashboard lives, when that can be told from the API's address."""
+    parts = urlsplit(api_url)
+    host = (parts.hostname or "").lower()
     if host.startswith("api."):
-        return f"{scheme}://app.{host[len('api.') :]}"
-    return _LOCAL_DASHBOARD
+        return f"{parts.scheme}://app.{parts.netloc[len('api.') :]}"
+    return _LOCAL_DASHBOARD if host in _LOCAL_HOSTS else None
 
 
 def from_environment(
-    api_key: str | None, base_url: str | None, identity: str | None
+    api_key: str | None,
+    base_url: str | None,
+    identity: str | None,
+    namespace_id: str | None = None,
 ) -> dict[str, str | None]:
     """What a client made directly uses: what it was given, then the environment."""
     return {
         "api_key": api_key or _env("MEMDOT_API_KEY"),
         "api_url": base_url or _env("MEMDOT_API_URL") or DEFAULT_API_URL,
         "identity": identity or _env("MEMDOT_AGENT_IDENTITY"),
+        "namespace_id": namespace_id or _env("MEMDOT_NAMESPACE"),
     }
 
 
@@ -99,13 +124,13 @@ class ResolvedCredentials:
     """The credentials in force, after flags and environment. Never written back to the file."""
 
     api_url: str
-    api_key: str | None
-    identity: str | None
+    api_key: str | None = field(repr=False)
+    identity: str | None = field(repr=False)
     namespace_id: str | None
     user_id: str | None
     agent_id: str | None
     run_id: str | None
-    recovery_code: str | None
+    recovery_code: str | None = field(repr=False)
     #: Where the key came from, for `memdot status`: "flag", "env", "file" or None.
     api_key_source: str | None
 
@@ -123,7 +148,7 @@ def resolve_credentials(
     # The saved key goes only where it was saved for: pointing elsewhere mustn't hand it over.
     saved_key = (
         saved["api_key"]
-        if saved.get("api_key") and _same_origin(api_url, saved.get("api_url", ""))
+        if saved.get("api_key") and same_origin(api_url, saved.get("api_url", ""))
         else None
     )
     api_key = flags.get("api_key") or from_env or saved_key

@@ -19,6 +19,7 @@ from ..models import FileData, FileInfo, FilePage, Grant, Recipient, SharedDetai
 from .context import Context
 from .files import open_file_info, read_object, store_object
 from .spaces import Spaces, open_text
+from .transport import seg
 
 log = logging.getLogger("memdot")
 
@@ -41,7 +42,7 @@ class Sharing:
 
     def recipient(self, address: str) -> Recipient:
         return Recipient.model_validate(
-            self._ctx.transport.json("GET", f"/v1/recipients/{address}")
+            self._ctx.transport.json("GET", f"/v1/recipients/{seg(address)}")
         )
 
     def share_space(
@@ -116,7 +117,7 @@ class Sharing:
     def revoke(self, grant_id: str) -> Any:
         """Stops future access and moves the space to a new key epoch."""
         given = self.list("given")
-        revoked = self._ctx.transport.json("DELETE", f"/v1/grants/{grant_id}")
+        revoked = self._ctx.transport.json("DELETE", f"/v1/grants/{seg(grant_id)}")
         for grant in given:
             if grant.id == grant_id:
                 self._ctx.registry.revoke_grant(grant.space_id, grant.id)
@@ -193,8 +194,8 @@ class Sharing:
         cached = self._ctx.vault.received_keys(grant_id)
         if cached:
             return cached
-        shared = self._ctx.transport.json("GET", f"/v1/shared/{grant_id}")
-        sealed = self._ctx.transport.bytes(f"/v1/shared/{grant_id}/key")
+        shared = self._ctx.transport.json("GET", f"/v1/shared/{seg(grant_id)}")
+        sealed = self._ctx.transport.bytes(f"/v1/shared/{seg(grant_id)}/key")
         identity = self._ctx.vault.identity()
         if shared.get("objectId"):
             keys: dict[str, Any] = {
@@ -209,7 +210,7 @@ class Sharing:
 
     def details(self, grant_id: str) -> SharedDetails:
         """What a received grant opens, with its name decrypted here (space name, or the file's)."""
-        shared = self._ctx.transport.json("GET", f"/v1/shared/{grant_id}")
+        shared = self._ctx.transport.json("GET", f"/v1/shared/{seg(grant_id)}")
         keys = self.open(grant_id)
         name = (
             keys["manifest"]["name"]
@@ -232,7 +233,7 @@ class Sharing:
         keys = self.open(grant_id)
         page = self._ctx.transport.json(
             "GET",
-            f"/v1/shared/{grant_id}/objects",
+            f"/v1/shared/{seg(grant_id)}/objects",
             params={"kind": "file", "folderId": folder_id, "cursor": cursor, "limit": limit},
         )
         items: list[FileInfo] = []
@@ -264,10 +265,12 @@ class Sharing:
         return read_object(self._ctx, detail, identities, load_segment)
 
     def _shared_detail(self, grant_id: str, object_id: str) -> dict[str, Any]:
-        return self._ctx.transport.json("GET", f"/v1/shared/{grant_id}/objects/{object_id}")
+        return self._ctx.transport.json(
+            "GET", f"/v1/shared/{seg(grant_id)}/objects/{seg(object_id)}"
+        )
 
     def _detail(self, object_id: str) -> dict[str, Any]:
-        return self._ctx.transport.json("GET", f"/v1/objects/{object_id}")
+        return self._ctx.transport.json("GET", f"/v1/objects/{seg(object_id)}")
 
     def _own_manifest(self, detail: dict[str, Any]) -> dict[str, Any]:
         """The owner opens their own manifest with the epoch it was sealed with."""
@@ -339,4 +342,4 @@ class Sharing:
         return grant
 
     def _complete(self, grant_id: str, body: dict[str, Any]) -> Any:
-        return self._ctx.transport.json("POST", f"/v1/grants/{grant_id}/complete", body)
+        return self._ctx.transport.json("POST", f"/v1/grants/{seg(grant_id)}/complete", body)

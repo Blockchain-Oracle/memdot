@@ -266,6 +266,9 @@ def test_registry_records_match():
     from memdot.registry import (
         ACTION,
         NO_SALT,
+        OBJECT_KIND,
+        SCOPE,
+        SPACE_MODE,
         action_hash,
         encode_call,
         encode_record,
@@ -276,6 +279,23 @@ def test_registry_records_match():
     )
 
     registry = V["registry"]
+    enums = registry["enums"]
+    assert vars(ACTION) == enums["Action"]
+    assert {
+        "sponsored": enums["SpaceMode"]["Sponsored"],
+        "self_signed": enums["SpaceMode"]["SelfSigned"],
+    } == SPACE_MODE
+    assert {"read": enums["Scope"]["Read"], "read_write": enums["Scope"]["ReadWrite"]} == SCOPE
+    kinds = enums["ObjectKind"]
+    # A file is recorded by its manifest, as packages/sdk/src/registry.ts does.
+    assert {
+        "file": kinds["Manifest"],
+        "manifest": kinds["Manifest"],
+        "segment": kinds["Segment"],
+        "index_snapshot": kinds["IndexSnapshot"],
+        "key_bundle": kinds["KeyBundle"],
+        "grant_key": kinds["GrantKey"],
+    } == OBJECT_KIND
     signed = registry["signed"]
     public_key, _ = owner_pair(bytes.fromhex(signed["seed"]))
     assert f"0x{public_key.hex()}" == signed["publicKey"]

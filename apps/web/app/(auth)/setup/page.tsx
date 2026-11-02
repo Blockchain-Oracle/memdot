@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandLoader, Wordmark } from "@memdot/ui/components/brand";
+import { Button } from "@memdot/ui/components/button";
 import {
   Stepper,
   StepperDescription,
@@ -52,8 +53,11 @@ function Setup() {
   const router = useRouter();
   const unlocked = useUnlocked();
   const queryClient = useQueryClient();
-  const { gate } = useGate();
-  const next = useSearchParams().get("next");
+  const { gate, retry } = useGate();
+  const params = useSearchParams();
+  const next = params.get("next");
+  // Sent here for another space: one they have already doesn't suit what they came for.
+  const newSpace = params.get("space") === "new";
   const steps = next ? STEPS.slice(0, STEPS_BEFORE_RETURNING) : STEPS;
   const [step, setStep] = useState<number | null>(null);
   const [spaceId, setSpaceId] = useState<string | null>(null);
@@ -70,17 +74,17 @@ function Setup() {
     if (gate === "sign-in") setStep(1);
     else if (gate === "setup") setStep(2);
     else if (gate === "unlock")
-      router.replace(`/unlock?next=${encodeURIComponent(setupFor(next))}`);
+      router.replace(`/unlock?next=${encodeURIComponent(setupFor(next, { newSpace }))}`);
     else if (spaces.data) {
       const first = spaces.data[0];
-      if (!first) setStep(3);
+      if (!first || newSpace) setStep(3);
       else if (next) router.replace(safeNext(next));
       else {
         setSpaceId(first.id);
         setStep(4);
       }
     }
-  }, [gate, spaces.data, step, next, router]);
+  }, [gate, spaces.data, step, next, newSpace, router]);
 
   const finish = () => router.replace(HOME);
   const signOut = async () => {
@@ -150,7 +154,14 @@ function Setup() {
         </header>
         <div className="flex flex-1 justify-center px-4 py-10 sm:items-center sm:py-16">
           <div className="w-full max-w-[480px]">
-            {step === null ? (
+            {gate === "offline" && step === null ? (
+              <div className="flex flex-col items-start gap-3">
+                <p className="text-ui-sm text-text-2">MemDot can't be reached right now.</p>
+                <Button variant="outline" onClick={retry}>
+                  Try again
+                </Button>
+              </div>
+            ) : step === null ? (
               <BrandLoader />
             ) : (
               <>

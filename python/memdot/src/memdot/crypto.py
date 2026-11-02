@@ -50,8 +50,11 @@ _mnemonic = Mnemonic("english")
 
 
 def dumps(value: Any) -> bytes:
-    """JSON the way the TypeScript SDK writes it: compact, and with text left as it is."""
-    return json.dumps(value, separators=(",", ":"), ensure_ascii=False).encode()
+    """JSON the way the TypeScript SDK writes it: compact, and with text left as it is.
+
+    NaN is refused here: Python would read it back, and JavaScript would fail on the whole segment.
+    """
+    return json.dumps(value, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
 
 
 # ── Keys ─────────────────────────────────────────────────────────────────────────────────────

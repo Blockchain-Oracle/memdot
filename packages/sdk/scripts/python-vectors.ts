@@ -13,6 +13,9 @@ import {
   encodeRecord,
   memDotRegistryAbi,
   NO_SALT,
+  ObjectKind,
+  Scope,
+  SpaceMode,
   signingMessage,
   uuidToBytes32,
 } from "@memdot/contracts";
@@ -416,6 +419,7 @@ const vectors = {
       12345678901234n,
       (records[0] as { hash: `0x${string}` }).hash,
     ),
+    enums: { Action, ObjectKind, SpaceMode, Scope },
     // sr25519 from the same seed, checked on the Python side; the signature itself is random.
     signed: {
       seed: hex(ownerSeed(amk)),

@@ -21,12 +21,13 @@ from .._constants import (
 from ..chain import cid_of, content_hash_from_cid
 from ..crypto import SegmentEntry
 from ..engine import iso_now
-from ..errors import IntegrityError, MemDotError
+from ..errors import ConflictError, IntegrityError, MemDotError, WrongKeyError
 from ..models import BlobCheck, FileData, FileInfo, FilePage, Job, PutResult, VerifyResult
 from .chain import NodeError
 from .context import AsyncContext
 from .simple import AsyncJobs
 from .spaces import AsyncSpaces, open_text, to_base64
+from .transport import seg
 
 #: How many entries one registering request can hold (`MAX_SEGMENT_ENTRIES`).
 _MAX_SEGMENT_ENTRIES = 150
@@ -316,7 +317,7 @@ class AsyncFiles:
                     row["folderId"] = folder_id
                 rows.append(row)
             await self._ctx.transport.json(
-                "POST", f"/v1/objects/{declared['object']['id']}/entries", {"entries": rows}
+                "POST", f"/v1/objects/{seg(declared['object']['id'])}/entries", {"entries": rows}
             )
         return entry_ids, declared["job"]["id"]
 
@@ -327,14 +328,24 @@ class AsyncFiles:
             raise MemDotError(400, "NOT_A_FILE", "That object is not a file in a space.")
         await self._ctx.ensure_keys(detail["spaceId"], detail["keyEpoch"])
         identities = self._ctx.vault.owned_identities(detail["spaceId"], detail["keyEpoch"])[:1]
-        return await read_object(self._ctx, detail, identities, self.detail)
+        try:
+            return await read_object(self._ctx, detail, identities, self.detail)
+        except WrongKeyError as error:
+            if not self._ctx.vault.is_agent:
+                raise
+            raise ConflictError(
+                409,
+                "KEY_BEHIND",
+                "This was sealed with a key this agent hasn't received. "
+                "It arrives the next time the owner opens MemDot.",
+            ) from error
 
     async def info(self, file_id: str) -> FileInfo:
         detail = await self.detail(file_id)
         return open_file_info(detail, await self._identities_for(detail))
 
     async def detail(self, file_id: str) -> dict[str, Any]:
-        return await self._ctx.transport.json("GET", f"/v1/objects/{file_id}")
+        return await self._ctx.transport.json("GET", f"/v1/objects/{seg(file_id)}")
 
     async def list(
         self,
@@ -381,33 +392,33 @@ class AsyncFiles:
             crypto.dumps(meta), [self._ctx.vault.seal_to(space["id"], space["keyEpoch"])]
         )
         raw = await self._ctx.transport.json(
-            "PATCH", f"/v1/objects/{file_id}", {"encryptedMeta": to_base64(sealed)}
+            "PATCH", f"/v1/objects/{seg(file_id)}", {"encryptedMeta": to_base64(sealed)}
         )
         self._epochs[space["id"]] = space["keyEpoch"]
         return open_file_info(raw, await self._identities_for(raw))
 
     async def move(self, file_id: str, folder_id: str | None) -> Any:
         return await self._ctx.transport.json(
-            "PATCH", f"/v1/objects/{file_id}", {"folderId": folder_id}
+            "PATCH", f"/v1/objects/{seg(file_id)}", {"folderId": folder_id}
         )
 
     async def delete(self, file_id: str) -> Any:
         """Tombstones and stops renewing; the bytes expire from the chain within 7 days."""
         detail = await self.detail(file_id)
-        deleted = await self._ctx.transport.json("DELETE", f"/v1/objects/{file_id}")
+        deleted = await self._ctx.transport.json("DELETE", f"/v1/objects/{seg(file_id)}")
         # A file inside a segment has no blob of its own; the segment's record stays true.
         if detail.get("cid") and not detail.get("segmentId"):
             await self._ctx.registry.tombstone_object(detail.get("spaceId"), detail["cid"])
         return deleted
 
     async def versions(self, file_id: str) -> list[FileInfo]:
-        page = await self._ctx.transport.json("GET", f"/v1/objects/{file_id}/versions")
+        page = await self._ctx.transport.json("GET", f"/v1/objects/{seg(file_id)}/versions")
         return [open_file_info(raw, await self._identities_for(raw)) for raw in page["items"]]
 
     async def renew(self, file_id: str, *, wait: bool = True) -> Job:
         """Every stored blob moves to a fresh 7-day window, same CIDs."""
         job = Job.model_validate(
-            await self._ctx.transport.json("POST", f"/v1/objects/{file_id}/renew")
+            await self._ctx.transport.json("POST", f"/v1/objects/{seg(file_id)}/renew")
         )
         return await self._jobs.wait_for(job.id) if wait else job
 

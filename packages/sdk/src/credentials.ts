@@ -114,6 +114,14 @@ function sameOrigin(a: string, b: string): boolean {
   }
 }
 
+/** What's saved, going to this API. A key and an agent belong to the address they came from. */
+export function credentialsForApi(file: Credentials | null, apiUrl: string): Partial<Credentials> {
+  if (!file) return {};
+  if (sameOrigin(apiUrl, file.api_url)) return file;
+  const { api_key: _key, agent: _agent, namespace_id: _namespace, ...rest } = file;
+  return rest;
+}
+
 /** Flags beat the environment, which beats the file. */
 export function resolveCredentials(
   file: Credentials | null,

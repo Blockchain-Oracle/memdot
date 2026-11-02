@@ -28,13 +28,14 @@ ACTION = SimpleNamespace(
     RegisterAgent=8,
     RevokeAgent=9,
 )
+#: Which kind an object is recorded as. A file is recorded by its manifest, which names the rest.
 OBJECT_KIND = {
-    "file": 0,
-    "manifest": 0,
-    "segment": 1,
-    "index_snapshot": 2,
-    "key_bundle": 3,
-    "grant_key": 4,
+    "file": 1,
+    "manifest": 1,
+    "segment": 2,
+    "index_snapshot": 3,
+    "key_bundle": 4,
+    "grant_key": 5,
 }
 SPACE_MODE = {"sponsored": 0, "self_signed": 1}
 SCOPE = {"read": 0, "read_write": 1}

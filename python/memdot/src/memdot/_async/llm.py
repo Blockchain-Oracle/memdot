@@ -201,7 +201,8 @@ class AsyncModel:
         schema: dict[str, Any] | None,
     ) -> str:
         compatible = self._config["provider"] == "openai-compatible"
-        base = self._config.get("baseUrl")
+        # Only a compatible provider has an address of its own: this text and key go there.
+        base = self._config.get("baseUrl") if compatible else None
         if compatible and not base:
             raise ModelError(400, "An OpenAI-compatible provider needs a base URL.")
         body: dict[str, Any] = {"model": model}
@@ -370,7 +371,19 @@ async def extract_memories(
         ],
         schema=_EXTRACTION,
     )
-    return [memory for memory in output["memories"] if memory["text"].strip()]
+    try:
+        return [
+            {
+                "text": memory["text"],
+                "attributed_to": memory["attributed_to"],
+                "entities": memory["entities"],
+                "categories": memory["categories"],
+            }
+            for memory in output["memories"]
+            if memory["text"].strip()
+        ]
+    except (KeyError, TypeError, AttributeError) as error:
+        raise ModelError(400, "The model's answer wasn't the shape it was asked for.") from error
 
 
 async def procedural_record(

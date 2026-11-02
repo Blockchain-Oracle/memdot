@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -12,6 +13,11 @@ from ..errors import MemDotError, NetworkError, error_for
 
 SDK_CLIENT = f"sdk-py/{__version__}"
 _TIMEOUT = httpx.Timeout(60.0, connect=20.0)
+
+
+def seg(value: object) -> str:
+    """One path segment, whatever it holds: `priya#work` must not become `priya`, nor `../x` climb."""
+    return quote(str(value), safe="")
 
 
 class AsyncTransport:
@@ -82,7 +88,7 @@ class AsyncTransport:
 
     async def blob(self, cid: str) -> bytes:
         """Stored bytes through MemDot's gateway, checked against their CID here."""
-        return check_blob(cid, await self.bytes(f"/v1/cids/{cid}"))
+        return check_blob(cid, await self.bytes(f"/v1/cids/{seg(cid)}"))
 
     async def aclose(self) -> None:
         await self._http.aclose()

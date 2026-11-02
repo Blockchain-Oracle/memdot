@@ -12,6 +12,7 @@ from ..crypto import WrongKeyError
 from ..errors import MemDotError
 from ..models import Folder, Space
 from .context import Context
+from .transport import seg
 
 
 def to_base64(data: bytes) -> str:
@@ -64,7 +65,7 @@ class Spaces:
         return self._open(self.raw(space_id))
 
     def raw(self, space_id: str) -> dict[str, Any]:
-        space = self._ctx.transport.json("GET", f"/v1/spaces/{space_id}")
+        space = self._ctx.transport.json("GET", f"/v1/spaces/{seg(space_id)}")
         self._ctx.ensure_keys(space_id, space["keyEpoch"])
         return space
 
@@ -72,18 +73,20 @@ class Spaces:
         space = self.raw(space_id)
         sealed = seal_text(name, self._ctx.vault.seal_to(space_id, space["keyEpoch"]))
         return self._open(
-            self._ctx.transport.json("PATCH", f"/v1/spaces/{space_id}", {"encryptedName": sealed})
+            self._ctx.transport.json(
+                "PATCH", f"/v1/spaces/{seg(space_id)}", {"encryptedName": sealed}
+            )
         )
 
     def set_mode(self, space_id: str, mode: str) -> Space:
         """Who signs future writes: MemDot's relayer (sponsored) or a wallet (self-signed)."""
         return self._open(
-            self._ctx.transport.json("PATCH", f"/v1/spaces/{space_id}", {"mode": mode})
+            self._ctx.transport.json("PATCH", f"/v1/spaces/{seg(space_id)}", {"mode": mode})
         )
 
     def delete(self, space_id: str) -> Any:
         """Tombstones everything in it and stops renewing; bytes expire within 7 days."""
-        deleted = self._ctx.transport.json("DELETE", f"/v1/spaces/{space_id}")
+        deleted = self._ctx.transport.json("DELETE", f"/v1/spaces/{seg(space_id)}")
         self._ctx.registry.delete_space(space_id)
         return deleted
 
@@ -111,31 +114,31 @@ class Folders:
         sealed = seal_text(name, self._ctx.vault.seal_to(space_id, space["keyEpoch"]))
         raw = self._ctx.transport.json(
             "POST",
-            f"/v1/spaces/{space_id}/folders",
+            f"/v1/spaces/{seg(space_id)}/folders",
             {"encryptedName": sealed, "parentId": parent_id, "memoryMode": memory_mode},
         )
         return self._open(raw, space["keyEpoch"])
 
     def list(self, space_id: str) -> list[Folder]:
         space = self._spaces.raw(space_id)
-        page = self._ctx.transport.json("GET", f"/v1/spaces/{space_id}/folders")
+        page = self._ctx.transport.json("GET", f"/v1/spaces/{seg(space_id)}/folders")
         return [self._open(raw, space["keyEpoch"]) for raw in page["items"]]
 
     def rename(self, folder_id: str, space_id: str, name: str) -> Folder:
         space = self._spaces.raw(space_id)
         sealed = seal_text(name, self._ctx.vault.seal_to(space_id, space["keyEpoch"]))
         raw = self._ctx.transport.json(
-            "PATCH", f"/v1/folders/{folder_id}", {"encryptedName": sealed}
+            "PATCH", f"/v1/folders/{seg(folder_id)}", {"encryptedName": sealed}
         )
         return self._open(raw, space["keyEpoch"])
 
     def move(self, folder_id: str, parent_id: str | None) -> Any:
         return self._ctx.transport.json(
-            "PATCH", f"/v1/folders/{folder_id}", {"parentId": parent_id}
+            "PATCH", f"/v1/folders/{seg(folder_id)}", {"parentId": parent_id}
         )
 
     def delete(self, folder_id: str) -> Any:
-        return self._ctx.transport.json("DELETE", f"/v1/folders/{folder_id}")
+        return self._ctx.transport.json("DELETE", f"/v1/folders/{seg(folder_id)}")
 
     def _open(self, raw: dict[str, Any], through_epoch: int) -> Folder:
         vault = self._ctx.vault

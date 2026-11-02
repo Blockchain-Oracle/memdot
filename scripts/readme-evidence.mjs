@@ -14,12 +14,14 @@ const latestSelfSigned = latest("s07-self-signed-");
 const latestMemory = latest("s08-seed-");
 const latestLive = latest("s08-live-");
 const latestAgents = latest("s09-agents-");
+const latestPython = latest("s10-python-");
 
 const seed = read(`docs/evidence/${latestSeed}`);
 const selfSigned = latestSelfSigned ? read(`docs/evidence/${latestSelfSigned}`) : null;
 const memory = latestMemory ? read(`docs/evidence/${latestMemory}`) : null;
 const live = latestLive ? read(`docs/evidence/${latestLive}`) : null;
 const agents = latestAgents ? read(`docs/evidence/${latestAgents}`) : null;
+const python = latestPython ? read(`docs/evidence/${latestPython}`) : null;
 const registry = read("packages/contracts/deployments/portaldot-v3.json");
 const block = (n) => `[#${n.toLocaleString("en-US")}](${seed.app}/proof/block/${n})`;
 const tx = (hash) => `[\`${hash.slice(0, 10)}…${hash.slice(-6)}\`](${seed.app}/proof/tx/${hash})`;
@@ -119,6 +121,16 @@ const rows = [
         ],
       ]
     : []),
+  ...(python
+    ? [
+        [
+          "A Private memory written from Python, which the TypeScript SDK then opened",
+          tx(python.pythonWrites.txHash),
+          block(python.pythonWrites.block),
+          cid(python.pythonWrites.cid),
+        ],
+      ]
+    : []),
   ...seed.records.map((record) => [
     `Registry record: ${LABEL[record.action] ?? record.action}`,
     `\`${record.txHash.slice(0, 10)}…${record.txHash.slice(-6)}\``,
@@ -131,7 +143,7 @@ const table = [
   "|---|---|---|---|",
   ...rows.map((row) => `| ${row.join(" | ")} |`),
   "",
-  `Recorded by [\`docs/evidence/${latestSeed}\`](docs/evidence/${latestSeed})${latestSelfSigned ? `, [\`docs/evidence/${latestSelfSigned}\`](docs/evidence/${latestSelfSigned})` : ""}${latestMemory ? `, [\`docs/evidence/${latestMemory}\`](docs/evidence/${latestMemory})` : ""}${latestLive ? ` and [\`docs/evidence/${latestLive}\`](docs/evidence/${latestLive})` : ""}. Registry transaction hashes are the EVM hashes Revive's RPC reports.`,
+  `Recorded by [\`docs/evidence/${latestSeed}\`](docs/evidence/${latestSeed})${latestSelfSigned ? `, [\`docs/evidence/${latestSelfSigned}\`](docs/evidence/${latestSelfSigned})` : ""}${latestMemory ? `, [\`docs/evidence/${latestMemory}\`](docs/evidence/${latestMemory})` : ""}${latestLive ? `, [\`docs/evidence/${latestLive}\`](docs/evidence/${latestLive})` : ""}${latestAgents ? `, [\`docs/evidence/${latestAgents}\`](docs/evidence/${latestAgents})` : ""}${latestPython ? ` and [\`docs/evidence/${latestPython}\`](docs/evidence/${latestPython})` : ""}. Registry transaction hashes are the EVM hashes Revive's RPC reports.`,
 ].join("\n");
 
 const readmeUrl = new URL("../README.md", import.meta.url);

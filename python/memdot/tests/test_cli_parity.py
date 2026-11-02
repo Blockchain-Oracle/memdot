@@ -114,3 +114,13 @@ def test_config_round_trips_the_same_file(capsys, monkeypatch, tmp_path):
     assert (tmp_path / "credentials.json").stat().st_mode & 0o777 == 0o600
     code, out = run(capsys, "config", "get", "user_id", "--agent")
     assert json.loads(out)["data"] == {"key": "user_id", "value": "priya"}
+
+
+def test_changing_the_address_leaves_the_key_behind(capsys, monkeypatch, tmp_path):
+    monkeypatch.setenv("MEMDOT_CREDENTIALS_DIR", str(tmp_path))
+    (tmp_path / "credentials.json").write_text(
+        json.dumps({"version": 1, "api_url": "https://api.a.test", "api_key": "md_a"})
+    )
+    run(capsys, "config", "set", "api_url", "https://evil.test", "--agent")
+    saved = json.loads((tmp_path / "credentials.json").read_text())
+    assert saved["api_url"] == "https://evil.test" and "api_key" not in saved

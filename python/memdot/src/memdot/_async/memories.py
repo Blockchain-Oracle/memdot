@@ -36,6 +36,7 @@ from .context import AsyncContext
 from .private_memory import AsyncPrivateNamespace, PrivateDeps
 from .simple import AsyncJobs
 from .spaces import AsyncFolders, AsyncSpaces, open_text, to_base64
+from .transport import seg
 
 log = logging.getLogger("memdot")
 
@@ -135,7 +136,11 @@ class AsyncMemories:
         folders: AsyncFolders,
         jobs: AsyncJobs,
         embedder: Embedder | None = None,
+        default_namespace: str | None = None,
     ) -> None:
+        #: Where a call that names no namespace goes. Without it, the API would pick an Assisted
+        #: one, so text meant for a Private namespace would have already left this device.
+        self._default_namespace = default_namespace
         self._ctx = ctx
         self._spaces = spaces
         self._folders = folders
@@ -151,6 +156,11 @@ class AsyncMemories:
         if not self._ctx.vault.unlocked:
             self._private.clear()
             self._private_settings = ...
+            self._private_model_client = None
+
+    async def aclose(self) -> None:
+        if self._private_model_client is not None:
+            await self._private_model_client.aclose()
             self._private_model_client = None
 
     def _local_embedder(self) -> Embedder:
@@ -246,7 +256,7 @@ class AsyncMemories:
         }
 
     async def _open_settings(self, namespace_id: str) -> dict[str, Any]:
-        row = await self._ctx.transport.json("GET", f"/v1/namespaces/{namespace_id}/settings")
+        row = await self._ctx.transport.json("GET", f"/v1/namespaces/{seg(namespace_id)}/settings")
         if row.get("sealed"):
             text = crypto.open_with(
                 base64.b64decode(row["sealed"]), self._ctx.vault.identity(), "the settings"
@@ -269,7 +279,7 @@ class AsyncMemories:
             body: dict[str, Any] = {"sealed": to_base64(sealed)}
         else:
             body = {"custom_instructions": custom_instructions, "categories": categories}
-        await self._ctx.transport.json("PUT", f"/v1/namespaces/{namespace_id}/settings", body)
+        await self._ctx.transport.json("PUT", f"/v1/namespaces/{seg(namespace_id)}/settings", body)
 
     # ── The model Private namespaces use ─────────────────────────────────────────────────────
 
@@ -379,6 +389,7 @@ class AsyncMemories:
         """
         if not (user_id or agent_id or run_id):
             raise ValidationError(400, "SCOPE_REQUIRED", _SCOPE_REQUIRED)
+        namespace_id = namespace_id or self._default_namespace
         normalized = normalize_messages(messages)
         held = await self._route(namespace_id)
         if held:
@@ -465,7 +476,7 @@ class AsyncMemories:
 
     async def event(self, event_id: str) -> MemoryEvent:
         return MemoryEvent.model_validate(
-            await self._ctx.transport.json("GET", f"/v1/memories/events/{event_id}")
+            await self._ctx.transport.json("GET", f"/v1/memories/events/{seg(event_id)}")
         )
 
     async def events(self, *, limit: int | None = None, cursor: str | None = None) -> Any:
@@ -501,6 +512,7 @@ class AsyncMemories:
         show_expired: bool = False,
         reference_date: int | float | str | None = None,
     ) -> builtins.list[ScoredMemory]:
+        namespace_id = namespace_id or self._default_namespace
         held = await self._route(namespace_id)
         if held:
             hits = await held.search(
@@ -540,6 +552,7 @@ class AsyncMemories:
         cursor: str | None = None,
         page_size: int = _DEFAULT_PAGE,
     ) -> MemoryPage:
+        namespace_id = namespace_id or self._default_namespace
         held = await self._route(namespace_id)
         if held:
             entries = await held.list(
@@ -576,7 +589,7 @@ class AsyncMemories:
 
     async def get(self, memory_id: str) -> Memory:
         try:
-            raw = await self._ctx.transport.json("GET", f"/v1/memories/{memory_id}")
+            raw = await self._ctx.transport.json("GET", f"/v1/memories/{seg(memory_id)}")
             return Memory.model_validate(_from_wire(raw))
         except MemDotError as error:
             held = await self._private_holding(error)
@@ -597,7 +610,7 @@ class AsyncMemories:
             if held.holds(memory_id):
                 return held
         try:
-            await self._ctx.transport.json("GET", f"/v1/memories/{memory_id}")
+            await self._ctx.transport.json("GET", f"/v1/memories/{seg(memory_id)}")
             return None
         except MemDotError as error:
             held = await self._private_holding(error)
@@ -631,12 +644,12 @@ class AsyncMemories:
             body["metadata"] = metadata
         if expiration_date is not ...:
             body["expiration_date"] = expiration_date
-        raw = await self._ctx.transport.json("PUT", f"/v1/memories/{memory_id}", body)
+        raw = await self._ctx.transport.json("PUT", f"/v1/memories/{seg(memory_id)}", body)
         return Memory.model_validate(_from_wire(raw))
 
     async def delete(self, memory_id: str) -> None:
         """Forgets one memory: out of search and lists at once, in both modes."""
-        await self._ctx.transport.json("DELETE", f"/v1/memories/{memory_id}")
+        await self._ctx.transport.json("DELETE", f"/v1/memories/{seg(memory_id)}")
         for held in self._private.values():
             held.forget([memory_id])
 
@@ -651,6 +664,7 @@ class AsyncMemories:
         """Forgets everything in a scope and says how many. `"*"` matches every value of one."""
         if not (user_id or agent_id or run_id):
             raise ValidationError(400, "SCOPE_REQUIRED", _SCOPE_REQUIRED)
+        namespace_id = namespace_id or self._default_namespace
         held = await self._route(namespace_id)
         scope = {"user_id": user_id, "agent_id": agent_id, "run_id": run_id}
         if held:
@@ -665,7 +679,7 @@ class AsyncMemories:
 
     async def history(self, memory_id: str) -> builtins.list[HistoryEvent]:
         try:
-            answer = await self._ctx.transport.json("GET", f"/v1/memories/{memory_id}/history")
+            answer = await self._ctx.transport.json("GET", f"/v1/memories/{seg(memory_id)}/history")
             return [
                 HistoryEvent(
                     event=row["event"],
@@ -734,6 +748,7 @@ class AsyncMemories:
     async def summary(
         self, *, namespace_id: str | None = None, filters: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        namespace_id = namespace_id or self._default_namespace
         held = await self._route(namespace_id)
         if held:
             return {"summary": await held.summary(filter_node=_parse_filters(filters))}
@@ -747,6 +762,7 @@ class AsyncMemories:
     # ── Entities ─────────────────────────────────────────────────────────────────────────────
 
     async def entities(self, *, namespace_id: str | None = None) -> builtins.list[Entity]:
+        namespace_id = namespace_id or self._default_namespace
         held = await self._route(namespace_id)
         if held:
             totals: dict[str, Entity] = {}
@@ -789,12 +805,15 @@ class AsyncMemories:
         self, kind: str, entity_id: str, *, namespace_id: str | None = None
     ) -> int:
         """Forgets a user, agent or run, and every memory it holds."""
+        namespace_id = namespace_id or self._default_namespace
         held = await self._route(namespace_id)
         if held:
             key = {"user": "user_id", "agent": "agent_id", "run": "run_id"}[kind]
             return await self.delete_all(namespace_id=held.id, **{key: entity_id})
         answer = await self._ctx.transport.json(
-            "DELETE", f"/v1/entities/{kind}/{entity_id}", params={"namespace_id": namespace_id}
+            "DELETE",
+            f"/v1/entities/{seg(kind)}/{seg(entity_id)}",
+            params={"namespace_id": namespace_id},
         )
         return answer["deleted"]
 
@@ -809,12 +828,14 @@ class AsyncMemories:
         held = await self._route(namespace_id)
         if held:
             return await held.restore()
-        accepted = await self._ctx.transport.json("POST", f"/v1/namespaces/{namespace_id}/restore")
+        accepted = await self._ctx.transport.json(
+            "POST", f"/v1/namespaces/{seg(namespace_id)}/restore"
+        )
         return await self.wait_for_event(accepted["event_id"], "chain")
 
     async def reset(self, namespace_id: str) -> None:
         """Forgets everything in a namespace."""
-        await self._ctx.transport.json("POST", f"/v1/namespaces/{namespace_id}/reset")
+        await self._ctx.transport.json("POST", f"/v1/namespaces/{seg(namespace_id)}/reset")
         self._private.pop(namespace_id, None)
 
     async def compact(self, namespace_id: str) -> Any:
@@ -822,7 +843,7 @@ class AsyncMemories:
         held = await self._route(namespace_id)
         if held:
             return await held.compact()
-        return await self._ctx.transport.json("POST", f"/v1/namespaces/{namespace_id}/compact")
+        return await self._ctx.transport.json("POST", f"/v1/namespaces/{seg(namespace_id)}/compact")
 
     async def save_index(self, namespace_id: str) -> str:
         """Private: stores the index, encrypted, so another device can start without embedding."""
@@ -852,7 +873,7 @@ class AsyncMemories:
                 }
                 for entry in await held.list(show_expired=True)
             ]
-        answer = await self._ctx.transport.json("GET", f"/v1/namespaces/{namespace_id}/export")
+        answer = await self._ctx.transport.json("GET", f"/v1/namespaces/{seg(namespace_id)}/export")
         return answer["memories"]
 
     async def import_memories(
@@ -915,17 +936,21 @@ class AsyncMemories:
         by_space: dict[str, builtins.list[dict[str, Any]]] = {}
         for segment in results:
             by_space.setdefault(segment["space_id"], []).append(segment)
+        recorded: builtins.list[str] = []
         for space_id, segments in by_space.items():
-            await self._ctx.registry.add_objects(
+            if await self._ctx.registry.add_objects(
                 space_id,
                 [
                     {"kind": "segment", "root_cid": segment["cid"], "size": segment["size"]}
                     for segment in segments
                 ],
+            ):
+                recorded.extend(segment["id"] for segment in segments)
+        # What wasn't recorded stays unrecorded, for an unlock that can.
+        if recorded:
+            await self._ctx.transport.json(
+                "POST", "/v1/namespaces/recorded-segments", {"ids": recorded}
             )
-        await self._ctx.transport.json(
-            "POST", "/v1/namespaces/recorded-segments", {"ids": [s["id"] for s in results]}
-        )
 
 
 def _private_source(source: dict[str, str] | None) -> dict[str, str]:

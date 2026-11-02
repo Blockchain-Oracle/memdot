@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 log = logging.getLogger("memdot")
 _NO_OWNER_EXTRA = (
     'Registry records need the owner extra: pip install "memdot[owner]". '
-    "They'll be added the next time the owner unlocks with it installed."
+    "Without it, what this client does stays off the account's public record."
 )
 _HEX_32 = re.compile(r"^0x[0-9a-fA-F]{64}$")
 
@@ -87,9 +87,9 @@ class AsyncRegistryLog:
     ) -> None:
         await self.add_objects(space_id, [{"kind": kind, "root_cid": root_cid, "size": size}])
 
-    async def add_objects(self, space_id: str | None, items: list[dict[str, Any]]) -> None:
-        """Several objects in one record, for the cost of one."""
-        await self._record(
+    async def add_objects(self, space_id: str | None, items: list[dict[str, Any]]) -> bool:
+        """Several objects in one record, for the cost of one. Says whether it was recorded."""
+        return await self._record(
             _salt_of(space_id),
             reg.ACTION.AddObjects,
             lambda: reg.encode_record.add_objects(
@@ -167,17 +167,19 @@ class AsyncRegistryLog:
             data=data,
         )
 
-    async def _record(self, salt: str, action: int, data: Any) -> None:
+    async def _record(self, salt: str, action: int, data: Any) -> bool:
         if not self._vault.unlocked:
-            return
+            return False
         try:
             calldata = self._signed_call(salt, action, data())
         except ImportError:
             if not self._warned:
                 self._warned = True
                 log.warning(_NO_OWNER_EXTRA)
-            return
+            return False
         try:
             await self._transport.json("POST", "/v1/registry/records", {"calldata": calldata})
         except MemDotError as error:
             log.warning("registry record skipped: %s", error)
+            return False
+        return True

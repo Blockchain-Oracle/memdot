@@ -12,6 +12,7 @@ from .._concurrency import sleep
 from ..errors import JobFailedError, MemDotError
 from ..models import ApiKey, Job, NewApiKey
 from .context import Context
+from .transport import seg
 
 _TERMINAL = {"finalized", "failed"}
 _POLL_SECONDS = 2.0
@@ -25,7 +26,7 @@ class Jobs:
         self._ctx = ctx
 
     def get(self, job_id: str) -> Job:
-        return Job.model_validate(self._ctx.transport.json("GET", f"/v1/jobs/{job_id}"))
+        return Job.model_validate(self._ctx.transport.json("GET", f"/v1/jobs/{seg(job_id)}"))
 
     def list(
         self,
@@ -77,7 +78,7 @@ class Jobs:
     def events(self, job_id: str) -> list[dict[str, Any]]:
         """What the job's stream holds now, for tools that want the raw updates."""
         response = self._ctx.transport.send(
-            "GET", f"/v1/jobs/{job_id}/events", headers={"accept": "text/event-stream"}
+            "GET", f"/v1/jobs/{seg(job_id)}/events", headers={"accept": "text/event-stream"}
         )
         return [
             jsonlib.loads(line[len("data: ") :])
@@ -114,11 +115,11 @@ class Keys:
 
     def rotate(self, key_id: str) -> NewApiKey:
         """Revokes the key first, then mints a new one with the same name, role and spaces."""
-        answer = self._ctx.transport.json("POST", f"/v1/keys/{key_id}/rotate")
+        answer = self._ctx.transport.json("POST", f"/v1/keys/{seg(key_id)}/rotate")
         return NewApiKey.model_validate(answer)
 
     def revoke(self, key_id: str) -> Any:
-        return self._ctx.transport.json("DELETE", f"/v1/keys/{key_id}")
+        return self._ctx.transport.json("DELETE", f"/v1/keys/{seg(key_id)}")
 
 
 class Activity:
@@ -147,10 +148,10 @@ class Proof:
         self._ctx = ctx
 
     def cid(self, cid: str) -> Any:
-        return self._ctx.transport.json("GET", f"/v1/proof/cid/{cid}")
+        return self._ctx.transport.json("GET", f"/v1/proof/cid/{seg(cid)}")
 
     def tx(self, tx_hash: str) -> Any:
-        return self._ctx.transport.json("GET", f"/v1/proof/tx/{tx_hash}")
+        return self._ctx.transport.json("GET", f"/v1/proof/tx/{seg(tx_hash)}")
 
     def stats(self) -> Any:
         return self._ctx.transport.json("GET", "/v1/proof/stats")

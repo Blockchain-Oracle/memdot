@@ -44,6 +44,7 @@ def client_for(resolved: creds.ResolvedCredentials) -> MemDot:
         base_url=resolved.api_url,
         client=CLIENT,
         identity=resolved.identity,
+        namespace_id=resolved.namespace_id,
         complete_grants_on_unlock=False,
     )
     if resolved.recovery_code:

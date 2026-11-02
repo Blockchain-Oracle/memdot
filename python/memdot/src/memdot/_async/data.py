@@ -14,7 +14,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ..engine import iso_now
-from ..errors import MemDotError, ValidationError
+from ..errors import ValidationError
 from ..models import ArchiveExport, ExportFailure, FileInfo, ImportReport
 from .context import AsyncContext
 from .files import AsyncFiles
@@ -23,7 +23,6 @@ from .spaces import AsyncFolders, AsyncSpaces
 
 _MANIFEST = "manifest.json"
 _LIST_PAGE = 200
-_RECOVERABLE = (MemDotError, ValueError)
 
 
 def _safe_name(name: str) -> str:
@@ -126,7 +125,7 @@ class AsyncData:
                             "folderId": file.folder_id,
                         }
                     )
-                except _RECOVERABLE as error:
+                except Exception as error:
                     failures.append(ExportFailure(item=label, reason=str(error)))
                 done += 1
             for namespace in namespaces:
@@ -141,7 +140,7 @@ class AsyncData:
                             "memories": await self._memories.export_memories(namespace.id),
                         }
                     )
-                except _RECOVERABLE as error:
+                except Exception as error:
                     failures.append(ExportFailure(item=label, reason=str(error)))
                 done += 1
             manifest["spaces"].append(entry)
@@ -190,7 +189,7 @@ class AsyncData:
                 try:
                     target = (await self._spaces.create(exported["name"])).id
                     report.spaces += 1
-                except _RECOVERABLE as error:
+                except Exception as error:
                     report.failures.append(ExportFailure(item=exported["name"], reason=str(error)))
                     continue
             folder_ids: dict[str, str] = {}
@@ -224,7 +223,7 @@ class AsyncData:
                     report.failures.append(
                         ExportFailure(item=file["name"], reason="Missing from the zip.")
                     )
-                except _RECOVERABLE as error:
+                except Exception as error:
                     report.failures.append(ExportFailure(item=file["name"], reason=str(error)))
                 done += 1
             for namespace in exported["namespaces"]:
@@ -242,7 +241,7 @@ class AsyncData:
                         )
                         report.memories += result["imported"]
                         report.duplicates += result["duplicates"]
-                except _RECOVERABLE as error:
+                except Exception as error:
                     report.failures.append(ExportFailure(item=namespace["name"], reason=str(error)))
                 done += 1
         return report

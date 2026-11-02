@@ -22,12 +22,13 @@ from .._constants import (
 from ..chain import cid_of, content_hash_from_cid
 from ..crypto import SegmentEntry
 from ..engine import iso_now
-from ..errors import IntegrityError, MemDotError
+from ..errors import ConflictError, IntegrityError, MemDotError, WrongKeyError
 from ..models import BlobCheck, FileData, FileInfo, FilePage, Job, PutResult, VerifyResult
 from .chain import NodeError
 from .context import Context
 from .simple import Jobs
 from .spaces import Spaces, open_text, to_base64
+from .transport import seg
 
 #: How many entries one registering request can hold (`MAX_SEGMENT_ENTRIES`).
 _MAX_SEGMENT_ENTRIES = 150
@@ -309,7 +310,7 @@ class Files:
                     row["folderId"] = folder_id
                 rows.append(row)
             self._ctx.transport.json(
-                "POST", f"/v1/objects/{declared['object']['id']}/entries", {"entries": rows}
+                "POST", f"/v1/objects/{seg(declared['object']['id'])}/entries", {"entries": rows}
             )
         return entry_ids, declared["job"]["id"]
 
@@ -320,14 +321,24 @@ class Files:
             raise MemDotError(400, "NOT_A_FILE", "That object is not a file in a space.")
         self._ctx.ensure_keys(detail["spaceId"], detail["keyEpoch"])
         identities = self._ctx.vault.owned_identities(detail["spaceId"], detail["keyEpoch"])[:1]
-        return read_object(self._ctx, detail, identities, self.detail)
+        try:
+            return read_object(self._ctx, detail, identities, self.detail)
+        except WrongKeyError as error:
+            if not self._ctx.vault.is_agent:
+                raise
+            raise ConflictError(
+                409,
+                "KEY_BEHIND",
+                "This was sealed with a key this agent hasn't received. "
+                "It arrives the next time the owner opens MemDot.",
+            ) from error
 
     def info(self, file_id: str) -> FileInfo:
         detail = self.detail(file_id)
         return open_file_info(detail, self._identities_for(detail))
 
     def detail(self, file_id: str) -> dict[str, Any]:
-        return self._ctx.transport.json("GET", f"/v1/objects/{file_id}")
+        return self._ctx.transport.json("GET", f"/v1/objects/{seg(file_id)}")
 
     def list(
         self,
@@ -374,30 +385,34 @@ class Files:
             crypto.dumps(meta), [self._ctx.vault.seal_to(space["id"], space["keyEpoch"])]
         )
         raw = self._ctx.transport.json(
-            "PATCH", f"/v1/objects/{file_id}", {"encryptedMeta": to_base64(sealed)}
+            "PATCH", f"/v1/objects/{seg(file_id)}", {"encryptedMeta": to_base64(sealed)}
         )
         self._epochs[space["id"]] = space["keyEpoch"]
         return open_file_info(raw, self._identities_for(raw))
 
     def move(self, file_id: str, folder_id: str | None) -> Any:
-        return self._ctx.transport.json("PATCH", f"/v1/objects/{file_id}", {"folderId": folder_id})
+        return self._ctx.transport.json(
+            "PATCH", f"/v1/objects/{seg(file_id)}", {"folderId": folder_id}
+        )
 
     def delete(self, file_id: str) -> Any:
         """Tombstones and stops renewing; the bytes expire from the chain within 7 days."""
         detail = self.detail(file_id)
-        deleted = self._ctx.transport.json("DELETE", f"/v1/objects/{file_id}")
+        deleted = self._ctx.transport.json("DELETE", f"/v1/objects/{seg(file_id)}")
         # A file inside a segment has no blob of its own; the segment's record stays true.
         if detail.get("cid") and not detail.get("segmentId"):
             self._ctx.registry.tombstone_object(detail.get("spaceId"), detail["cid"])
         return deleted
 
     def versions(self, file_id: str) -> list[FileInfo]:
-        page = self._ctx.transport.json("GET", f"/v1/objects/{file_id}/versions")
+        page = self._ctx.transport.json("GET", f"/v1/objects/{seg(file_id)}/versions")
         return [open_file_info(raw, self._identities_for(raw)) for raw in page["items"]]
 
     def renew(self, file_id: str, *, wait: bool = True) -> Job:
         """Every stored blob moves to a fresh 7-day window, same CIDs."""
-        job = Job.model_validate(self._ctx.transport.json("POST", f"/v1/objects/{file_id}/renew"))
+        job = Job.model_validate(
+            self._ctx.transport.json("POST", f"/v1/objects/{seg(file_id)}/renew")
+        )
         return self._jobs.wait_for(job.id) if wait else job
 
     def estimate(self, size: int) -> dict[str, Any]:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 
@@ -95,7 +95,7 @@ class FilePage(Model):
 
 
 class FileData(Model):
-    data: bytes
+    data: bytes = Field(exclude=True)
     name: str
     mime: str
 
@@ -352,7 +352,7 @@ class ExportFailure(Model):
 
 
 class ArchiveExport(Model):
-    zip: bytes
+    zip: bytes = Field(exclude=True)
     manifest: dict[str, Any]
     #: Files that couldn't be read back. They are named, never silently left out.
     failures: list[ExportFailure] = []

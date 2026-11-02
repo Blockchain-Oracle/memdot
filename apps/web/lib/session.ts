@@ -47,11 +47,23 @@ export function hereWithQuery(): string {
 }
 
 /** Setup, remembering what the person came for: a new account shouldn't lose it on the way. */
-export function setupFor(next: string | null): string {
-  return next ? `/setup?next=${encodeURIComponent(next)}` : "/setup";
+export function setupFor(next: string | null, options: { newSpace?: boolean } = {}): string {
+  const query = new URLSearchParams();
+  if (next) query.set("next", next);
+  if (options.newSpace) query.set("space", "new");
+  const text = query.toString();
+  return text ? `/setup?${text}` : "/setup";
 }
 
 /** A same-site path to return to after unlocking (never an open redirect). */
 export function safeNext(next: string | null): string {
-  return next?.startsWith("/") && !next.startsWith("//") ? next : HOME;
+  if (!next?.startsWith("/")) return HOME;
+  // Parsed as the browser will: `/\\evil.com` and a tab after the slash both leave the site.
+  try {
+    const url = new URL(next, window.location.origin);
+    if (url.origin !== window.location.origin) return HOME;
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return HOME;
+  }
 }

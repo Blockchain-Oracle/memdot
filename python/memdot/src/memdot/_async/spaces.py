@@ -11,6 +11,7 @@ from ..crypto import WrongKeyError
 from ..errors import MemDotError
 from ..models import Folder, Space
 from .context import AsyncContext
+from .transport import seg
 
 
 def to_base64(data: bytes) -> str:
@@ -63,7 +64,7 @@ class AsyncSpaces:
         return await self._open(await self.raw(space_id))
 
     async def raw(self, space_id: str) -> dict[str, Any]:
-        space = await self._ctx.transport.json("GET", f"/v1/spaces/{space_id}")
+        space = await self._ctx.transport.json("GET", f"/v1/spaces/{seg(space_id)}")
         await self._ctx.ensure_keys(space_id, space["keyEpoch"])
         return space
 
@@ -72,19 +73,19 @@ class AsyncSpaces:
         sealed = seal_text(name, self._ctx.vault.seal_to(space_id, space["keyEpoch"]))
         return await self._open(
             await self._ctx.transport.json(
-                "PATCH", f"/v1/spaces/{space_id}", {"encryptedName": sealed}
+                "PATCH", f"/v1/spaces/{seg(space_id)}", {"encryptedName": sealed}
             )
         )
 
     async def set_mode(self, space_id: str, mode: str) -> Space:
         """Who signs future writes: MemDot's relayer (sponsored) or a wallet (self-signed)."""
         return await self._open(
-            await self._ctx.transport.json("PATCH", f"/v1/spaces/{space_id}", {"mode": mode})
+            await self._ctx.transport.json("PATCH", f"/v1/spaces/{seg(space_id)}", {"mode": mode})
         )
 
     async def delete(self, space_id: str) -> Any:
         """Tombstones everything in it and stops renewing; bytes expire within 7 days."""
-        deleted = await self._ctx.transport.json("DELETE", f"/v1/spaces/{space_id}")
+        deleted = await self._ctx.transport.json("DELETE", f"/v1/spaces/{seg(space_id)}")
         await self._ctx.registry.delete_space(space_id)
         return deleted
 
@@ -112,31 +113,31 @@ class AsyncFolders:
         sealed = seal_text(name, self._ctx.vault.seal_to(space_id, space["keyEpoch"]))
         raw = await self._ctx.transport.json(
             "POST",
-            f"/v1/spaces/{space_id}/folders",
+            f"/v1/spaces/{seg(space_id)}/folders",
             {"encryptedName": sealed, "parentId": parent_id, "memoryMode": memory_mode},
         )
         return self._open(raw, space["keyEpoch"])
 
     async def list(self, space_id: str) -> list[Folder]:
         space = await self._spaces.raw(space_id)
-        page = await self._ctx.transport.json("GET", f"/v1/spaces/{space_id}/folders")
+        page = await self._ctx.transport.json("GET", f"/v1/spaces/{seg(space_id)}/folders")
         return [self._open(raw, space["keyEpoch"]) for raw in page["items"]]
 
     async def rename(self, folder_id: str, space_id: str, name: str) -> Folder:
         space = await self._spaces.raw(space_id)
         sealed = seal_text(name, self._ctx.vault.seal_to(space_id, space["keyEpoch"]))
         raw = await self._ctx.transport.json(
-            "PATCH", f"/v1/folders/{folder_id}", {"encryptedName": sealed}
+            "PATCH", f"/v1/folders/{seg(folder_id)}", {"encryptedName": sealed}
         )
         return self._open(raw, space["keyEpoch"])
 
     async def move(self, folder_id: str, parent_id: str | None) -> Any:
         return await self._ctx.transport.json(
-            "PATCH", f"/v1/folders/{folder_id}", {"parentId": parent_id}
+            "PATCH", f"/v1/folders/{seg(folder_id)}", {"parentId": parent_id}
         )
 
     async def delete(self, folder_id: str) -> Any:
-        return await self._ctx.transport.json("DELETE", f"/v1/folders/{folder_id}")
+        return await self._ctx.transport.json("DELETE", f"/v1/folders/{seg(folder_id)}")
 
     def _open(self, raw: dict[str, Any], through_epoch: int) -> Folder:
         vault = self._ctx.vault

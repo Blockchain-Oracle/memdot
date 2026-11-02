@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from mnemonic import Mnemonic
 
@@ -45,7 +45,7 @@ class Wallet:
 
     address: str
     public_key: bytes
-    _secret_key: bytes
+    _secret_key: bytes = field(repr=False)
 
     @classmethod
     def from_seed(cls, mini_secret: bytes) -> Wallet:

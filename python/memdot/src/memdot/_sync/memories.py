@@ -37,6 +37,7 @@ from .context import Context
 from .private_memory import PrivateDeps, PrivateNamespace
 from .simple import Jobs
 from .spaces import Folders, Spaces, open_text, to_base64
+from .transport import seg
 
 log = logging.getLogger("memdot")
 
@@ -136,7 +137,11 @@ class Memories:
         folders: Folders,
         jobs: Jobs,
         embedder: Embedder | None = None,
+        default_namespace: str | None = None,
     ) -> None:
+        #: Where a call that names no namespace goes. Without it, the API would pick an Assisted
+        #: one, so text meant for a Private namespace would have already left this device.
+        self._default_namespace = default_namespace
         self._ctx = ctx
         self._spaces = spaces
         self._folders = folders
@@ -152,6 +157,11 @@ class Memories:
         if not self._ctx.vault.unlocked:
             self._private.clear()
             self._private_settings = ...
+            self._private_model_client = None
+
+    def close(self) -> None:
+        if self._private_model_client is not None:
+            self._private_model_client.close()
             self._private_model_client = None
 
     def _local_embedder(self) -> Embedder:
@@ -245,7 +255,7 @@ class Memories:
         }
 
     def _open_settings(self, namespace_id: str) -> dict[str, Any]:
-        row = self._ctx.transport.json("GET", f"/v1/namespaces/{namespace_id}/settings")
+        row = self._ctx.transport.json("GET", f"/v1/namespaces/{seg(namespace_id)}/settings")
         if row.get("sealed"):
             text = crypto.open_with(
                 base64.b64decode(row["sealed"]), self._ctx.vault.identity(), "the settings"
@@ -268,7 +278,7 @@ class Memories:
             body: dict[str, Any] = {"sealed": to_base64(sealed)}
         else:
             body = {"custom_instructions": custom_instructions, "categories": categories}
-        self._ctx.transport.json("PUT", f"/v1/namespaces/{namespace_id}/settings", body)
+        self._ctx.transport.json("PUT", f"/v1/namespaces/{seg(namespace_id)}/settings", body)
 
     # ── The model Private namespaces use ─────────────────────────────────────────────────────
 
@@ -376,6 +386,7 @@ class Memories:
         """
         if not (user_id or agent_id or run_id):
             raise ValidationError(400, "SCOPE_REQUIRED", _SCOPE_REQUIRED)
+        namespace_id = namespace_id or self._default_namespace
         normalized = normalize_messages(messages)
         held = self._route(namespace_id)
         if held:
@@ -460,7 +471,7 @@ class Memories:
 
     def event(self, event_id: str) -> MemoryEvent:
         return MemoryEvent.model_validate(
-            self._ctx.transport.json("GET", f"/v1/memories/events/{event_id}")
+            self._ctx.transport.json("GET", f"/v1/memories/events/{seg(event_id)}")
         )
 
     def events(self, *, limit: int | None = None, cursor: str | None = None) -> Any:
@@ -496,6 +507,7 @@ class Memories:
         show_expired: bool = False,
         reference_date: int | float | str | None = None,
     ) -> builtins.list[ScoredMemory]:
+        namespace_id = namespace_id or self._default_namespace
         held = self._route(namespace_id)
         if held:
             hits = held.search(
@@ -535,6 +547,7 @@ class Memories:
         cursor: str | None = None,
         page_size: int = _DEFAULT_PAGE,
     ) -> MemoryPage:
+        namespace_id = namespace_id or self._default_namespace
         held = self._route(namespace_id)
         if held:
             entries = held.list(filter_node=_parse_filters(filters), show_expired=show_expired)
@@ -569,7 +582,7 @@ class Memories:
 
     def get(self, memory_id: str) -> Memory:
         try:
-            raw = self._ctx.transport.json("GET", f"/v1/memories/{memory_id}")
+            raw = self._ctx.transport.json("GET", f"/v1/memories/{seg(memory_id)}")
             return Memory.model_validate(_from_wire(raw))
         except MemDotError as error:
             held = self._private_holding(error)
@@ -590,7 +603,7 @@ class Memories:
             if held.holds(memory_id):
                 return held
         try:
-            self._ctx.transport.json("GET", f"/v1/memories/{memory_id}")
+            self._ctx.transport.json("GET", f"/v1/memories/{seg(memory_id)}")
             return None
         except MemDotError as error:
             held = self._private_holding(error)
@@ -624,12 +637,12 @@ class Memories:
             body["metadata"] = metadata
         if expiration_date is not ...:
             body["expiration_date"] = expiration_date
-        raw = self._ctx.transport.json("PUT", f"/v1/memories/{memory_id}", body)
+        raw = self._ctx.transport.json("PUT", f"/v1/memories/{seg(memory_id)}", body)
         return Memory.model_validate(_from_wire(raw))
 
     def delete(self, memory_id: str) -> None:
         """Forgets one memory: out of search and lists at once, in both modes."""
-        self._ctx.transport.json("DELETE", f"/v1/memories/{memory_id}")
+        self._ctx.transport.json("DELETE", f"/v1/memories/{seg(memory_id)}")
         for held in self._private.values():
             held.forget([memory_id])
 
@@ -644,6 +657,7 @@ class Memories:
         """Forgets everything in a scope and says how many. `"*"` matches every value of one."""
         if not (user_id or agent_id or run_id):
             raise ValidationError(400, "SCOPE_REQUIRED", _SCOPE_REQUIRED)
+        namespace_id = namespace_id or self._default_namespace
         held = self._route(namespace_id)
         scope = {"user_id": user_id, "agent_id": agent_id, "run_id": run_id}
         if held:
@@ -658,7 +672,7 @@ class Memories:
 
     def history(self, memory_id: str) -> builtins.list[HistoryEvent]:
         try:
-            answer = self._ctx.transport.json("GET", f"/v1/memories/{memory_id}/history")
+            answer = self._ctx.transport.json("GET", f"/v1/memories/{seg(memory_id)}/history")
             return [
                 HistoryEvent(
                     event=row["event"],
@@ -723,6 +737,7 @@ class Memories:
     def summary(
         self, *, namespace_id: str | None = None, filters: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        namespace_id = namespace_id or self._default_namespace
         held = self._route(namespace_id)
         if held:
             return {"summary": held.summary(filter_node=_parse_filters(filters))}
@@ -736,6 +751,7 @@ class Memories:
     # ── Entities ─────────────────────────────────────────────────────────────────────────────
 
     def entities(self, *, namespace_id: str | None = None) -> builtins.list[Entity]:
+        namespace_id = namespace_id or self._default_namespace
         held = self._route(namespace_id)
         if held:
             totals: dict[str, Entity] = {}
@@ -776,12 +792,15 @@ class Memories:
 
     def delete_entity(self, kind: str, entity_id: str, *, namespace_id: str | None = None) -> int:
         """Forgets a user, agent or run, and every memory it holds."""
+        namespace_id = namespace_id or self._default_namespace
         held = self._route(namespace_id)
         if held:
             key = {"user": "user_id", "agent": "agent_id", "run": "run_id"}[kind]
             return self.delete_all(namespace_id=held.id, **{key: entity_id})
         answer = self._ctx.transport.json(
-            "DELETE", f"/v1/entities/{kind}/{entity_id}", params={"namespace_id": namespace_id}
+            "DELETE",
+            f"/v1/entities/{seg(kind)}/{seg(entity_id)}",
+            params={"namespace_id": namespace_id},
         )
         return answer["deleted"]
 
@@ -796,12 +815,12 @@ class Memories:
         held = self._route(namespace_id)
         if held:
             return held.restore()
-        accepted = self._ctx.transport.json("POST", f"/v1/namespaces/{namespace_id}/restore")
+        accepted = self._ctx.transport.json("POST", f"/v1/namespaces/{seg(namespace_id)}/restore")
         return self.wait_for_event(accepted["event_id"], "chain")
 
     def reset(self, namespace_id: str) -> None:
         """Forgets everything in a namespace."""
-        self._ctx.transport.json("POST", f"/v1/namespaces/{namespace_id}/reset")
+        self._ctx.transport.json("POST", f"/v1/namespaces/{seg(namespace_id)}/reset")
         self._private.pop(namespace_id, None)
 
     def compact(self, namespace_id: str) -> Any:
@@ -809,7 +828,7 @@ class Memories:
         held = self._route(namespace_id)
         if held:
             return held.compact()
-        return self._ctx.transport.json("POST", f"/v1/namespaces/{namespace_id}/compact")
+        return self._ctx.transport.json("POST", f"/v1/namespaces/{seg(namespace_id)}/compact")
 
     def save_index(self, namespace_id: str) -> str:
         """Private: stores the index, encrypted, so another device can start without embedding."""
@@ -839,7 +858,7 @@ class Memories:
                 }
                 for entry in held.list(show_expired=True)
             ]
-        answer = self._ctx.transport.json("GET", f"/v1/namespaces/{namespace_id}/export")
+        answer = self._ctx.transport.json("GET", f"/v1/namespaces/{seg(namespace_id)}/export")
         return answer["memories"]
 
     def import_memories(
@@ -902,17 +921,19 @@ class Memories:
         by_space: dict[str, builtins.list[dict[str, Any]]] = {}
         for segment in results:
             by_space.setdefault(segment["space_id"], []).append(segment)
+        recorded: builtins.list[str] = []
         for space_id, segments in by_space.items():
-            self._ctx.registry.add_objects(
+            if self._ctx.registry.add_objects(
                 space_id,
                 [
                     {"kind": "segment", "root_cid": segment["cid"], "size": segment["size"]}
                     for segment in segments
                 ],
-            )
-        self._ctx.transport.json(
-            "POST", "/v1/namespaces/recorded-segments", {"ids": [s["id"] for s in results]}
-        )
+            ):
+                recorded.extend(segment["id"] for segment in segments)
+        # What wasn't recorded stays unrecorded, for an unlock that can.
+        if recorded:
+            self._ctx.transport.json("POST", "/v1/namespaces/recorded-segments", {"ids": recorded})
 
 
 def _private_source(source: dict[str, str] | None) -> dict[str, str]:
