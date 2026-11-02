@@ -22,7 +22,8 @@
     "build": "tsdown src/index.ts src/stdio.ts --dts",
     "dev": "tsdown src/index.ts src/stdio.ts --dts --watch --no-clean",
     "typecheck": "tsc -p tsconfig.json",
-    "journey": "tsx scripts/journey-s09.ts"
+    "journey": "tsx scripts/journey-s09.ts",
+    "live:agents": "tsx scripts/agents-live.ts"
   },
   "dependencies": {
     "@memdot/sdk": "workspace:*",

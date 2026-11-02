@@ -44,7 +44,7 @@ function Both({ hosted, local }: { hosted: React.ReactNode; local: React.ReactNo
 function LoginFirst() {
   return (
     <Step n={1}>
-      Install the CLI and connect it. Your browser asks what it can reach.
+      <p>Install the CLI and connect it. Your browser asks what it can reach.</p>
       <CodeBlock lang="bash" code={`${INSTALL()}\nmemdot login`} />
     </Step>
   );
@@ -68,12 +68,14 @@ export function ConnectInstructions() {
           hosted={
             <>
               <Step n={1}>
-                Add the server:
+                <p>Add the server:</p>
                 <CodeBlock lang="bash" code={`claude mcp add --transport http memdot ${MCP_URL}`} />
               </Step>
               <Step n={2}>
-                In Claude Code, run <code className="font-mono">/mcp</code>, pick memdot and
-                authenticate. Your browser asks what it can reach.
+                <p>
+                  In Claude Code, run <code className="font-mono">/mcp</code>, pick memdot and
+                  authenticate. Your browser asks what it can reach.
+                </p>
               </Step>
             </>
           }
@@ -81,7 +83,7 @@ export function ConnectInstructions() {
             <>
               <LoginFirst />
               <Step n={2}>
-                Add the server:
+                <p>Add the server:</p>
                 <CodeBlock lang="bash" code="claude mcp add memdot -- memdot mcp" />
               </Step>
             </>
@@ -93,8 +95,10 @@ export function ConnectInstructions() {
         <Both
           hosted={
             <Step n={1}>
-              In Settings, under Connectors, add a custom connector with this address, then connect
-              it. Your browser asks what it can reach.
+              <p>
+                In Settings, under Connectors, add a custom connector with this address, then
+                connect it. Your browser asks what it can reach.
+              </p>
               <CodeBlock lang="url" code={MCP_URL} />
             </Step>
           }
@@ -102,8 +106,10 @@ export function ConnectInstructions() {
             <>
               <LoginFirst />
               <Step n={2}>
-                Add this to <code className="font-mono">claude_desktop_config.json</code> and
-                restart Claude:
+                <p>
+                  Add this to <code className="font-mono">claude_desktop_config.json</code> and
+                  restart Claude:
+                </p>
                 <CodeBlock lang="json" code={json({ command: "memdot", args: ["mcp"] })} />
               </Step>
             </>
@@ -115,8 +121,10 @@ export function ConnectInstructions() {
         <Both
           hosted={
             <Step n={1}>
-              Add this to <code className="font-mono">~/.cursor/mcp.json</code>, then connect it in
-              Cursor's MCP settings:
+              <p>
+                Add this to <code className="font-mono">~/.cursor/mcp.json</code>, then connect it
+                in Cursor's MCP settings:
+              </p>
               <CodeBlock lang="json" code={json({ type: "http", url: MCP_URL })} />
             </Step>
           }
@@ -124,7 +132,9 @@ export function ConnectInstructions() {
             <>
               <LoginFirst />
               <Step n={2}>
-                Add this to <code className="font-mono">~/.cursor/mcp.json</code>:
+                <p>
+                  Add this to <code className="font-mono">~/.cursor/mcp.json</code>:
+                </p>
                 <CodeBlock lang="json" code={json({ command: "memdot", args: ["mcp"] })} />
               </Step>
             </>
@@ -135,8 +145,10 @@ export function ConnectInstructions() {
       <TabsContent value="cli" className="flex flex-col gap-3">
         <LoginFirst />
         <Step n={2}>
-          Remember something and find it again. Add <code className="font-mono">--agent</code> to
-          any command for JSON.
+          <p>
+            Remember something and find it again. Add <code className="font-mono">--agent</code> to
+            any command for JSON.
+          </p>
           <CodeBlock
             lang="bash"
             code={`memdot add "I prefer short answers" -u me --no-infer\nmemdot search "how should you answer?" -u me`}
@@ -146,7 +158,9 @@ export function ConnectInstructions() {
 
       <TabsContent value="sdk" className="flex flex-col gap-3">
         <Step n={1}>
-          After <code className="font-mono">memdot login</code>, your code can act as that agent:
+          <p>
+            After <code className="font-mono">memdot login</code>, your code can act as that agent:
+          </p>
           <CodeBlock
             lang="ts"
             code={`import { clientFor, loadCredentials, resolveCredentials } from "@memdot/sdk/credentials";
