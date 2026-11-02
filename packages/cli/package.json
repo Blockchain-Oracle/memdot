@@ -1,0 +1,32 @@
+{
+  "name": "@memdot/cli",
+  "version": "0.1.0",
+  "description": "MemDot from your terminal: encrypted storage and agent memory on Portaldot V3.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "memdot": "./dist/index.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch --no-clean",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "commander": "15.0.0"
+  },
+  "devDependencies": {
+    "@memdot/config": "workspace:*",
+    "@memdot/mcp": "workspace:*",
+    "@memdot/sdk": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:"
+  }
+}
