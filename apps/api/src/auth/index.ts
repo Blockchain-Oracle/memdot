@@ -1,5 +1,8 @@
 import { apiKey } from "@better-auth/api-key";
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { mcp } from "@better-auth/mcp";
 import { passkey } from "@better-auth/passkey";
 import {
   API_KEY_LENGTH,
@@ -11,6 +14,14 @@ import {
 import {
   account,
   apikey,
+  jwks,
+  oauthAccessToken,
+  oauthClient,
+  oauthClientAssertion,
+  oauthClientResource,
+  oauthConsent,
+  oauthRefreshToken,
+  oauthResource,
   passkey as passkeyTable,
   rateLimit,
   session,
@@ -20,14 +31,14 @@ import {
 } from "@memdot/db";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
-import { siwe } from "better-auth/plugins";
+import { jwt, siwe } from "better-auth/plugins";
 import { type Hex, verifyMessage } from "viem";
 import { generateSiweNonce } from "viem/siwe";
 import { db } from "../db.js";
 import { env, isProduction } from "../env.js";
 import { placeholderEmail } from "./placeholder.js";
 import { recoveryCode } from "./recovery.js";
-import { ROLE_PERMISSIONS } from "./roles.js";
+import { MCP_SCOPE, ROLE_PERMISSIONS } from "./roles.js";
 import { siws } from "./siws.js";
 
 const SESSION_DAYS = 30;
@@ -37,6 +48,10 @@ export const FRESH_SESSION_SECONDS = 15 * 60;
 /** How long a session check may be answered from the signed cookie instead of the database. */
 const SESSION_COOKIE_CACHE_SECONDS = 60;
 const DISPLAY_NAME_MAX = 64;
+/** What MCP clients ask a token for; the same URL they connect to. */
+export const MCP_RESOURCE = `${env.API_URL}/mcp`;
+/** Hosted agents stay signed in between sessions: the refresh token renews this short one. */
+const MCP_ACCESS_TOKEN_SECONDS = 60 * 60;
 
 /** WebAuthn ceremonies whose responses must never carry the PRF output (R10, D4). */
 const PASSKEY_VERIFY_PATHS = new Set([
@@ -72,6 +87,14 @@ export const auth = betterAuth({
       walletAddress,
       apikey,
       rateLimit,
+      jwks,
+      oauthClient,
+      oauthAccessToken,
+      oauthRefreshToken,
+      oauthConsent,
+      oauthClientAssertion,
+      oauthResource,
+      oauthClientResource,
     },
   }),
   session: {
@@ -98,7 +121,7 @@ export const auth = betterAuth({
   },
   // Keys are minted through /v1/keys so every key carries a role; the raw plugin routes stay
   // closed to clients.
-  disabledPaths: ["/api-key/create", "/api-key/update"],
+  disabledPaths: ["/api-key/create", "/api-key/update", "/token"],
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       // Adding a passkey to an existing account needs a recent sign-in, like a recovery code.
@@ -178,6 +201,22 @@ export const auth = betterAuth({
       rateLimit: { enabled: false },
       permissions: { defaultPermissions: ROLE_PERMISSIONS.read_only },
     }),
+    // Hosted MCP: the signing key for access tokens, and the OAuth server MCP clients discover.
+    jwt(),
+    mcp({
+      // The dashboard signs people in and shows what they're agreeing to.
+      loginPage: `${env.WEB_ORIGIN}/connect/oauth/sign-in`,
+      consentPage: `${env.WEB_ORIGIN}/connect/oauth`,
+      resource: MCP_RESOURCE,
+      scopes: ["offline_access", MCP_SCOPE],
+      accessTokenExpiresIn: MCP_ACCESS_TOKEN_SECONDS,
+      // Client ID Metadata Documents are the current way; registration is for clients that don't
+      // speak them yet.
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      clientRegistrationDefaultApplicationType: "infer",
+    }),
+    cimd({ fetchClientMetadataResource, metadataProfile: "mcp-2026-07-28" }),
   ],
 });
 

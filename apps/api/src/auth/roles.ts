@@ -7,6 +7,9 @@ export type ApiKeyRole = (typeof API_KEY_ROLES)[number];
 
 export type Permissions = Record<string, string[]>;
 
+/** The one OAuth scope hosted MCP asks for; what it reaches is chosen on the consent page. */
+export const MCP_SCOPE = "mcp";
+
 const READ: Permissions = {
   spaces: ["read"],
   files: ["read"],

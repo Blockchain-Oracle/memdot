@@ -15,12 +15,14 @@ import { activityRoutes } from "./routes/activity.js";
 import { agentRoutes } from "./routes/agents.js";
 import { chatRoutes } from "./routes/chat.js";
 import { configureRoutes } from "./routes/configure.js";
+import { connectRoutes } from "./routes/connect.js";
 import { folderRoutes } from "./routes/folders.js";
 import { gatewayRoutes } from "./routes/gateway.js";
 import { grantRoutes } from "./routes/grants.js";
 import { healthRoutes } from "./routes/health.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { keyRoutes } from "./routes/keys.js";
+import { mcpRoutes } from "./routes/mcp.js";
 import { memoryRoutes } from "./routes/memories.js";
 import { namespaceRoutes } from "./routes/namespaces.js";
 import { objectRoutes } from "./routes/objects.js";
@@ -89,6 +91,12 @@ export function createApp(services: Services) {
   );
 
   app.on(["GET", "POST"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+  // What MCP clients read first, at the addresses the OAuth standards fix.
+  app.on(["GET", "HEAD"], "/.well-known/*", (c) => auth.handler(c.req.raw));
+
+  app.use("/mcp", jsonLimit);
+  const mcp = mcpRoutes(() => app as never);
+  app.all("/mcp", (c) => mcp(c.req.raw));
 
   app.route("/", healthRoutes(services));
   // Someone opening the API's address by hand wants its reference.
@@ -131,6 +139,7 @@ export function createApp(services: Services) {
     .route("/", sharedRoutes(services))
     .route("/", keyRoutes())
     .route("/", agentRoutes())
+    .route("/", connectRoutes())
     .route("/", jobRoutes(services))
     .route("/", usageRoutes(services))
     .route("/", activityRoutes())

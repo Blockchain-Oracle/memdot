@@ -155,6 +155,22 @@ export class RegistryLog {
     );
   }
 
+  registerAgent(agentKey: string): Promise<void> {
+    return this.record(
+      NO_SALT,
+      Action.RegisterAgent,
+      encodeRecord.registerAgent(toHex(publicKeyFromAgeRecipient(agentKey)) as Hex),
+    );
+  }
+
+  revokeAgent(agentKey: string): Promise<void> {
+    return this.record(
+      NO_SALT,
+      Action.RevokeAgent,
+      encodeRecord.revokeAgent(toHex(publicKeyFromAgeRecipient(agentKey)) as Hex),
+    );
+  }
+
   private signedCall(salt: Hex, action: number, data: Hex): Hex {
     const signer = signerFromSeed(ownerSeed(this.ctx.vault.amk()));
     const owner = toHex(signer.publicKey) as Hex;

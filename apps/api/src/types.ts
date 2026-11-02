@@ -24,6 +24,11 @@ export interface Principal {
     /** Spaces the key may touch; null means all of the owner's spaces. */
     spaceIds: string[] | null;
     agentId: string | null;
+    /** A hosted agent: what its consent page chose. */
+    hosted?: {
+      namespaceId: string | null;
+      namespaces: { id: string; name: string | null }[] | null;
+    };
   } | null;
 }
 

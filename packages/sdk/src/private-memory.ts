@@ -1,6 +1,6 @@
 import { bitswapGet } from "@memdot/chain";
 import { SEGMENT_PACK_BYTES } from "@memdot/config";
-import { openSegment, openWith, sealSegment, sealTo } from "@memdot/crypto";
+import { openSegment, openWith, sealSegment, sealTo, WrongKeyError } from "@memdot/crypto";
 import {
   type ChatMessage,
   candidateCount,
@@ -158,7 +158,7 @@ export class PrivateNamespace {
   }
 
   private async sync(fromChain = false): Promise<void> {
-    if (!this.ctx.vault.unlocked) {
+    if (!this.ctx.vault.holdsKeys) {
       throw new MemDotError(423, "LOCKED", "Unlock your account to read a Private namespace.");
     }
     const state = await this.state();
@@ -169,7 +169,16 @@ export class PrivateNamespace {
       const sealed = chain
         ? await bitswapGet(chain.client, segment.cid)
         : await this.ctx.transport.bytes(`/v1/cids/${segment.cid}`);
-      const packed = await openSegment(sealed, identities);
+      const packed = await openSegment(sealed, identities).catch((error: unknown) => {
+        if (this.ctx.vault.isAgent && error instanceof WrongKeyError) {
+          throw new MemDotError(
+            409,
+            "KEY_BEHIND",
+            "Something here was sealed with a key this agent hasn't received. It arrives the next time the owner opens MemDot.",
+          );
+        }
+        throw error;
+      });
       this.opened.set(
         segment.cid,
         packed.map((entry) => decodeEntry(entry.data)),

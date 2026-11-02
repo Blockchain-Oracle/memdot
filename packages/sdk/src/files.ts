@@ -510,7 +510,7 @@ export class FilesApi {
    * metadata with the newer epoch. Space epochs are cached per client.
    */
   private async identitiesFor(raw: RawObject): Promise<string[]> {
-    if (!this.ctx.vault.unlocked || !raw.spaceId) return [];
+    if (!this.ctx.vault.holdsKeys || !raw.spaceId) return [];
     let epoch = this.epochs.get(raw.spaceId);
     if (epoch === undefined) {
       epoch = (await this.spaces.raw(raw.spaceId)).keyEpoch;

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { API_KEY_PREFIX, API_KEY_RATE_MAX, API_KEY_RATE_WINDOW_MS } from "@memdot/config";
-import { accounts } from "@memdot/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { accounts, agents } from "@memdot/db";
+import { and, eq, gt, isNull, or } from "drizzle-orm";
 import type { Context, MiddlewareHandler } from "hono";
 import { auth, isFresh } from "../auth/index.js";
 import {
@@ -9,6 +9,7 @@ import {
   type ApiKeyMetadata,
   type ApiKeyRole,
   type Permissions,
+  ROLE_PERMISSIONS,
 } from "../auth/roles.js";
 import { db } from "../db.js";
 import type { AppEnv, Principal } from "../types.js";
@@ -72,7 +73,12 @@ function metadataOf(raw: unknown): ApiKeyMetadata {
   };
 }
 
-async function principalForKey(key: string): Promise<Principal> {
+/** Connected agents show when they last called; at most one write per cache window. */
+async function touchAgent(agentId: string): Promise<void> {
+  await db.update(agents).set({ lastUsedAt: new Date() }).where(eq(agents.id, agentId));
+}
+
+export async function principalForKey(key: string): Promise<Principal> {
   const digest = createHash("sha256").update(key).digest("hex");
   const cached = keyCache.get(digest);
   if (cached) return cached;
@@ -96,11 +102,71 @@ async function principalForKey(key: string): Promise<Principal> {
     },
   };
   keyCache.set(digest, principal);
+  if (metadata.agentId) await touchAgent(metadata.agentId);
   return principal;
+}
+
+/**
+ * A hosted agent: a valid OAuth token only says which client is asking for which person. What it
+ * reaches comes from the agent row, read fresh, so revoking works while the token is still valid.
+ */
+export async function principalForOAuth(userId: string, clientId: string): Promise<Principal> {
+  const cacheKey = `oauth:${userId}:${clientId}`;
+  const cached = keyCache.get(cacheKey);
+  if (cached) return cached;
+  const accountId = await accountIdOf(userId);
+  const [agent] = accountId
+    ? await db
+        .select()
+        .from(agents)
+        .where(
+          and(
+            eq(agents.accountId, accountId),
+            eq(agents.oauthClientId, clientId),
+            isNull(agents.revokedAt),
+            or(isNull(agents.expiresAt), gt(agents.expiresAt, new Date())),
+          ),
+        )
+        .limit(1)
+    : [];
+  if (!agent) {
+    throw unauthorized("This connection was revoked or has expired. Connect it again.");
+  }
+  const role: ApiKeyRole = agent.role === "read_only" ? "read_only" : "read_write";
+  const principal: Principal = {
+    userId,
+    via: "api_key",
+    accountId,
+    sessionCreatedAt: null,
+    apiKey: {
+      id: `oauth:${agent.id}`,
+      start: "oauth",
+      role,
+      permissions: ROLE_PERMISSIONS[role],
+      spaceIds: agent.spaceIds,
+      agentId: agent.id,
+      hosted: { namespaceId: agent.namespaceId, namespaces: agent.namespaces },
+    },
+  };
+  keyCache.set(cacheKey, principal);
+  await touchAgent(agent.id);
+  return principal;
+}
+
+/** Applies a key's request budget; MCP calls count against the same one as REST. */
+export function hitKeyLimit(id: string): number {
+  return keyLimiter.hit(id);
 }
 
 /** Resolves the caller once per request. Routes then ask `principalOf` / `requireScope`. */
 export const resolvePrincipal: MiddlewareHandler<AppEnv> = async (c, next) => {
+  // Hosted MCP calls the API in-process with the caller it already verified. `env` is ours: an HTTP
+  // request can't set it.
+  const internal = (c.env as { internalPrincipal?: Principal } | undefined)?.internalPrincipal;
+  if (internal) {
+    c.set("principal", internal);
+    return next();
+  }
   const key = presentedKey(c);
   if (!key) {
     // Better Auth may refresh the session or its cookie cache here; pass those cookies on.

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigserial,
   index,
@@ -9,7 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { granteeKind, grantScope, grantStatus, jobStatus } from "./enums.js";
+import { connectStatus, granteeKind, grantScope, grantStatus, jobStatus } from "./enums.js";
 import { accounts, createdAt, objects, spaces } from "./storage.js";
 
 /**
@@ -54,15 +55,53 @@ export const agents = pgTable(
     label: text("label").notNull(),
     /** e.g. claude-code, cursor, codex, sdk */
     client: text("client").notNull(),
-    publicKey: text("public_key").notNull(),
+    /** Where its grants are wrapped to. Hosted agents hold no key, so they reach Assisted only. */
+    publicKey: text("public_key"),
+    /** Hosted agents: the OAuth client this row answers for, and what the consent page chose. */
+    oauthClientId: text("oauth_client_id"),
+    role: text("role").$type<"read_only" | "read_write">(),
+    spaceIds: jsonb("space_ids").$type<string[]>(),
+    /** Hosted agents can't open sealed names, so the owner's browser hands over these. */
+    namespaces: jsonb("namespaces").$type<{ id: string; name: string | null }[]>(),
+    namespaceId: uuid("namespace_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: createdAt(),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
   },
   (t) => [
     uniqueIndex("agents_key_idx").on(t.publicKey),
+    uniqueIndex("agents_oauth_idx")
+      .on(t.accountId, t.oauthClientId)
+      .where(sql`${t.oauthClientId} is not null and ${t.revokedAt} is null`),
     index("agents_account_idx").on(t.accountId),
   ],
+);
+
+/**
+ * A `memdot login` waiting on the owner's browser. The key the owner approves is sealed to the
+ * device's own public key, so this row never holds anything the device alone can't open.
+ */
+export const connectRequests = pgTable(
+  "connect_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Shown in the terminal and on the consent page, so the owner can tell it's their terminal. */
+    code: text("code").notNull(),
+    /** Only the device that asked can collect the result. */
+    pollHash: text("poll_hash").notNull(),
+    publicKey: text("public_key").notNull(),
+    label: text("label").notNull(),
+    client: text("client").notNull(),
+    status: connectStatus("status").notNull().default("pending"),
+    accountId: uuid("account_id").references(() => accounts.id, { onDelete: "cascade" }),
+    agentId: uuid("agent_id").references(() => agents.id, { onDelete: "cascade" }),
+    sealedKey: text("sealed_key"),
+    namespaceId: uuid("namespace_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("connect_requests_expiry_idx").on(t.expiresAt)],
 );
 
 /**

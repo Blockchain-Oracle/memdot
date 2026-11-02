@@ -3,6 +3,7 @@ import { PORTALDOT_WSS } from "@memdot/config";
 import type { Embedder } from "@memdot/memory-engine";
 import { AccountApi } from "./account.js";
 import { ActivityApi } from "./activity.js";
+import { AgentsApi } from "./agents.js";
 import type { Context, Schemas } from "./context.js";
 import { DataApi } from "./data.js";
 import { MemDotError } from "./errors.js";
@@ -54,19 +55,23 @@ export class MemDot {
   readonly proof: ProofApi;
   readonly memories: MemoriesApi;
   readonly data: DataApi;
+  readonly agents: AgentsApi;
 
   private readonly transport: Transport;
   private readonly registry: RegistryLog;
+  private readonly vault: Vault;
   private chainClient: Promise<ChainClient> | null = null;
 
   private constructor(private readonly options: MemDotOptions) {
     this.transport = new Transport(options);
     const vault = new Vault();
+    this.vault = vault;
     this.registry = new RegistryLog({ transport: this.transport, vault });
     const ctx: Context = {
       transport: this.transport,
       vault,
       registry: this.registry,
+      ensureKeys: (spaceId, epoch) => this.sharing.ensureKeys(spaceId, epoch),
       chain: () => this.chain(),
     };
     this.jobs = new JobsApi(ctx);
@@ -79,6 +84,7 @@ export class MemDot {
     this.sharing = new SharingApi(ctx, this.spaces);
     this.memories = new MemoriesApi(ctx, this.spaces, this.folders, this.jobs, options.embedder);
     this.data = new DataApi(ctx, this.spaces, this.folders, this.files, this.memories);
+    this.agents = new AgentsApi(ctx, this.sharing);
     this.account = new AccountApi(ctx, options.origin, () => this.afterUnlock());
   }
 
@@ -89,6 +95,15 @@ export class MemDot {
   /** Switch to (or drop) an API key, for example after minting one in a script. */
   useApiKey(apiKey: string | undefined): void {
     this.transport.apiKey = apiKey;
+  }
+
+  /**
+   * Runs as a connected agent: this API key, and the device's own identity to open what was shared
+   * with it. `memdot login` makes both. Only what the owner chose can be read or written.
+   */
+  useAgent(input: { apiKey: string; identity: string }): void {
+    this.transport.apiKey = input.apiKey;
+    this.vault.useAgentIdentity(input.identity);
   }
 
   usage(): Promise<Usage> {

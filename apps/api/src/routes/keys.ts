@@ -85,7 +85,7 @@ const serialize = (row: KeyRow) => {
 };
 
 /** Mints a key through Better Auth on the server, so the role's permissions are server-set. */
-async function mint(
+export async function mint(
   userId: string,
   input: { name: string; metadata: ApiKeyMetadata; expiresAt: Date | null },
 ) {

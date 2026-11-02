@@ -55,3 +55,11 @@ export const grantStatus = pgEnum("grant_status", ["pending", "active", "revoked
 export const granteeKind = pgEnum("grantee_kind", ["account", "agent"]);
 
 export const memoryEvent = pgEnum("memory_event", ["ADD", "UPDATE", "DELETE"]);
+
+/** A `memdot login` waiting on the owner's browser. */
+export const connectStatus = pgEnum("connect_status", [
+  "pending",
+  "approved",
+  "denied",
+  "delivered",
+]);

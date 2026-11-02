@@ -1,6 +1,9 @@
 // Wire constants shared by the API, the SDKs and the CLI.
 
 /** Every MemDot API key starts with this, so tools can spot a leaked key. */
+/** Where the CLI and the MCP server connect unless told otherwise. */
+export const DEFAULT_API_URL = "https://api.84.46.247.92.sslip.io";
+
 export const API_KEY_PREFIX = "md_";
 
 /** Random characters after the prefix (Better Auth default is 64). */

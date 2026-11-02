@@ -1,0 +1,145 @@
+import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
+import { DEFAULT_API_URL } from "@memdot/config";
+import { localEmbedder } from "./local-embedder.js";
+import { MemDot } from "./memdot.js";
+
+const DIR_MODE = 0o700;
+const FILE_MODE = 0o600;
+const FILE_NAME = "credentials.json";
+
+/** What `memdot login` leaves on this machine, readable only by you. */
+export interface Credentials {
+  version: 1;
+  api_url: string;
+  /** How this API can be reached: a connected agent's key, or one pasted with --api-key. */
+  api_key?: string;
+  /** A connected agent's own key pair. The identity never leaves this file. */
+  agent?: { id: string; label: string; identity: string; public_key: string };
+  /** Where memories go when a command doesn't name a namespace. */
+  namespace_id?: string;
+  defaults?: { user_id?: string; agent_id?: string; run_id?: string };
+  /** `memdot login` started without waiting: `--continue` collects it. */
+  pending?: {
+    id: string;
+    code: string;
+    url: string;
+    poll_secret: string;
+    expires_at: string;
+    identity: string;
+    public_key: string;
+    label: string;
+  };
+  created_at?: string;
+}
+
+/** The credentials in force, after flags and environment. Never written back to the file. */
+export interface ResolvedCredentials {
+  apiUrl: string;
+  apiKey: string | null;
+  identity: string | null;
+  namespaceId: string | null;
+  userId: string | null;
+  agentId: string | null;
+  runId: string | null;
+  recoveryCode: string | null;
+  /** Where each of the above came from, for `memdot status`. */
+  apiKeySource: "flag" | "env" | "file" | null;
+}
+
+export interface CredentialFlags {
+  apiKey?: string | undefined;
+  apiUrl?: string | undefined;
+  namespace?: string | undefined;
+  userId?: string | undefined;
+  agentId?: string | undefined;
+  runId?: string | undefined;
+}
+
+const env = (name: string): string | null => process.env[name]?.trim() || null;
+
+/** `MEMDOT_CREDENTIALS_DIR` must be absolute: a relative one could land a key inside a repository. */
+export function credentialsDir(): string {
+  const configured = env("MEMDOT_CREDENTIALS_DIR");
+  if (!configured) return join(homedir(), ".memdot");
+  if (!isAbsolute(configured)) {
+    throw new Error("MEMDOT_CREDENTIALS_DIR must be an absolute path.");
+  }
+  return configured;
+}
+
+export const credentialsPath = (): string => join(credentialsDir(), FILE_NAME);
+
+export async function loadCredentials(): Promise<Credentials | null> {
+  try {
+    return JSON.parse(await readFile(credentialsPath(), "utf8")) as Credentials;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new Error(`Couldn't read ${credentialsPath()}: ${(error as Error).message}`);
+  }
+}
+
+/** Replaces the file in one step, so a crash never leaves half a key. */
+export async function saveCredentials(credentials: Credentials): Promise<void> {
+  const dir = credentialsDir();
+  await mkdir(dir, { recursive: true, mode: DIR_MODE });
+  await chmod(dir, DIR_MODE);
+  const temporary = join(dir, `.${FILE_NAME}.${process.pid}.tmp`);
+  try {
+    await writeFile(temporary, `${JSON.stringify(credentials, null, 2)}\n`, { mode: FILE_MODE });
+    await chmod(temporary, FILE_MODE);
+    await rename(temporary, credentialsPath());
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
+}
+
+export async function removeCredentials(): Promise<void> {
+  await rm(credentialsPath(), { force: true });
+}
+
+/** Flags beat the environment, which beats the file. */
+export function resolveCredentials(
+  file: Credentials | null,
+  flags: CredentialFlags = {},
+): ResolvedCredentials {
+  const fromEnv = env("MEMDOT_API_KEY");
+  const apiKey = flags.apiKey ?? fromEnv ?? file?.api_key ?? null;
+  return {
+    apiUrl: flags.apiUrl ?? env("MEMDOT_API_URL") ?? file?.api_url ?? DEFAULT_API_URL,
+    apiKey,
+    // A key from somewhere else isn't this file's agent, so it doesn't get that agent's identity.
+    identity:
+      env("MEMDOT_AGENT_IDENTITY") ??
+      (apiKey && apiKey === file?.api_key ? (file?.agent?.identity ?? null) : null),
+    namespaceId: flags.namespace ?? env("MEMDOT_NAMESPACE") ?? file?.namespace_id ?? null,
+    userId: flags.userId ?? env("MEMDOT_USER_ID") ?? file?.defaults?.user_id ?? null,
+    agentId: flags.agentId ?? env("MEMDOT_AGENT_ID") ?? file?.defaults?.agent_id ?? null,
+    runId: flags.runId ?? env("MEMDOT_RUN_ID") ?? file?.defaults?.run_id ?? null,
+    recoveryCode: env("MEMDOT_RECOVERY_CODE"),
+    apiKeySource: flags.apiKey ? "flag" : fromEnv ? "env" : file?.api_key ? "file" : null,
+  };
+}
+
+/**
+ * A client from resolved credentials. With an agent identity it opens what was shared with that
+ * agent; with `MEMDOT_RECOVERY_CODE` it acts as the owner, for scripts that need to. The code is
+ * only ever read from the environment, never stored.
+ */
+export async function clientFor(resolved: ResolvedCredentials, client: string): Promise<MemDot> {
+  const memdot = MemDot.create({
+    baseUrl: resolved.apiUrl,
+    client,
+    embedder: localEmbedder(),
+    completeGrantsOnUnlock: false,
+    ...(resolved.apiKey ? { apiKey: resolved.apiKey } : {}),
+  });
+  if (resolved.recoveryCode) {
+    await memdot.account.unlockWithRecoveryCode(resolved.recoveryCode);
+  } else if (resolved.apiKey && resolved.identity) {
+    memdot.useAgent({ apiKey: resolved.apiKey, identity: resolved.identity });
+  }
+  return memdot;
+}

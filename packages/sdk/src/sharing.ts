@@ -23,6 +23,9 @@ export interface SharedDetails extends Omit<SharedSpace, "encryptedName"> {
 }
 export type Recipient = Schemas["Recipient"];
 
+/** A key an agent is missing arrives when the owner next opens MemDot: no need to keep asking. */
+const KEY_RETRY_MS = 30_000;
+
 export type ShareTarget = { address: string } | { agentId: string; agentKey: string };
 
 export interface ShareOptions {
@@ -38,6 +41,9 @@ export interface ShareOptions {
  * owner unlocks. Revoking moves the space to a new epoch the former grantee never receives.
  */
 export class SharingApi {
+  /** When an agent behind on a space's key may ask for it again. */
+  private readonly keyRetryAt = new Map<string, number>();
+
   constructor(
     private readonly ctx: Context,
     private readonly spaces: SpacesApi,
@@ -137,6 +143,26 @@ export class SharingApi {
       await this.complete(grant.id, { wrappedKeyCid, keyEpoch: grant.spaceKeyEpoch });
     }
     return items.length;
+  }
+
+  /**
+   * A connected agent's keys for a space, from the grant wrapped to it. Asked again when the space
+   * has moved on: a revoke rotates the epoch, and the owner's next unlock wraps the new one.
+   */
+  async ensureKeys(spaceId: string, epoch: number): Promise<void> {
+    const { vault } = this.ctx;
+    if (!vault.isAgent || vault.newestEpoch(spaceId) >= epoch) return;
+    if (Date.now() < (this.keyRetryAt.get(spaceId) ?? 0)) return;
+    this.keyRetryAt.set(spaceId, Date.now() + KEY_RETRY_MS);
+    const { items } = await this.list("received", spaceId);
+    const grant = items.find((item) => item.status === "active" && !item.objectId);
+    if (!grant) return;
+    vault.forgetReceived(grant.id);
+    const keys = await this.open(grant.id);
+    if (keys.kind === "space") {
+      vault.setKeyring(spaceId, keys.keys);
+      this.keyRetryAt.delete(spaceId);
+    }
   }
 
   // ── What others shared with you ─────────────────────────────────────────────────────────────

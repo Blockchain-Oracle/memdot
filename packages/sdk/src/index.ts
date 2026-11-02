@@ -13,6 +13,15 @@ export {
 } from "./account.js";
 export { ActivityApi, type ChainTransaction, type RequestLogEntry } from "./activity.js";
 export {
+  type Agent,
+  AgentsApi,
+  type ApproveConnect,
+  type ConnectRequest,
+  type ConnectResult,
+  type ConnectStart,
+  newAgentIdentity,
+} from "./agents.js";
+export {
   type BrowserWallet,
   connectEvmWallet,
   connectWallet,

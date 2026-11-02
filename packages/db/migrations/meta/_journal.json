@@ -71,6 +71,13 @@
       "when": 1793611700604,
       "tag": "0009_model_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793627186048,
+      "tag": "0010_agent_connect",
+      "breakpoints": true
     }
   ]
 }

@@ -11,7 +11,6 @@ import {
   isNull,
   lt,
   notInArray,
-  or,
   type SQL,
 } from "drizzle-orm";
 import { db } from "../db.js";
@@ -246,23 +245,24 @@ export function grantRoutes() {
           if (query.spaceId) await loadSpace(c, query.spaceId);
           scope = and(eq(spaces.accountId, accountId), allowedSpaces(principalOf(c)));
         } else {
-          const owner = await ownerAccountOf(accountId);
-          const myAgents = await db
-            .select({ key: agents.publicKey })
-            .from(agents)
-            .where(and(eq(agents.accountId, accountId), isNull(agents.revokedAt)));
-          scope = or(
-            and(eq(grants.granteeKind, "account"), eq(grants.grantee, owner ?? "")),
-            myAgents.length > 0
-              ? and(
-                  eq(grants.granteeKind, "agent"),
-                  inArray(
-                    grants.grantee,
-                    myAgents.map((a) => a.key),
-                  ),
-                )
-              : undefined,
-          );
+          // A connected agent sees what was shared with it, never what was shared with its owner.
+          const agentId = principalOf(c).apiKey?.agentId;
+          if (agentId) {
+            const [agent] = await db
+              .select({ key: agents.publicKey })
+              .from(agents)
+              .where(
+                and(
+                  eq(agents.id, agentId),
+                  eq(agents.accountId, accountId),
+                  isNull(agents.revokedAt),
+                ),
+              );
+            scope = and(eq(grants.granteeKind, "agent"), eq(grants.grantee, agent?.key ?? ""));
+          } else {
+            const owner = await ownerAccountOf(accountId);
+            scope = and(eq(grants.granteeKind, "account"), eq(grants.grantee, owner ?? ""));
+          }
         }
         const rows = await db
           .select({ grant: grants, spaceKeyEpoch: spaces.keyEpoch, owner: accounts.ownerAccount })
@@ -362,7 +362,9 @@ export function grantRoutes() {
                 isNull(agents.revokedAt),
               ),
             );
-          if (!agent) throw badRequest("AGENT", "That agent does not exist or was revoked.");
+          if (!agent?.key) {
+            throw badRequest("AGENT", "That agent does not exist, was revoked, or holds no key.");
+          }
           if (!body.wrappedKeyCid) {
             throw badRequest("WRAPPED_KEY", "Agent grants need the key wrapped to the agent.");
           }

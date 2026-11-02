@@ -68,8 +68,12 @@ export class SpacesApi {
     return this.open(await this.raw(id));
   }
 
-  raw(id: string): Promise<RawSpace> {
-    return unwrap(this.ctx.transport.api.GET("/v1/spaces/{id}", { params: { path: { id } } }));
+  async raw(id: string): Promise<RawSpace> {
+    const space = await unwrap(
+      this.ctx.transport.api.GET("/v1/spaces/{id}", { params: { path: { id } } }),
+    );
+    await this.ctx.ensureKeys(id, space.keyEpoch);
+    return space;
   }
 
   async rename(id: string, name: string): Promise<Space> {
@@ -108,7 +112,8 @@ export class SpacesApi {
 
   private async open(raw: RawSpace): Promise<Space> {
     const { encryptedName, ...rest } = raw;
-    const identities = this.ctx.vault.unlocked
+    await this.ctx.ensureKeys(raw.id, raw.keyEpoch);
+    const identities = this.ctx.vault.holdsKeys
       ? this.ctx.vault.ownedIdentities(raw.id, raw.keyEpoch)
       : [];
     return { ...rest, name: await openText(encryptedName, identities) };
@@ -180,7 +185,7 @@ export class FoldersApi {
 
   private async open(raw: RawFolder, throughEpoch: number): Promise<Folder> {
     const { encryptedName, ...rest } = raw;
-    const identities = this.ctx.vault.unlocked
+    const identities = this.ctx.vault.holdsKeys
       ? this.ctx.vault.ownedIdentities(raw.spaceId, throughEpoch)
       : [];
     return { ...rest, name: await openText(encryptedName, identities) };

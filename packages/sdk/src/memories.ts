@@ -298,7 +298,8 @@ export class MemoriesApi {
     const rows = await this.rawNamespaces(spaceId);
     return Promise.all(
       rows.map(async (row) => {
-        const identities = this.ctx.vault.unlocked
+        await this.ctx.ensureKeys(row.space_id, row.key_epoch);
+        const identities = this.ctx.vault.holdsKeys
           ? this.ctx.vault.ownedIdentities(row.space_id, row.key_epoch)
           : [];
         return {

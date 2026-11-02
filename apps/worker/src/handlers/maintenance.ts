@@ -1,4 +1,4 @@
-import { memories, objects } from "@memdot/db";
+import { connectRequests, memories, objects } from "@memdot/db";
 import { failObject } from "@memdot/jobs";
 import { compactIfDue } from "@memdot/memory-server";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
@@ -17,9 +17,19 @@ export async function maintenance(deps: Deps): Promise<void> {
   const pruned = await pruneRequestLog(deps);
   const abandoned = await expireAbandonedUploads(deps);
   const compacted = await compactNamespaces(deps);
+  const connects = await pruneConnectRequests(deps);
   console.log(
-    `[maintenance] pruned ${pruned} request log rows, expired ${abandoned} abandoned uploads, checked ${compacted} namespaces`,
+    `[maintenance] pruned ${pruned} request log rows, expired ${abandoned} abandoned uploads, checked ${compacted} namespaces, removed ${connects} old connect requests`,
   );
+}
+
+/** A `memdot login` nobody answered: it can't be approved or collected any more. */
+async function pruneConnectRequests(deps: Deps): Promise<number> {
+  const gone = await deps.db
+    .delete(connectRequests)
+    .where(lt(connectRequests.expiresAt, new Date()))
+    .returning({ id: connectRequests.id });
+  return gone.length;
 }
 
 /** Assisted namespaces with a segment that failed or is mostly forgotten get rewritten. */

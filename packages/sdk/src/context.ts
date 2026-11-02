@@ -12,6 +12,8 @@ export interface Context {
   vault: Vault;
   /** The public, owner-signed record of this account's data on Portaldot V3. */
   registry: RegistryLog;
+  /** A connected agent fetches a space's keyring here before it reads or seals. No-op for owners. */
+  ensureKeys(spaceId: string, epoch: number): Promise<void>;
   /** A direct connection to Portaldot V3, opened on first use (verify, self-signed writes). */
   chain(): Promise<ChainClient>;
 }

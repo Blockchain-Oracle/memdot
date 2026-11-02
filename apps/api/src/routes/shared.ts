@@ -57,6 +57,8 @@ async function loadReceivedGrant(c: Context<AppEnv>, grantId: string) {
 
   let addressedToCaller = false;
   if (row.grant.granteeKind === "account") {
+    // A connected agent acts for its owner, but what others shared with them stays theirs.
+    if (principal.apiKey?.agentId) throw notFound("Grant");
     const [me] = await db
       .select({ owner: accounts.ownerAccount })
       .from(accounts)
