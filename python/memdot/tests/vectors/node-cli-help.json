@@ -1,0 +1,1136 @@
+{
+  "exit_codes": {
+    "ok": 0,
+    "failed": 1,
+    "usage": 2,
+    "auth": 3,
+    "notFound": 4,
+    "conflict": 5,
+    "limited": 6,
+    "network": 7
+  },
+  "envelope": {
+    "success": {
+      "status": "success",
+      "command": "",
+      "duration_ms": 0,
+      "count": 0,
+      "data": {}
+    },
+    "error": {
+      "status": "error",
+      "command": "",
+      "error": {
+        "code": "",
+        "message": ""
+      },
+      "data": null
+    }
+  },
+  "name": "memdot",
+  "description": "Encrypted storage and agent memory on Portaldot V3.",
+  "arguments": [],
+  "options": [
+    {
+      "flags": "-v, --version",
+      "description": "this CLI's version"
+    },
+    {
+      "flags": "--agent",
+      "description": "answer as one JSON envelope on stdout, for agents and scripts"
+    },
+    {
+      "flags": "--json",
+      "description": "the same as --agent"
+    },
+    {
+      "flags": "-o, --output <mode>",
+      "description": "how to answer",
+      "choices": [
+        "text",
+        "json",
+        "table",
+        "quiet"
+      ],
+      "env": "MEMDOT_OUTPUT"
+    },
+    {
+      "flags": "--api-key <key>",
+      "description": "use this key (or MEMDOT_API_KEY)"
+    },
+    {
+      "flags": "--api-url <url>",
+      "description": "use this API (or MEMDOT_API_URL)"
+    },
+    {
+      "flags": "-n, --namespace <id>",
+      "description": "which namespace (or MEMDOT_NAMESPACE)"
+    },
+    {
+      "flags": "-u, --user-id <id>",
+      "description": "who this is about (or MEMDOT_USER_ID)"
+    },
+    {
+      "flags": "--agent-id <id>",
+      "description": "which agent this belongs to (or MEMDOT_AGENT_ID)"
+    },
+    {
+      "flags": "--run-id <id>",
+      "description": "which session or run (or MEMDOT_RUN_ID)"
+    }
+  ],
+  "subcommands": [
+    {
+      "name": "add",
+      "description": "Remember something",
+      "arguments": [
+        {
+          "name": "text",
+          "required": false,
+          "description": "what to remember; or pipe it in"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--messages <json>",
+          "description": "a conversation, as a JSON array of {role, content}"
+        },
+        {
+          "flags": "-f, --file <path>",
+          "description": "read the conversation from a JSON file"
+        },
+        {
+          "flags": "-m, --metadata <json>",
+          "description": "metadata to keep with it"
+        },
+        {
+          "flags": "--no-infer",
+          "description": "store it exactly as written, without a model"
+        },
+        {
+          "flags": "--procedural",
+          "description": "keep this as an agent's working record"
+        },
+        {
+          "flags": "--immutable",
+          "description": "never let it change"
+        },
+        {
+          "flags": "--expires <date>",
+          "description": "when it stops counting (YYYY-MM-DD)"
+        },
+        {
+          "flags": "--timestamp <time>",
+          "description": "when it happened (ISO time or unix seconds)"
+        },
+        {
+          "flags": "--prompt <text>",
+          "description": "custom instructions, for this call only"
+        },
+        {
+          "flags": "--wait-chain",
+          "description": "wait until it's finalized on Portaldot V3"
+        },
+        {
+          "flags": "--no-wait",
+          "description": "return at once with an event to follow"
+        }
+      ]
+    },
+    {
+      "name": "search",
+      "description": "Find what's been remembered, by meaning and keyword",
+      "arguments": [
+        {
+          "name": "query",
+          "required": false,
+          "description": "what to look for; or pipe it in"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-k, --top-k <n>",
+          "description": "how many results"
+        },
+        {
+          "flags": "--threshold <n>",
+          "description": "minimum similarity, 0 to 1"
+        },
+        {
+          "flags": "--keyword",
+          "description": "match words only"
+        },
+        {
+          "flags": "--semantic",
+          "description": "match meaning only"
+        },
+        {
+          "flags": "--rerank",
+          "description": "let the model put the best first"
+        },
+        {
+          "flags": "--filter <json>",
+          "description": "for example {\"AND\":[{\"user_id\":\"priya\"}]}"
+        },
+        {
+          "flags": "--show-expired",
+          "description": "include what has expired"
+        },
+        {
+          "flags": "--reference-date <date>",
+          "description": "search as of this moment"
+        },
+        {
+          "flags": "--fields <list>",
+          "description": "only these fields, comma separated"
+        }
+      ]
+    },
+    {
+      "name": "list",
+      "description": "List memories, newest first",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--page-size <n>",
+          "description": "how many at a time"
+        },
+        {
+          "flags": "--cursor <cursor>",
+          "description": "next_cursor from the page before"
+        },
+        {
+          "flags": "--category <name>",
+          "description": "only this category"
+        },
+        {
+          "flags": "--after <date>",
+          "description": "created after this date"
+        },
+        {
+          "flags": "--before <date>",
+          "description": "created before this date"
+        },
+        {
+          "flags": "--filter <json>",
+          "description": "for example {\"user_id\":\"priya\"}"
+        },
+        {
+          "flags": "--show-expired",
+          "description": "include what has expired"
+        }
+      ]
+    },
+    {
+      "name": "get",
+      "description": "Read one memory",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "description": ""
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "update",
+      "description": "Correct a memory; the old version stays in its history",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "description": ""
+        },
+        {
+          "name": "text",
+          "required": false,
+          "description": "what it should say; or pipe it in"
+        }
+      ],
+      "options": [
+        {
+          "flags": "-m, --metadata <json>",
+          "description": "metadata to merge in"
+        },
+        {
+          "flags": "--expires <date>",
+          "description": "when it stops counting (YYYY-MM-DD)"
+        }
+      ]
+    },
+    {
+      "name": "delete",
+      "description": "Forget a memory, or everything in a scope",
+      "destructive": true,
+      "confirm_flag": "--force",
+      "arguments": [
+        {
+          "name": "id",
+          "required": false,
+          "description": ""
+        }
+      ],
+      "options": [
+        {
+          "flags": "--all",
+          "description": "everything in the given scope (-u, --agent-id or --run-id)"
+        },
+        {
+          "flags": "--dry-run",
+          "description": "say what would go, and change nothing"
+        },
+        {
+          "flags": "--force",
+          "description": "don't ask"
+        }
+      ]
+    },
+    {
+      "name": "history",
+      "description": "How a memory changed",
+      "arguments": [
+        {
+          "name": "id",
+          "required": true,
+          "description": ""
+        }
+      ],
+      "options": []
+    },
+    {
+      "name": "import",
+      "description": "Bring memories in from a MemDot or Mem0 export",
+      "arguments": [
+        {
+          "name": "file",
+          "required": true,
+          "description": "a JSON file"
+        }
+      ],
+      "options": [
+        {
+          "flags": "--source <name>",
+          "description": "where these came from"
+        }
+      ]
+    },
+    {
+      "name": "export",
+      "description": "Write a namespace's memories out as JSON, decrypted here",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--out <file>",
+          "description": "where to write it (default: stdout)"
+        }
+      ]
+    },
+    {
+      "name": "restore",
+      "description": "Rebuild a namespace's search from the chain",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "file",
+      "description": "Encrypted files on Portaldot V3",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "file put",
+          "description": "Encrypt a file here and store it",
+          "arguments": [
+            {
+              "name": "path",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--space <id>",
+              "description": "which space (default: the only one you can reach)"
+            },
+            {
+              "flags": "--folder <id>",
+              "description": "which folder"
+            },
+            {
+              "flags": "--name <name>",
+              "description": "what to call it (default: the file's own name)"
+            },
+            {
+              "flags": "--mime <type>",
+              "description": "its type"
+            },
+            {
+              "flags": "--replaces <id>",
+              "description": "store this as a new version of that file"
+            },
+            {
+              "flags": "--dry-run",
+              "description": "say what it would cost, and store nothing"
+            },
+            {
+              "flags": "--no-wait",
+              "description": "return once it's queued, before it's on chain"
+            }
+          ]
+        },
+        {
+          "name": "file get",
+          "description": "Fetch a file and decrypt it here",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "-O, --out <path>",
+              "description": "where to write it (default: its own name)"
+            },
+            {
+              "flags": "--stdout",
+              "description": "write the bytes to stdout"
+            }
+          ]
+        },
+        {
+          "name": "file ls",
+          "description": "List files, names decrypted here",
+          "arguments": [],
+          "options": [
+            {
+              "flags": "--space <id>",
+              "description": ""
+            },
+            {
+              "flags": "--folder <id>",
+              "description": ""
+            },
+            {
+              "flags": "--limit <n>",
+              "description": "how many"
+            },
+            {
+              "flags": "--cursor <cursor>",
+              "description": ""
+            }
+          ]
+        },
+        {
+          "name": "file verify",
+          "description": "Check a file against the chain, from this machine",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        },
+        {
+          "name": "file share",
+          "description": "Share a file or a space, which takes the owner's keys",
+          "arguments": [
+            {
+              "name": "id",
+              "required": false,
+              "description": "a file; or use --space for a whole space"
+            }
+          ],
+          "options": [
+            {
+              "flags": "--space <id>",
+              "description": "share this whole space instead"
+            },
+            {
+              "flags": "--to <address>",
+              "description": "someone's Portaldot or EVM address"
+            },
+            {
+              "flags": "--to-agent <id>",
+              "description": "a connected agent"
+            },
+            {
+              "flags": "--scope <scope>",
+              "description": "read or read_write"
+            },
+            {
+              "flags": "--expires-days <n>",
+              "description": "stop working after this many days"
+            }
+          ]
+        },
+        {
+          "name": "file revoke",
+          "description": "Stop a share; future writes use a key they never get",
+          "destructive": true,
+          "confirm_flag": "--force",
+          "arguments": [
+            {
+              "name": "grantId",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--force",
+              "description": "don't ask"
+            }
+          ]
+        },
+        {
+          "name": "file rm",
+          "description": "Delete a file; its bytes leave the chain within 7 days",
+          "destructive": true,
+          "confirm_flag": "--force",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--force",
+              "description": "don't ask"
+            }
+          ]
+        },
+        {
+          "name": "file renew",
+          "description": "Renew a file now, without waiting for the keeper",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--no-wait",
+              "description": "return once it's queued"
+            }
+          ]
+        },
+        {
+          "name": "file versions",
+          "description": "Every version of a file",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        }
+      ]
+    },
+    {
+      "name": "space",
+      "description": "Spaces: where files and namespaces live",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "space ls",
+          "description": "List the spaces this key can reach",
+          "arguments": [],
+          "options": []
+        },
+        {
+          "name": "space get",
+          "description": "Read one space",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        },
+        {
+          "name": "space create",
+          "description": "Create a space, which takes the owner's keys",
+          "arguments": [
+            {
+              "name": "name",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--self-signed",
+              "description": "your wallet signs each store"
+            }
+          ]
+        },
+        {
+          "name": "space rename",
+          "description": "Rename a space",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "name",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        },
+        {
+          "name": "space rm",
+          "description": "Delete a space and everything in it",
+          "destructive": true,
+          "confirm_flag": "--force",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--force",
+              "description": "don't ask"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "folder",
+      "description": "Folders inside a space",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "folder ls",
+          "description": "List folders in a space",
+          "arguments": [],
+          "options": [
+            {
+              "flags": "--space <id>",
+              "description": ""
+            }
+          ]
+        },
+        {
+          "name": "folder create",
+          "description": "Create a folder; its name is sealed here",
+          "arguments": [
+            {
+              "name": "name",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--space <id>",
+              "description": ""
+            },
+            {
+              "flags": "--parent <id>",
+              "description": ""
+            }
+          ]
+        },
+        {
+          "name": "folder rename",
+          "description": "Rename a folder",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "name",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--space <id>",
+              "description": ""
+            }
+          ]
+        },
+        {
+          "name": "folder rm",
+          "description": "Delete a folder",
+          "destructive": true,
+          "confirm_flag": "--force",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--force",
+              "description": "don't ask"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "namespace",
+      "description": "Where memories live",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "namespace ls",
+          "description": "List namespaces",
+          "arguments": [],
+          "options": [
+            {
+              "flags": "--space <id>",
+              "description": ""
+            }
+          ]
+        },
+        {
+          "name": "namespace create",
+          "description": "Create a namespace; its mode can't change afterwards",
+          "arguments": [
+            {
+              "name": "name",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--mode <mode>",
+              "description": "private: only devices with the key read it. assisted: the server reads text."
+            },
+            {
+              "flags": "--space <id>",
+              "description": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "entity",
+      "description": "The users, agents and runs memories are about",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "entity ls",
+          "description": "List them, with how many memories each has",
+          "arguments": [],
+          "options": []
+        },
+        {
+          "name": "entity rm",
+          "description": "Forget one and all its memories",
+          "destructive": true,
+          "confirm_flag": "--force",
+          "arguments": [
+            {
+              "name": "type",
+              "required": true,
+              "description": "user, agent or run"
+            },
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--dry-run",
+              "description": "say what would go, and change nothing"
+            },
+            {
+              "flags": "--force",
+              "description": "don't ask"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "event",
+      "description": "Memory operations",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "event ls",
+          "description": "Recent writes, and whether each finished",
+          "arguments": [],
+          "options": [
+            {
+              "flags": "--limit <n>",
+              "description": "how many"
+            }
+          ]
+        },
+        {
+          "name": "event get",
+          "description": "One operation: whether it's indexed, and on the chain",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        }
+      ]
+    },
+    {
+      "name": "job",
+      "description": "Storage jobs",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "job ls",
+          "description": "Recent jobs",
+          "arguments": [],
+          "options": [
+            {
+              "flags": "--status <status>",
+              "description": ""
+            },
+            {
+              "flags": "--limit <n>",
+              "description": "how many"
+            }
+          ]
+        },
+        {
+          "name": "job get",
+          "description": "One job",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        },
+        {
+          "name": "job wait",
+          "description": "Wait until a job finishes",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        }
+      ]
+    },
+    {
+      "name": "agents",
+      "description": "Connected agents; managing them takes an account-wide management key",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "agents ls",
+          "description": "List connected agents",
+          "arguments": [],
+          "options": []
+        },
+        {
+          "name": "agents rename",
+          "description": "Rename a connected agent",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            },
+            {
+              "name": "label",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        },
+        {
+          "name": "agents revoke",
+          "description": "Stop an agent now: its keys and tokens stop working, and its spaces change key",
+          "destructive": true,
+          "confirm_flag": "--force",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--force",
+              "description": "don't ask"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "keys",
+      "description": "API keys; managing them takes an account-wide management key",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "keys ls",
+          "description": "List API keys",
+          "arguments": [],
+          "options": []
+        },
+        {
+          "name": "keys create",
+          "description": "Make a key. It's shown once, here",
+          "arguments": [
+            {
+              "name": "name",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--role <role>",
+              "description": "read_only, read_write, management"
+            },
+            {
+              "flags": "--space <id...>",
+              "description": "limit it to these spaces"
+            },
+            {
+              "flags": "--expires-days <n>",
+              "description": "stop working after this many days"
+            }
+          ]
+        },
+        {
+          "name": "keys rotate",
+          "description": "Revoke a key and make a new one with the same name, role and spaces",
+          "destructive": true,
+          "confirm_flag": "--force",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--force",
+              "description": "don't ask"
+            }
+          ]
+        },
+        {
+          "name": "keys revoke",
+          "description": "Revoke a key",
+          "destructive": true,
+          "confirm_flag": "--force",
+          "arguments": [
+            {
+              "name": "id",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": [
+            {
+              "flags": "--force",
+              "description": "don't ask"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "usage",
+      "description": "Storage, renewals and shared-model allowance",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "logs",
+      "description": "Recent API requests: metadata only, never bodies",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--limit <n>",
+          "description": "how many"
+        }
+      ]
+    },
+    {
+      "name": "login",
+      "description": "Connect this machine: you choose what it can reach, in your browser",
+      "arguments": [],
+      "options": [
+        {
+          "flags": "--label <name>",
+          "description": "what to call it"
+        },
+        {
+          "flags": "--with-key <key>",
+          "description": "use an API key you already have (Assisted only, no browser)"
+        },
+        {
+          "flags": "--no-browser",
+          "description": "just print the address"
+        },
+        {
+          "flags": "--no-wait",
+          "description": "print the address and return; finish later with --continue"
+        },
+        {
+          "flags": "--continue",
+          "description": "collect a login started with --no-wait"
+        },
+        {
+          "flags": "--wait <seconds>",
+          "description": "how long --continue waits"
+        }
+      ]
+    },
+    {
+      "name": "init",
+      "description": "Set up this machine: the same as login, or --api-key to use a key you have",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "logout",
+      "description": "Forget this machine's key. It keeps working elsewhere until you revoke it",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "whoami",
+      "description": "Who this machine is connected as",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "status",
+      "description": "Whether MemDot is reachable and this key works",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "version",
+      "description": "This CLI's version",
+      "arguments": [],
+      "options": []
+    },
+    {
+      "name": "config",
+      "description": "What's saved on this machine",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "config show",
+          "description": "Show it, with keys hidden",
+          "arguments": [],
+          "options": []
+        },
+        {
+          "name": "config get",
+          "description": "Read one setting",
+          "arguments": [
+            {
+              "name": "key",
+              "required": true,
+              "description": "api_url, namespace_id, user_id, agent_id, run_id"
+            }
+          ],
+          "options": []
+        },
+        {
+          "name": "config set",
+          "description": "Save one setting",
+          "arguments": [
+            {
+              "name": "key",
+              "required": true,
+              "description": "api_url, namespace_id, user_id, agent_id, run_id"
+            },
+            {
+              "name": "value",
+              "required": true,
+              "description": ""
+            }
+          ],
+          "options": []
+        }
+      ]
+    },
+    {
+      "name": "mcp",
+      "description": "Run the local MCP server over stdio, or set a client up to use it",
+      "arguments": [],
+      "options": [],
+      "subcommands": [
+        {
+          "name": "mcp config",
+          "description": "What a client needs to use MemDot; --write adds it to the client's settings",
+          "arguments": [],
+          "options": [
+            {
+              "flags": "--client <name>",
+              "description": "claude-code, claude-desktop, cursor"
+            },
+            {
+              "flags": "--hosted",
+              "description": "the hosted server: Assisted namespaces, signs in with OAuth"
+            },
+            {
+              "flags": "--write",
+              "description": "add it to that client's settings file"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

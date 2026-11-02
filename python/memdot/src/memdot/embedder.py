@@ -46,11 +46,14 @@ class LocalEmbedder:
             import numpy
             import onnxruntime
             from huggingface_hub import hf_hub_download
+            from huggingface_hub.utils import logging as hf_logging
             from tokenizers import Tokenizer
         except ImportError as error:
             raise EmbedderMissing(
                 'Searching by meaning needs the local model: pip install "memdot[local]"'
             ) from error
+        # It would warn about having no token on every run, on stderr, for a public model.
+        hf_logging.set_verbosity_error()
         tokenizer = Tokenizer.from_file(hf_hub_download(_REPO, "tokenizer.json"))
         tokenizer.enable_padding()
         tokenizer.enable_truncation(max_length=_MAX_TOKENS)

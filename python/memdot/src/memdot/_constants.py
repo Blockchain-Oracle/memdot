@@ -23,3 +23,6 @@ CID_PREFIX = bytes((0x01, 0x55, 0xA0, 0xE4, 0x02, 0x20))
 TPOT_DECIMALS = 14
 BLOCK_SECONDS = 6
 BITSWAP_TIMEOUT_SECONDS = 30
+#: The measured linear fee model, for quotes before anything is encrypted.
+STORE_FEE_BASE_PLANCK = 1_220_582_728_631
+STORE_FEE_PER_BYTE_PLANCK = 10_000_000_000

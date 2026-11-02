@@ -32,6 +32,7 @@
     "seed:memory": "tsx scripts/seed-memory.ts",
     "live:memory": "tsx scripts/memory-live.ts",
     "vectors:python": "tsx scripts/python-vectors.ts",
+    "journey:python": "tsx scripts/journey-s10.ts",
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {

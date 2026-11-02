@@ -38,6 +38,7 @@ dev = [
   "pyright>=1.1.400",
   "pytest>=8",
   "ruff>=0.8",
+  "mcp>=1.12",
   "numpy>=1.26",
   "eth-abi>=5",
   "eth-hash[pycryptodome]>=0.7",

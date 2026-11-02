@@ -3,7 +3,9 @@
 // read this file, and test/python-vectors.test.ts reads what Python sealed in return.
 // Usage: pnpm --filter @memdot/sdk vectors:python
 
+import { execFileSync } from "node:child_process";
 import { writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { cidOf, contentHash, signerFromSeed, toHex } from "@memdot/chain";
 import {
   Action,
@@ -457,6 +459,22 @@ const prompts = {
 await writeFile(
   new URL("../../../python/memdot/src/memdot/engine/prompts.json", import.meta.url),
   `${JSON.stringify(prompts, null, 2)}\n`,
+);
+
+// What the Node CLI offers, for the Python CLI's parity test. Defaults are left out: one holds this
+// machine's name, and flags are what has to match.
+const cli = fileURLToPath(new URL("../../cli/dist/index.mjs", import.meta.url));
+const tree = execFileSync(process.execPath, [cli, "help", "--json"], {
+  encoding: "utf8",
+  env: { PATH: process.env.PATH },
+});
+await writeFile(
+  new URL("../../../python/memdot/tests/vectors/node-cli-help.json", import.meta.url),
+  `${JSON.stringify(
+    JSON.parse(tree, (key, value) => (key === "default" ? undefined : value)),
+    null,
+    2,
+  )}\n`,
 );
 
 await writeFile(

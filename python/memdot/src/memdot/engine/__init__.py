@@ -58,7 +58,7 @@ __all__ = [
 
 #: One text in both languages; a test checks this file against the TypeScript prompts.
 PROMPTS: dict[str, Any] = json.loads(
-    resources.files(__package__).joinpath("prompts.json").read_text("utf8")
+    resources.files("memdot.engine").joinpath("prompts.json").read_text("utf8")
 )
 
 LOCAL_EMBEDDING_MODEL = {"id": "Xenova/all-MiniLM-L6-v2", "dtype": "q8", "dimensions": 384}
