@@ -1,0 +1,34 @@
+{
+  "stage": "S08",
+  "at": "2026-11-02T13:27:42.300Z",
+  "app": "https://app.84.46.247.92.sslip.io",
+  "api": "https://api.84.46.247.92.sslip.io",
+  "namespaceId": "b5312053-d4bd-463d-a577-ea7c5d2f4489",
+  "models": {
+    "llm": "google",
+    "embedder": "gemini-embedding-001"
+  },
+  "byMeaning": [
+    {
+      "score": 0.701,
+      "semantic": 0.701,
+      "bm25": 0
+    },
+    {
+      "score": 0.625,
+      "semantic": 0.625,
+      "bm25": 0
+    },
+    {
+      "score": 0.592,
+      "semantic": 0.592,
+      "bm25": 0
+    }
+  ],
+  "extracted": {
+    "memories": 3,
+    "cid": "bafk2bzaceacyzape23nfdzyqypvol4mnvmep2c3t43cukovdwpw5t245b4xty",
+    "txHash": "0xb963441be4733ef5925db6d90c295585199d4d494faacccd7a62623d160d1f99",
+    "block": 292294
+  }
+}
