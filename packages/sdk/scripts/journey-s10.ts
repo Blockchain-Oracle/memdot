@@ -220,6 +220,7 @@ check("and the Python CLI says what to do", cliStopped.exit === 3, cliStopped);
 if (live) {
   await owner.files.delete(chunked.file.id);
   await owner.files.delete(uploaded.file.id);
+  await owner.files.delete(left.fileId);
 }
 
 if (live && failures === 0) {
