@@ -30,7 +30,9 @@
     "journey:memory": "tsx scripts/journey-s08.ts",
     "smoke:memory": "tsx scripts/memory-smoke.ts",
     "seed:memory": "tsx scripts/seed-memory.ts",
-    "live:memory": "tsx scripts/memory-live.ts"
+    "live:memory": "tsx scripts/memory-live.ts",
+    "vectors:python": "tsx scripts/python-vectors.ts",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@memdot/chain": "workspace:*",

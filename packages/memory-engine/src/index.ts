@@ -30,7 +30,17 @@ export {
   messageText,
   normalizeMessages,
 } from "./messages.js";
-export { DEFAULT_CATEGORIES, type PromptCategory, RECALL_PREAMBLE } from "./prompts.js";
+export {
+  AGENT_SCOPE_SUFFIX,
+  DEFAULT_CATEGORIES,
+  EXTRACTION_SYSTEM,
+  INSTRUCTIONS_SYSTEM,
+  PROCEDURAL_SYSTEM,
+  type PromptCategory,
+  RECALL_PREAMBLE,
+  RERANK_SYSTEM,
+  SUMMARY_SYSTEM,
+} from "./prompts.js";
 export {
   EMBEDDING_PROVIDERS,
   type EmbeddingConfig,
@@ -56,4 +66,4 @@ export {
   rank,
   type ScoreBreakdown,
 } from "./scoring.js";
-export { termFrequencies, tokenize } from "./tokenize.js";
+export { STOPWORDS, termFrequencies, tokenize } from "./tokenize.js";

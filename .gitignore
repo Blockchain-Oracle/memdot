@@ -24,3 +24,9 @@ dist/
 
 # Packed from packages/cli when the web image is built.
 apps/web/public/cli/
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

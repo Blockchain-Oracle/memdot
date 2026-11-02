@@ -15,6 +15,7 @@
       "!**/.papi",
       "!docs/evidence",
       "!**/*.md",
+      "!python",
       "!pnpm-lock.yaml",
       "!packages/sdk/openapi.json",
       "!packages/sdk/src/schema.ts"

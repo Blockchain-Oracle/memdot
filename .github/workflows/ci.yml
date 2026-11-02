@@ -31,6 +31,31 @@ jobs:
           pnpm --filter @memdot/sdk generate:check
       - run: pnpm test
 
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Lint and test the SDK, sealing fresh vectors
+        working-directory: python/memdot
+        env:
+          MEMDOT_WRITE_VECTORS: "1"
+        run: |
+          uv sync --locked --extra local
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pytest
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript opens what Python just sealed
+        run: pnpm turbo run test --filter=@memdot/sdk
+
   contracts:
     runs-on: ubuntu-latest
     defaults:

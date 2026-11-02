@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "memdot"
+version = "0.1.0"
+description = "MemDot for Python: encrypted storage and agent memory on Portaldot V3."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = [
+  "click>=8.1",
+  "httpx>=0.27",
+  "mnemonic>=0.21",
+  "pydantic>=2.7",
+  "pynacl>=1.5",
+  "pyrage>=1.2",
+]
+
+[project.optional-dependencies]
+# Search a Private namespace by meaning, on this machine.
+local = ["huggingface-hub>=0.24", "numpy>=1.26", "onnxruntime>=1.18", "tokenizers>=0.20"]
+# Add records to the public registry when you act as the owner.
+owner = ["eth-abi>=5", "eth-hash[pycryptodome]>=0.7", "py-sr25519-bindings>=0.2.1"]
+# Run the local MCP server from Python.
+mcp = ["mcp>=1.12"]
+langgraph = ["langgraph>=1.0"]
+crewai = ["crewai>=1.15"]
+strands = ["strands-agents>=1.45"]
+openai-agents = ["openai-agents>=0.20"]
+
+[project.scripts]
+memdot = "memdot.cli:main"
+
+[dependency-groups]
+dev = [
+  "pyright>=1.1.400",
+  "pytest>=8",
+  "ruff>=0.8",
+  "numpy>=1.26",
+  "eth-abi>=5",
+  "eth-hash[pycryptodome]>=0.7",
+  "py-sr25519-bindings>=0.2.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/memdot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/memdot/_sync/*" = ["RUF029", "SIM"]
+
+[tool.pyright]
+include = ["src"]
+exclude = ["src/memdot/integrations"]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,5 +1,5 @@
 /** Words too common to help a keyword search. Short on purpose: recall matters more than size. */
-const STOPWORDS = new Set(
+export const STOPWORDS = new Set(
   "a an and are as at be been but by do does did for from had has have he her his i if in into is it its me my no not of on or our she so that the their them they this to was we were what when where which who why will with you your".split(
     " ",
   ),
