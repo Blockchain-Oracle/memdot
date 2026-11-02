@@ -38,14 +38,13 @@ Working live on V3 today:
 - Agent memory on this storage layer, in two modes. Private runs on the device; Assisted runs on the server for agents that only hold an API key. Remember, search by meaning and keywords, filters, history, forget, restore from the chain, and import from another memory product. Model extraction, search by meaning, reading pictures and an OpenAI-compatible chat endpoint all run on the live service, on a free-tier model with a daily allowance per account.
 - Export everything as a decrypted zip and re-import it into a new account, and account deletion that stops every renewal.
 - Agents connect themselves: `memdot login` makes a key pair on the machine, the owner chooses spaces in the browser, and the browser wraps those keys to it. A local MCP server decrypts with that key; a hosted one signs in with OAuth and reaches Assisted namespaces only. Revoking stops either on its next call.
-- A dashboard on desktop and phone, in light and dark. A CLI with an agent JSON mode. A TypeScript SDK. A REST API with OpenAPI, API keys and rate limits.
+- A dashboard on desktop and phone, in light and dark. A CLI with an agent JSON mode. TypeScript and Python SDKs on the same encryption formats, tested against each other, with Python integrations for LangGraph, CrewAI, Strands and the OpenAI Agents SDK. A REST API with OpenAPI, API keys and rate limits.
 - Deployed: API, worker, web and Postgres on our own server, with health checks and daily database backups.
 
 ## Outstanding items
 
 - Walking real extensions and Touch ID on the live site. Wallet sign-in, MetaMask sign-in and wallet-paid stores have run in the dashboard on a local build against live V3 with test wallets; passkey and recovery-code flows have run end to end
-- Python SDK
-- Agent plugins and framework integrations
+- Agent plugins, TypeScript framework adapters and automation nodes
 - Docs site and landing page
 - The final domain, memdot.xyz, to replace the temporary address
 - Rebuilding spaces and objects from registry records (stored items and renewals already rebuild from chain events)

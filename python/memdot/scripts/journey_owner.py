@@ -221,7 +221,8 @@ def main() -> None:
     shared = friend.sharing.get(grant.id, big.file.id)
     check("the friend opens it", shared.data == big_bytes)
     details = friend.sharing.details(grant.id)
-    check("the friend sees its name", details.name == "renamed.bin", details.name)
+    # The name it was stored under: a rename seals new metadata for the owner, not a new manifest.
+    check("the friend sees its name", details.name == "big.bin", details.name)
     space_grant = memdot.sharing.share_space(space.id, {"address": friend_wallet.address})
     listed = friend.sharing.files(space_grant.id)
     check("space sharing lists names", any(f.name == "tiny.txt" for f in listed.items))

@@ -17,7 +17,7 @@
   <a href="https://api.84.46.247.92.sslip.io/docs"><b>API reference</b></a>
 </p>
 
-MemDot is a storage layer for Portaldot V3: a dashboard, a CLI, an MCP server, a TypeScript SDK and a REST API that put files and app data on `TransactionStorage`, encrypted before they leave your device, and record who owns and may read them in a Solidity registry on `Revive`. A keeper renews everything before the chain's 7-day retention ends, so developers get storage that behaves like storage. Agent memory runs on the same layer: an agent remembers and recalls by meaning, and each memory is an encrypted entry on the chain, read either on your device or by a server you've chosen to trust with it.
+MemDot is a storage layer for Portaldot V3: a dashboard, a CLI, an MCP server, TypeScript and Python SDKs and a REST API that put files and app data on `TransactionStorage`, encrypted before they leave your device, and record who owns and may read them in a Solidity registry on `Revive`. A keeper renews everything before the chain's 7-day retention ends, so developers get storage that behaves like storage. Agent memory runs on the same layer: an agent remembers and recalls by meaning, and each memory is an encrypted entry on the chain, read either on your device or by a server you've chosen to trust with it.
 
 Built for the [Portaldot Hacker House 2026](https://dorahacks.io/hackathon/portaldot-hacker-house-2026/detail) · Modular Cloud & Middleware. Jump to [how MemDot meets the hackathon](#how-memdot-meets-the-hackathon).
 
@@ -172,6 +172,7 @@ Earlier runs are in [`docs/evidence/`](docs/evidence): the first store and renew
 - **MCP:** run it locally with `memdot mcp`, which decrypts on your machine and reaches Private namespaces and files, or connect any client to the hosted server at `https://api.84.46.247.92.sslip.io/mcp`.
 - **Data:** export everything as a decrypted zip and bring it into a new account, or delete the account, which stops every renewal.
 - **TypeScript SDK:** [`packages/sdk`](packages/sdk) covers accounts, spaces, folders, files, sharing, jobs, memories in both modes, export and import, and self-signed stores with a wallet.
+- **Python SDK:** [`python/memdot`](python/memdot) is the same client, sync and async, sealing with the same formats, so a file uploaded in the dashboard opens in Python and the other way round. It runs Private memory on your machine with the same embedding model, has the same `memdot` command and local MCP server, and plugs into LangGraph, CrewAI, Strands and the OpenAI Agents SDK. Tests hold each language to what the other sealed.
 - **REST API:** OpenAPI 3.1 and a [reference](https://api.84.46.247.92.sslip.io/docs), with API keys and per-key rate limits, plus `/v1/chat/completions`: point any OpenAI client at it, and each call recalls what's relevant and remembers the exchange.
 - **Service:** relayer and keeper on one signer queue, a chain indexer, a CID gateway with a ciphertext cache, a low-balance breaker that pauses stores and never renewals, and alerts.
 - **Public proof pages:** one for each [CID, transaction and block](https://app.84.46.247.92.sslip.io/proof/registry), plus the registry.
@@ -196,6 +197,7 @@ Production images: [`apps/api/Dockerfile`](apps/api/Dockerfile), [`apps/worker/D
 | [`apps/api`](apps/api) | Hono REST API, auth and the CID gateway |
 | [`apps/worker`](apps/worker) | Relayer queue, keeper, indexer and alerts |
 | [`packages/sdk`](packages/sdk) | The TypeScript SDK |
+| [`python/memdot`](python/memdot) | The Python SDK, CLI, MCP server and framework integrations |
 | [`packages/cli`](packages/cli) | `memdot`, the command line |
 | [`packages/mcp`](packages/mcp) | The MCP server, local and hosted |
 | [`packages/crypto`](packages/crypto) | Keys, key bundle, encryption, manifests and segments |
@@ -210,7 +212,8 @@ Production images: [`apps/api/Dockerfile`](apps/api/Dockerfile), [`apps/worker/D
 - **Testnet only.** Everything here runs on Portaldot V3 testnet, and the app is on a temporary address until its own domain is live. Accounts made on this address will need their recovery code after the move, because passkeys are tied to a domain.
 - **Sponsored storage is small.** The relayer pays about 105 tPOT per MiB from a testnet budget of a few hundred tPOT, so a sponsored space holds 128 KiB, up to 5 spaces per account. Stores pause if the relayer runs low; renewals keep going. A space can move to your own wallet at any point: it then has no quota, and the wallet pays for each store.
 - **Real extensions still being walked.** Wallet sign-in, MetaMask sign-in and wallet-paid stores ran in the dashboard on a local build against live V3, using test wallets that sign the way an extension does. Touch ID passkey unlock and Talisman or SubWallet unlock need a real authenticator and extension, and haven't been walked on the live site yet. The recovery code works everywhere.
-- **Not built yet:** the Python SDK, agent plugins and the docs site. They're next in the build order, on the layer described here.
+- **Not built yet:** agent plugins, TypeScript framework adapters, automation nodes and the docs site. They're next in the build order, on the layer described here.
+- **Python can't write to a self-signed space.** A wallet signs each `store` there, with Portaldot's runtime types, which the Python package doesn't carry. It reads those spaces; writing them takes the dashboard or the TypeScript SDK. Passkeys and browser wallets stay in the browser too, so Python signs in with the recovery code or a key.
 - **An agent's reach is per space, not per namespace.** A space's key opens everything in it, so an agent you connect can read that space's files and namespaces. Keep what it shouldn't see in another space.
 - **A hosted agent reaches Assisted namespaces only,** and its names for them are the ones your browser gave it when you connected it.
 - **Revoking an agent stops its keys, not what it read.** It can't call MemDot any more and it never gets the space's next key, but anything it already decrypted may have been kept. Other agents in that space get the new key the next time you open MemDot, and can't read what's written after the change until then.
