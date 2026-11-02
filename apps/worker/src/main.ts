@@ -1,6 +1,7 @@
 import { createChainClient, formatTpot, signerFromMnemonic } from "@memdot/chain";
 import { createDatabase, MIGRATIONS_FOLDER, migrateDatabase } from "@memdot/db";
-import { chainTxPayload, PRIORITY, QUEUE, startBoss } from "@memdot/jobs";
+import { chainTxPayload, memoryPayload, PRIORITY, QUEUE, startBoss } from "@memdot/jobs";
+import { AssistedKeys } from "@memdot/memory-server";
 import type { Job, JobWithMetadata } from "pg-boss";
 import { type AlertMessage, deliverAlert } from "./alerts.js";
 import { StoreBreaker } from "./breaker.js";
@@ -10,6 +11,7 @@ import { createEvmClients } from "./evm.js";
 import { indexChain } from "./handlers/indexer.js";
 import { keeperScan } from "./handlers/keeper.js";
 import { maintenance } from "./handlers/maintenance.js";
+import { handleMemory } from "./handlers/memory.js";
 import { handleRegistry } from "./handlers/registry.js";
 import { handleRenew } from "./handlers/renew.js";
 import { handleStore } from "./handlers/store.js";
@@ -17,6 +19,7 @@ import { startHealthServer } from "./health.js";
 
 const BREAKER_CHECK_MS = 60_000;
 const CHAIN_TX_POLL_SECONDS = 2;
+const MEMORY_POLL_SECONDS = 1;
 const SHUTDOWN_GRACE_MS = 30_000;
 
 const database = createDatabase(env.DATABASE_URL, 5);
@@ -25,7 +28,15 @@ await migrateDatabase(database, MIGRATIONS_FOLDER);
 const boss = await startBoss(env.DATABASE_URL, "worker");
 const chain = createChainClient(env.PORTALDOT_WSS);
 const signer = signerFromMnemonic(env.SIGNER_MNEMONIC);
-const deps: Deps = { db: database.db, boss, chain, signer, evm: createEvmClients(env), env };
+const deps: Deps = {
+  db: database.db,
+  boss,
+  chain,
+  signer,
+  evm: createEvmClients(env),
+  env,
+  memoryKeys: new AssistedKeys(env.MEMORY_SECRET),
+};
 
 async function runChainTx([job]: JobWithMetadata<unknown>[]): Promise<void> {
   if (!job) return;
@@ -63,6 +74,14 @@ const breakerTimer = setInterval(
   BREAKER_CHECK_MS,
 );
 breakerTimer.unref();
+
+await boss.work(
+  QUEUE.memory,
+  { pollingIntervalSeconds: MEMORY_POLL_SECONDS, includeMetadata: true },
+  async ([job]: JobWithMetadata<unknown>[]) => {
+    if (job) await handleMemory(deps, { ...job, data: memoryPayload.parse(job.data) });
+  },
+);
 
 await boss.schedule(QUEUE.keeperScan, "*/10 * * * *");
 await boss.work(QUEUE.keeperScan, () => keeperScan(deps));

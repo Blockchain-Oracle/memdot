@@ -57,6 +57,13 @@
       "when": 1793547584213,
       "tag": "0007_registry_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793606089876,
+      "tag": "0008_memories",
+      "breakpoints": true
     }
   ]
 }

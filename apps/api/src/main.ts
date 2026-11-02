@@ -3,6 +3,7 @@ import { createChainClient } from "@memdot/chain";
 import { GATEWAY_CACHE_BYTES } from "@memdot/config";
 import { MIGRATIONS_FOLDER, migrateDatabase } from "@memdot/db";
 import { JobEventHub, startBoss } from "@memdot/jobs";
+import { AssistedKeys } from "@memdot/memory-server";
 import { createApp } from "./app.js";
 import { database } from "./db.js";
 import { env } from "./env.js";
@@ -22,7 +23,9 @@ const chainHead = new ChainHead(chain);
 const gatewayCache = await CiphertextCache.open(env.GATEWAY_CACHE_DIR, GATEWAY_CACHE_BYTES);
 const requestLog = new RequestLog(database.db);
 
-const app = createApp({ boss, chain, chainHead, gatewayCache, jobEvents, requestLog });
+const memoryKeys = new AssistedKeys(env.MEMORY_SECRET);
+
+const app = createApp({ boss, chain, chainHead, gatewayCache, jobEvents, memoryKeys, requestLog });
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(`[api] listening on :${info.port}`);
 });

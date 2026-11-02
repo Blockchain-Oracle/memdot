@@ -35,6 +35,13 @@ export const chainTxPayload = z.discriminatedUnion("action", [
   registryPayload,
 ]);
 
+/** One memory job. What it writes, if anything, waits sealed in `memory_inbox`. */
+export const memoryPayload = z.object({
+  op: z.enum(["add", "import", "restore", "compact"]),
+  jobId: z.uuid(),
+});
+
+export type MemoryPayload = z.infer<typeof memoryPayload>;
 export type StoreBlobPayload = z.infer<typeof storeBlobPayload>;
 export type RenewBatchPayload = z.infer<typeof renewBatchPayload>;
 export type RegistryPayload = z.infer<typeof registryPayload>;

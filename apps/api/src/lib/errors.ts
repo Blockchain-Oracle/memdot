@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { APICallError, RetryError } from "ai";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -36,6 +37,34 @@ export const forbidden = (message: string) => new HttpError(403, "FORBIDDEN", me
 export const notFound = (what: string) => new HttpError(404, "NOT_FOUND", `${what} not found.`);
 export const conflict = (code: string, message: string) => new HttpError(409, code, message);
 
+/** A model provider refused or failed: the caller should hear that, not "something went wrong". */
+function modelFailure(
+  error: Error,
+): { status: ContentfulStatusCode; code: string; message: string } | null {
+  const cause = RetryError.isInstance(error) ? error.lastError : error;
+  if (!APICallError.isInstance(cause)) return null;
+  if (cause.statusCode === 429) {
+    return {
+      status: 429,
+      code: "MODEL_RATE_LIMITED",
+      message:
+        "The model provider says this key is over its quota. Try again later, or set your own key under Configuration.",
+    };
+  }
+  if (cause.statusCode === 401 || cause.statusCode === 403) {
+    return {
+      status: 502,
+      code: "MODEL_KEY_REJECTED",
+      message: "The model provider rejected this key. Check it under Configuration.",
+    };
+  }
+  return {
+    status: 502,
+    code: "MODEL_UNAVAILABLE",
+    message: "The model provider couldn't answer. Try again shortly.",
+  };
+}
+
 function body(c: Context<AppEnv>, code: string, message: string, details?: unknown) {
   return {
     error: { code, message, requestId: c.get("requestId") ?? "", ...(details ? { details } : {}) },
@@ -49,6 +78,8 @@ export function errorResponse(error: Error, c: Context<AppEnv>) {
   if (error instanceof HTTPException) {
     return c.json(body(c, "HTTP_ERROR", error.message), error.status);
   }
+  const model = modelFailure(error);
+  if (model) return c.json(body(c, model.code, model.message), model.status);
   console.error(`[api] ${c.req.method} ${c.req.path} ${c.get("requestId")}`, error);
   return c.json(body(c, "INTERNAL", "Something went wrong on our side."), 500);
 }

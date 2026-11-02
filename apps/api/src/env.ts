@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
 import { DEFAULT_MAX_FILE_BYTES, PORTALDOT_WSS, SPONSORED_QUOTA_BYTES } from "@memdot/config";
+import { memoryEnvSchema } from "@memdot/memory-server";
 import { z } from "zod";
 
 // In development the repo-root .env is the single source; in production Coolify injects env.
 const rootEnv = new URL("../../../.env", import.meta.url);
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
-const schema = z.object({
+const schema = memoryEnvSchema.extend({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8787),
   DATABASE_URL: z.url(),

@@ -36,7 +36,10 @@
     "hono": "^4.13.14",
     "pg-boss": "^12.38.0",
     "viem": "^2.57.13",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@memdot/memory-engine": "workspace:*",
+    "@memdot/memory-server": "workspace:*",
+    "ai": "^7.0.159"
   },
   "devDependencies": {
     "@polkadot-labs/hdkd": "^0.0.32",

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { PORTALDOT_EVM_RPC, PORTALDOT_WSS, REGISTRY_ADDRESS, TPOT_DECIMALS } from "@memdot/config";
+import { memoryEnvSchema } from "@memdot/memory-server";
 import { z } from "zod";
 
 // In development the repo-root .env is the single source; in production Coolify injects env.
@@ -9,7 +10,7 @@ if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 const tpot = (value: number) =>
   BigInt(Math.round(value * 10 ** 4)) * 10n ** BigInt(TPOT_DECIMALS - 4);
 
-const schema = z.object({
+const schema = memoryEnvSchema.extend({
   DATABASE_URL: z.url(),
   /** The relayer and keeper account (sr25519). Testnet only; never committed. */
   SIGNER_MNEMONIC: z.string().min(1),

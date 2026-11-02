@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Database } from "@memdot/db";
 import { sql } from "drizzle-orm";
 import { fromDrizzle, PgBoss } from "pg-boss";
-import type { ChainTxPayload } from "./payloads.js";
+import type { ChainTxPayload, MemoryPayload } from "./payloads.js";
 import { PRIORITY, QUEUE } from "./queues.js";
 
 const CHAIN_TX_RETRIES = 5;
@@ -11,6 +11,10 @@ const CHAIN_TX_RETRY_DELAY_SECONDS = 15;
 const CHAIN_TX_EXPIRE_SECONDS = 15 * 60;
 /** Finished chain jobs stay visible to ops for a month. */
 const CHAIN_TX_KEEP_SECONDS = 30 * 24 * 60 * 60;
+/** Models rate limit hard and briefly, so memory jobs back off and try again for a while. */
+const MEMORY_RETRIES = 3;
+const MEMORY_RETRY_DELAY_SECONDS = 20;
+const MEMORY_EXPIRE_SECONDS = 10 * 60;
 
 export type BossRole = "api" | "worker";
 
@@ -42,6 +46,12 @@ export async function startBoss(connectionString: string, role: BossRole): Promi
   await boss.createQueue(QUEUE.indexer, { policy: "exclusive" });
   await boss.createQueue(QUEUE.alerts, { retryLimit: 3, retryDelay: 30, retryBackoff: true });
   await boss.createQueue(QUEUE.maintenance, { policy: "exclusive" });
+  await boss.createQueue(QUEUE.memory, {
+    retryLimit: MEMORY_RETRIES,
+    retryDelay: MEMORY_RETRY_DELAY_SECONDS,
+    retryBackoff: true,
+    expireInSeconds: MEMORY_EXPIRE_SECONDS,
+  });
   return boss;
 }
 
@@ -75,4 +85,13 @@ export async function enqueueChainTx(
   }
   const priority = payload.action === "registry" ? PRIORITY.registry : PRIORITY.renew;
   await boss.send(QUEUE.chainTx, payload, { priority, db });
+}
+
+/** Enqueues a memory job inside the caller's transaction, so its row and queue entry commit together. */
+export async function enqueueMemory(
+  boss: PgBoss,
+  executor: Executor,
+  payload: MemoryPayload,
+): Promise<void> {
+  await boss.send(QUEUE.memory, payload, { db: fromDrizzle(executor, sql) });
 }

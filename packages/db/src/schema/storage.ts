@@ -23,7 +23,7 @@ import {
 } from "./enums.js";
 
 /** bytea as Uint8Array, viewed in place both ways: blobs reach 7 MB, so no extra copies. */
-const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
+export const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
   dataType: () => "bytea",
   toDriver: (value) => Buffer.from(value.buffer, value.byteOffset, value.byteLength),
   fromDriver: (value) => new Uint8Array(value.buffer, value.byteOffset, value.byteLength),

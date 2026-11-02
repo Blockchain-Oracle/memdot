@@ -1,5 +1,6 @@
 import type { ChainClient } from "@memdot/chain";
 import type { JobEventHub } from "@memdot/jobs";
+import type { AssistedKeys } from "@memdot/memory-server";
 import type { PgBoss } from "pg-boss";
 import type { ApiKeyRole, Permissions } from "./auth/roles.js";
 import type { ChainHead } from "./lib/chain-head.js";
@@ -33,6 +34,8 @@ export interface Services {
   chainHead: ChainHead;
   gatewayCache: CiphertextCache;
   jobEvents: JobEventHub;
+  /** Opens and seals what Assisted namespaces hold. */
+  memoryKeys: AssistedKeys;
   requestLog: RequestLog;
 }
 

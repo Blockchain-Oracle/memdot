@@ -10,6 +10,8 @@ export const QUEUE = {
   alerts: "alerts",
   /** Daily: prune the request log past its retention. */
   maintenance: "maintenance",
+  /** Reads and writes memories with a model. Separate, because models are slow and rate limited. */
+  memory: "memory",
 } as const;
 
 /**
@@ -27,5 +29,12 @@ export const JOB_KIND = {
   renew: "renew",
   /** The keeper re-storing an item that expired before it could be renewed. */
   restore: "restore",
+  memoryAdd: "memory_add",
+  memoryUpdate: "memory_update",
+  memoryImport: "memory_import",
+  /** Rebuilding a namespace's index from what is on chain. */
+  memoryRestore: "memory_restore",
+  /** Rewriting half-dead segments into fewer live ones. */
+  memoryCompact: "memory_compact",
 } as const;
 export type JobKind = (typeof JOB_KIND)[keyof typeof JOB_KIND];

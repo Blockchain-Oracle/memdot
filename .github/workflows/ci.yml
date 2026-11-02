@@ -24,6 +24,7 @@ jobs:
           # Only to satisfy the API's config parsing; nothing connects.
           DATABASE_URL: postgres://ci:ci@127.0.0.1:1/ci
           BETTER_AUTH_SECRET: ci-only-placeholder-not-a-secret-value
+          MEMORY_SECRET: ci-only-placeholder-not-a-secret-value
         run: |
           pnpm --filter @memdot/api openapi
           git diff --exit-code packages/sdk/openapi.json

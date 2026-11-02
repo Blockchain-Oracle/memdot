@@ -53,3 +53,5 @@ export const grantScope = pgEnum("grant_scope", ["read", "read_write"]);
 export const grantStatus = pgEnum("grant_status", ["pending", "active", "revoked", "expired"]);
 
 export const granteeKind = pgEnum("grantee_kind", ["account", "agent"]);
+
+export const memoryEvent = pgEnum("memory_event", ["ADD", "UPDATE", "DELETE"]);

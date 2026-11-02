@@ -22,7 +22,10 @@
     "drizzle-orm": "0.45.4",
     "pg-boss": "^12.38.0",
     "viem": "^2.57.13",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@memdot/crypto": "workspace:*",
+    "@memdot/memory-engine": "workspace:*",
+    "@memdot/memory-server": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

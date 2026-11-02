@@ -6,6 +6,7 @@ import { parseArgs } from "node:util";
 import { createChainClient, signerFromMnemonic } from "@memdot/chain";
 import { createDatabase } from "@memdot/db";
 import { startBoss } from "@memdot/jobs";
+import { AssistedKeys } from "@memdot/memory-server";
 import type { Deps } from "../src/deps.js";
 import { env } from "../src/env.js";
 import { createEvmClients } from "../src/evm.js";
@@ -24,6 +25,7 @@ const deps: Deps = {
   signer: signerFromMnemonic(env.SIGNER_MNEMONIC),
   evm: createEvmClients(env),
   env,
+  memoryKeys: new AssistedKeys(env.MEMORY_SECRET),
 };
 
 try {

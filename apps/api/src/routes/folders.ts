@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { folders, objects } from "@memdot/db";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db.js";
-import { badRequest } from "../lib/errors.js";
+import { badRequest, conflict } from "../lib/errors.js";
 import { tombstoneObjects } from "../lib/lifecycle.js";
 import { loadFolder, loadSpace } from "../lib/ownership.js";
 import { requireScope } from "../lib/principal.js";
@@ -126,6 +126,13 @@ export function folderRoutes() {
           if (parent.spaceId !== space.id) {
             throw badRequest("PARENT_SPACE", "The parent folder is in another space.");
           }
+        }
+        // The server writes Assisted segments itself, and it can't sign with the owner's wallet.
+        if (body.memoryMode === "assisted" && space.mode === "self_signed") {
+          throw conflict(
+            "ASSISTED_NEEDS_SPONSORED",
+            "Assisted memory is stored by MemDot, so it needs a sponsored space. In a wallet-paid space, use Private.",
+          );
         }
         const [row] = await db
           .insert(folders)

@@ -1,5 +1,6 @@
 import type { ChainClient, LocalSigner } from "@memdot/chain";
 import type { Database } from "@memdot/db";
+import type { AssistedKeys } from "@memdot/memory-server";
 import type { PgBoss } from "pg-boss";
 import type { Env } from "./env.js";
 import type { EvmClients } from "./evm.js";
@@ -12,6 +13,8 @@ export interface Deps {
   signer: LocalSigner;
   evm: EvmClients;
   env: Env;
+  /** Opens and seals what Assisted namespaces hold. */
+  memoryKeys: AssistedKeys;
 }
 
 export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];

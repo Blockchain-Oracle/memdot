@@ -13,12 +13,16 @@ import { createRouter } from "./lib/router.js";
 import { accountRoutes } from "./routes/account.js";
 import { activityRoutes } from "./routes/activity.js";
 import { agentRoutes } from "./routes/agents.js";
+import { chatRoutes } from "./routes/chat.js";
+import { configureRoutes } from "./routes/configure.js";
 import { folderRoutes } from "./routes/folders.js";
 import { gatewayRoutes } from "./routes/gateway.js";
 import { grantRoutes } from "./routes/grants.js";
 import { healthRoutes } from "./routes/health.js";
 import { jobRoutes } from "./routes/jobs.js";
 import { keyRoutes } from "./routes/keys.js";
+import { memoryRoutes } from "./routes/memories.js";
+import { namespaceRoutes } from "./routes/namespaces.js";
 import { objectRoutes } from "./routes/objects.js";
 import { proofRoutes } from "./routes/proof.js";
 import { registryRoutes } from "./routes/registry.js";
@@ -131,7 +135,12 @@ export function createApp(services: Services) {
     .route("/", usageRoutes(services))
     .route("/", activityRoutes())
     .route("/", proofRoutes(services))
-    .route("/", registryRoutes(services));
+    .route("/", registryRoutes(services))
+    // Named routes like /v1/memories/import go first: /v1/memories/{id} would catch them otherwise.
+    .route("/", namespaceRoutes(services))
+    .route("/", memoryRoutes(services))
+    .route("/", configureRoutes(services))
+    .route("/", chatRoutes(services));
 
   app.openAPIRegistry.registerComponent("securitySchemes", "ApiKey", {
     type: "http",

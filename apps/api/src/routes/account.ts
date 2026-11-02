@@ -1,13 +1,33 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { EVM_ACCOUNT_SUFFIX } from "@memdot/config";
-import { accounts, account as authAccount, user as authUser, objects, passkey } from "@memdot/db";
+import {
+  accounts,
+  agents,
+  apikey,
+  account as authAccount,
+  user as authUser,
+  folders,
+  grants,
+  memoryConfig,
+  objects,
+  passkey,
+  session,
+  spaces,
+  walletAddress,
+} from "@memdot/db";
 import { Address, verifySignature } from "@talismn/siws";
-import { and, count, eq, isNull, ne, type SQL } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, ne, type SQL } from "drizzle-orm";
 import { type Hex, verifyMessage } from "viem";
 import { db } from "../db.js";
 import { badRequest, conflict, forbidden } from "../lib/errors.js";
 import { tombstoneObjects } from "../lib/lifecycle.js";
-import { accountOf, assertFreshSession, forgetAccount, principalOf } from "../lib/principal.js";
+import {
+  accountOf,
+  assertFreshSession,
+  forgetAccount,
+  forgetApiKeys,
+  principalOf,
+} from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { Cid, Hex32 } from "../schemas.js";
 
@@ -313,6 +333,88 @@ export function accountRoutes() {
         });
         if (!row) throw new Error("account update returned no row");
         return c.json(serialize(row), 200);
+      },
+    )
+    .openapi(
+      createRoute({
+        method: "delete",
+        path: "/v1/account",
+        tags: ["Account"],
+        summary: "Delete this account",
+        description:
+          "Stops every renewal, forgets all memories, revokes keys, agents and grants, and removes every way to sign in. Stored bytes expire from the chain within 7 days, and what was already shared or downloaded can't be recalled. Dashboard only, after a recent sign-in.",
+        security: [{ Session: [] }],
+        responses: {
+          200: {
+            description: "Deleted",
+            content: jsonContent(
+              z
+                .object({ deleted: z.literal(true), objects: z.number().int() })
+                .openapi("AccountDeleted"),
+            ),
+          },
+          ...errorResponses,
+        },
+      }),
+      async (c) => {
+        const principal = principalOf(c);
+        if (principal.via !== "session") {
+          throw forbidden("An account can only be deleted from the dashboard.");
+        }
+        assertFreshSession(principal);
+        const accountId = accountOf(c);
+        const objectCount = await db.transaction(async (tx) => {
+          const now = new Date();
+          const tombstoned = await tombstoneObjects(tx, eq(objects.accountId, accountId) as SQL);
+          const owned = tx
+            .select({ id: spaces.id })
+            .from(spaces)
+            .where(eq(spaces.accountId, accountId));
+          await tx
+            .update(grants)
+            .set({ status: "revoked", revokedAt: now })
+            .where(inArray(grants.spaceId, owned));
+          await tx.update(folders).set({ deletedAt: now }).where(inArray(folders.spaceId, owned));
+          await tx
+            .update(spaces)
+            .set({ deletedAt: now, usedBytes: 0 })
+            .where(eq(spaces.accountId, accountId));
+          await tx
+            .update(agents)
+            .set({ revokedAt: now })
+            .where(and(eq(agents.accountId, accountId), isNull(agents.revokedAt)));
+          await tx.delete(memoryConfig).where(eq(memoryConfig.accountId, accountId));
+          // The chain owner and sharing key go free, so the same wallet can start again.
+          await tx
+            .update(accounts)
+            .set({
+              deletedAt: now,
+              ownerAccount: `deleted:${accountId}`,
+              evmAddress: null,
+              encryptionKey: null,
+              keyBundleCid: null,
+              registryOwner: null,
+            })
+            .where(eq(accounts.id, accountId));
+          await tx.delete(apikey).where(eq(apikey.referenceId, principal.userId));
+          await tx.delete(passkey).where(eq(passkey.userId, principal.userId));
+          await tx.delete(authAccount).where(eq(authAccount.userId, principal.userId));
+          await tx.delete(walletAddress).where(eq(walletAddress.userId, principal.userId));
+          await tx.delete(session).where(eq(session.userId, principal.userId));
+          // The row stays for the account's foreign key; nothing in it identifies anyone now.
+          await tx
+            .update(authUser)
+            .set({
+              name: "Deleted account",
+              email: `deleted-${principal.userId}@memdot.invalid`,
+              image: null,
+            })
+            .where(eq(authUser.id, principal.userId));
+          return tombstoned;
+        });
+        forgetAccount(principal.userId);
+        forgetApiKeys();
+        return c.json({ deleted: true as const, objects: objectCount }, 200);
       },
     );
 }
