@@ -122,7 +122,7 @@ export function createApp(services: Services) {
   });
 
   app
-    .route("/", accountRoutes())
+    .route("/", accountRoutes(services))
     .route("/", spaceRoutes())
     .route("/", folderRoutes())
     .route("/", objectRoutes(services))

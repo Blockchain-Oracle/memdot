@@ -268,6 +268,11 @@ export class PrivateNamespace {
     return this.readableEntries(options).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
+  /** Whether this device already knows the memory is here. */
+  holds(id: string): boolean {
+    return this.entries.has(id);
+  }
+
   async get(id: string): Promise<MemoryEntry | null> {
     await this.ensureLoaded();
     return this.entries.get(id) ?? null;

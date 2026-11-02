@@ -290,8 +290,8 @@ export class DataApi {
    * Export first if you want a copy; nothing brings it back. Dashboard sessions only.
    */
   async deleteAccount(): Promise<void> {
-    await this.ctx.registry.deleteAccount();
-    await unwrap(this.ctx.transport.api.DELETE("/v1/account"));
+    const record = this.ctx.registry.deleteAccountCalldata();
+    await unwrap(this.ctx.transport.api.DELETE("/v1/account", { body: record ? { record } : {} }));
     this.ctx.vault.lock();
   }
 }

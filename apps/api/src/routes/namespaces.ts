@@ -4,18 +4,19 @@ import { enqueueMemory, JOB_KIND } from "@memdot/jobs";
 import { parseMemoryImport } from "@memdot/memory-engine";
 import { compactIfDue, openBody, sealWrite, tombstoneObjects } from "@memdot/memory-server";
 import { and, desc, eq, inArray, isNull, notInArray, type SQL, sql } from "drizzle-orm";
+import type { Context } from "hono";
 import { db } from "../db.js";
 import { badRequest, conflict } from "../lib/errors.js";
 import {
   assertAssisted,
-  assertSharedBudget,
   loadNamespace,
   resolveAssisted,
+  spendSharedModel,
 } from "../lib/namespaces.js";
 import { accountOf, principalOf, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { fromBase64, IdParam, SealedText, toBase64 } from "../schemas.js";
-import type { Services } from "../types.js";
+import type { AppEnv, Services } from "../types.js";
 import { AddAccepted, NamespaceRow, NamespaceSettings } from "./memory-schemas.js";
 
 /** Memories one import may hold. A JSON body caps at 1 MiB anyway. */
@@ -24,6 +25,8 @@ const MAX_IMPORT_ITEMS = 5_000;
 const MAX_EXPORT_ITEMS = 20_000;
 /** Segments one registry record lists. */
 const MAX_RECORD_BATCH = 100;
+/** Memories embedded in one model call. */
+const IMPORT_ITEMS_PER_CALL = 96;
 
 const PrivateState = z
   .object({
@@ -42,6 +45,12 @@ const PrivateState = z
     snapshot: z.object({ id: z.uuid(), cid: z.string(), key_epoch: z.number().int() }).nullable(),
   })
   .openapi("PrivateNamespaceState");
+
+/** A key limited to some spaces only touches objects in those spaces. */
+const allowedSpaces = (c: Context<AppEnv>) => {
+  const allowed = principalOf(c).apiKey?.spaceIds;
+  return allowed ? inArray(objects.spaceId, allowed) : undefined;
+};
 
 export function namespaceRoutes(services: Services) {
   const keys = services.memoryKeys;
@@ -91,6 +100,7 @@ export function namespaceRoutes(services: Services) {
               eq(objects.accountId, accountOf(c)),
               isNull(memorySegments.recordedAt),
               eq(objects.status, "stored"),
+              allowedSpaces(c),
             ),
           )
           .limit(MAX_RECORD_BATCH);
@@ -134,7 +144,9 @@ export function namespaceRoutes(services: Services) {
         const owned = db
           .select({ id: objects.id })
           .from(objects)
-          .where(and(inArray(objects.id, ids), eq(objects.accountId, accountOf(c))));
+          .where(
+            and(inArray(objects.id, ids), eq(objects.accountId, accountOf(c)), allowedSpaces(c)),
+          );
         const rows = await db
           .update(memorySegments)
           .set({ recordedAt: new Date() })
@@ -507,7 +519,8 @@ export function namespaceRoutes(services: Services) {
             ? item
             : { ...item, userId: body.user_id as string },
         );
-        await assertSharedBudget(c);
+        // Imports use no language model, but each batch of them is embedded.
+        await spendSharedModel(c, Math.ceil(scoped.length / IMPORT_ITEMS_PER_CALL));
         const sealed = sealWrite(keys, namespace.id, {
           kind: "import",
           items: scoped,

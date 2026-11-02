@@ -261,7 +261,14 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @description The owner-signed registry record saying this account has left */
+                        record?: string;
+                    };
+                };
+            };
             responses: {
                 /** @description Deleted */
                 200: {

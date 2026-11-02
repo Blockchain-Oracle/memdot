@@ -115,6 +115,36 @@ check(
   (await agent.memories.get(id)).memory.includes("Accra"),
 );
 
+// Another account, trying every filter shape that has an OR inside it.
+const stranger = client();
+await stranger.account.create(walletFromMnemonic(generateMnemonic(wordlist)), { name: "Stranger" });
+const strangerSpace = await stranger.spaces.create({ name: "Stranger" });
+const strangerNs = await stranger.memories.createNamespace({
+  spaceId: strangerSpace.id,
+  name: "Stranger",
+  mode: "assisted",
+});
+const probes: Record<string, unknown>[] = [
+  { memory_ids: { nin: ["00000000-0000-0000-0000-000000000000"] } },
+  { user_id: { nin: ["x"] } },
+  { created_at: { nin: ["2020-01-01"] } },
+  { metadata: { team: { nin: ["x"] } } },
+  { categories: { nin: ["x"] } },
+  { NOT: [{ user_id: { nin: ["x"] } }] },
+  { OR: [{ user_id: { nin: ["x"] } }] },
+];
+let reached = 0;
+for (const filters of probes) {
+  const page = await stranger.memories.list({
+    namespaceId: strangerNs.id,
+    filters,
+    showExpired: true,
+  });
+  reached += page.count;
+}
+check("Another account's filters reach none of these memories", reached === 0, reached);
+await stranger.close();
+
 // ── Private, on this machine ────────────────────────────────────────────────────────────────
 const privateAdd = await owner.memories.add("My favourite tea is Earl Grey.", {
   namespaceId: privateNs.id,

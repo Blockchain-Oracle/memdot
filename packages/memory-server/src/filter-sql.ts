@@ -125,8 +125,7 @@ function keywordCondition(keys: AssistedKeys, folderId: string, node: Condition)
   ) as SQL;
 }
 
-/** A parsed filter as SQL over `memories`. Values are always bound, never spliced. */
-export function filterToSql(keys: AssistedKeys, folderId: string, node: FilterNode): SQL {
+function nodeToSql(keys: AssistedKeys, folderId: string, node: FilterNode): SQL {
   switch (node.type) {
     case "and":
       return and(...node.children.map((child) => filterToSql(keys, folderId, child))) as SQL;
@@ -145,4 +144,13 @@ export function filterToSql(keys: AssistedKeys, folderId: string, node: FilterNo
       return textCondition(sql`${COLUMNS[node.field] as PgColumn}`, node);
     }
   }
+}
+
+/**
+ * A parsed filter as SQL over `memories`. Values are always bound, never spliced. Every node comes
+ * back in its own parentheses: the result is ANDed with the namespace check, and a bare `or` inside
+ * it would reach past that check into other accounts' rows.
+ */
+export function filterToSql(keys: AssistedKeys, folderId: string, node: FilterNode): SQL {
+  return sql`(${nodeToSql(keys, folderId, node)})`;
 }

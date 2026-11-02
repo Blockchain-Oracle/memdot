@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigserial,
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -164,6 +165,20 @@ export const memoryInbox = pgTable("memory_inbox", {
   sealed: bytea("sealed").notNull(),
   createdAt: createdAt(),
 });
+
+/** Each account's calls on MemDot's shared model key, per UTC day. Its own key isn't counted. */
+export const memoryModelUsage = pgTable(
+  "memory_model_usage",
+  {
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id),
+    day: date("day", { mode: "string" }).notNull(),
+    modelCalls: integer("model_calls").notNull().default(0),
+    searches: integer("searches").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.day] })],
+);
 
 /** A namespace's extraction settings. The server reads them for Assisted; Private seals them. */
 export const memorySettings = pgTable("memory_settings", {

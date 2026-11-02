@@ -24,7 +24,7 @@ const ACCOUNT_ACTIONS = new Set<number>([
   Action.TombstoneObjects,
 ]);
 
-function decodeRecordCall(calldata: Hex) {
+export function decodeRecordCall(calldata: Hex) {
   try {
     const { functionName, args } = decodeFunctionData({ abi: memDotRegistryAbi, data: calldata });
     if (functionName === "record") return args;

@@ -63,12 +63,33 @@ const KNOWN_QUERY_CHARS = 2_000;
 /** Texts sent to an embedding model in one call. */
 const EMBED_BATCH = 96;
 
-/** Refuses private addresses and oversized documents. */
+/**
+ * Reads at most MAX_DOCUMENT_BYTES, stopping as soon as a document goes past it, and refuses private
+ * addresses. Errors don't name the URL: they end up on the job, and a URL can carry secrets.
+ */
 const fetchDocument: FetchDocument = async (url) => {
   const response = await safeFetch(url, { signal: AbortSignal.timeout(DOCUMENT_TIMEOUT_MS) });
-  if (!response.ok) throw new Error(`Couldn't fetch ${url}: ${response.status}`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length > MAX_DOCUMENT_BYTES) throw new Error(`${url} is too large to read.`);
+  if (!response.ok)
+    throw new Error(`Couldn't fetch a document: the host answered ${response.status}.`);
+  const reader = response.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (reader) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > MAX_DOCUMENT_BYTES) {
+      await reader.cancel();
+      throw new Error("A document is too large to read.");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
   return { bytes, mime: response.headers.get("content-type")?.split(";")[0] ?? "" };
 };
 

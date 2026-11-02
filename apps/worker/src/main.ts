@@ -20,6 +20,7 @@ import { startHealthServer } from "./health.js";
 const BREAKER_CHECK_MS = 60_000;
 const CHAIN_TX_POLL_SECONDS = 2;
 const MEMORY_POLL_SECONDS = 1;
+const MEMORY_CONCURRENCY = 4;
 const SHUTDOWN_GRACE_MS = 30_000;
 
 const database = createDatabase(env.DATABASE_URL, 5);
@@ -77,7 +78,12 @@ breakerTimer.unref();
 
 await boss.work(
   QUEUE.memory,
-  { pollingIntervalSeconds: MEMORY_POLL_SECONDS, includeMetadata: true },
+  {
+    pollingIntervalSeconds: MEMORY_POLL_SECONDS,
+    includeMetadata: true,
+    // Models are slow: one account's long call mustn't hold up everyone else's.
+    localConcurrency: MEMORY_CONCURRENCY,
+  },
   async ([job]: JobWithMetadata<unknown>[]) => {
     if (job) await handleMemory(deps, { ...job, data: memoryPayload.parse(job.data) });
   },

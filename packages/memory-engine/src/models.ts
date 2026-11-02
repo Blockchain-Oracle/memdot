@@ -29,6 +29,9 @@ function oneModel(config: LlmConfig, model: string, fetch?: Fetch): LanguageMode
   }
 }
 
+/** No embedding call waits longer than this; a stalled provider must not hold a worker. */
+const EMBED_TIMEOUT_MS = 60_000;
+
 /** How long a model that hit its quota is left alone before it's asked again. */
 const QUOTA_COOLDOWN_MS = 60_000;
 
@@ -119,6 +122,7 @@ export function providerEmbedder(
         model,
         values: texts,
         maxRetries: 3,
+        abortSignal: AbortSignal.timeout(EMBED_TIMEOUT_MS),
         providerOptions: {
           google: {
             outputDimensionality: dimensions,

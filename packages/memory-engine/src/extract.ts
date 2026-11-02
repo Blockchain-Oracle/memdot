@@ -27,6 +27,10 @@ export const ChatMessageSchema = z.object({
   name: z.string().optional(),
 });
 
+/** No model call waits longer than this; a stalled provider must not hold a worker. */
+const MODEL_TIMEOUT_MS = 120_000;
+const timeout = () => AbortSignal.timeout(MODEL_TIMEOUT_MS);
+
 /** Fetches a document a message names by URL; the server's version refuses private addresses. */
 export type FetchDocument = (url: string) => Promise<{ bytes: Uint8Array; mime: string }>;
 
@@ -140,6 +144,7 @@ export async function extractMemories(
   ].join("\n\n");
   const { output } = await generateText({
     model,
+    abortSignal: timeout(),
     instructions: EXTRACTION_SYSTEM + (input.agentScoped ? AGENT_SCOPE_SUFFIX : ""),
     output: Output.object({ schema: Extraction }),
     messages: [
@@ -164,6 +169,7 @@ export async function proceduralRecord(
 ): Promise<string> {
   const { text } = await generateText({
     model,
+    abortSignal: timeout(),
     instructions: prompt || PROCEDURAL_SYSTEM,
     messages: [{ role: "user", content: await conversationParts(messages, fetchDocument) }],
   });
@@ -174,6 +180,7 @@ export async function proceduralRecord(
 export async function summarizeMemories(model: LanguageModel, texts: string[]): Promise<string> {
   const { text } = await generateText({
     model,
+    abortSignal: timeout(),
     instructions: SUMMARY_SYSTEM,
     prompt: texts.map((memory) => `- ${memory}`).join("\n"),
   });
@@ -190,6 +197,7 @@ export async function rerankTexts(
 ): Promise<number[]> {
   const { output } = await generateText({
     model,
+    abortSignal: timeout(),
     instructions: RERANK_SYSTEM,
     output: Output.object({ schema: Relevance }),
     prompt: `Query: ${query}\n\n${texts.map((text, i) => `[${i}] ${text}`).join("\n")}\n\nGive exactly ${texts.length} scores, in order.`,
@@ -206,6 +214,7 @@ const GeneratedInstructions = z.object({
 export async function generateInstructions(model: LanguageModel, useCase: string) {
   const { output } = await generateText({
     model,
+    abortSignal: timeout(),
     instructions: INSTRUCTIONS_SYSTEM,
     output: Output.object({ schema: GeneratedInstructions }),
     prompt: useCase,

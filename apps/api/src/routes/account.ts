@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { EVM_ACCOUNT_SUFFIX } from "@memdot/config";
+import { Action, NO_SALT } from "@memdot/contracts";
 import {
   accounts,
   agents,
@@ -8,15 +9,19 @@ import {
   user as authUser,
   folders,
   grants,
+  jobs,
   memoryConfig,
+  memoryInbox,
+  memorySettings,
   objects,
   passkey,
   session,
   spaces,
   walletAddress,
 } from "@memdot/db";
+import { enqueueChainTx, updateJob } from "@memdot/jobs";
 import { Address, verifySignature } from "@talismn/siws";
-import { and, count, eq, inArray, isNull, ne, type SQL } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, ne, notInArray, type SQL } from "drizzle-orm";
 import { type Hex, verifyMessage } from "viem";
 import { db } from "../db.js";
 import { badRequest, conflict, forbidden } from "../lib/errors.js";
@@ -30,6 +35,11 @@ import {
 } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { Cid, Hex32 } from "../schemas.js";
+import type { Services } from "../types.js";
+import { decodeRecordCall } from "./registry.js";
+
+/** A closing record is one short signed call. */
+const MAX_CLOSING_RECORD_CHARS = 4_096;
 
 const RECOVERY_PROVIDER = "recovery-code";
 /** What the owner signs to prove the chain account is theirs (it is bound to the user id). */
@@ -124,7 +134,7 @@ async function verifyOwner(
   return { ownerAccount, evmAddress: address };
 }
 
-export function accountRoutes() {
+export function accountRoutes(services: Services) {
   return createRouter()
     .openapi(
       createRoute({
@@ -344,6 +354,23 @@ export function accountRoutes() {
         description:
           "Stops every renewal, forgets all memories, revokes keys, agents and grants, and removes every way to sign in. Stored bytes expire from the chain within 7 days, and what was already shared or downloaded can't be recalled. Dashboard only, after a recent sign-in.",
         security: [{ Session: [] }],
+        request: {
+          body: {
+            required: false,
+            content: jsonContent(
+              z.object({
+                record: z
+                  .string()
+                  .max(MAX_CLOSING_RECORD_CHARS)
+                  .regex(/^0x[0-9a-fA-F]+$/)
+                  .optional()
+                  .openapi({
+                    description: "The owner-signed registry record saying this account has left",
+                  }),
+              }),
+            ),
+          },
+        },
         responses: {
           200: {
             description: "Deleted",
@@ -363,9 +390,40 @@ export function accountRoutes() {
         }
         assertFreshSession(principal);
         const accountId = accountOf(c);
+        const closing = c.req.valid("json")?.record as Hex | undefined;
+        const [current] = await db.select().from(accounts).where(eq(accounts.id, accountId));
+        if (closing) {
+          const [owner, salt, action] = decodeRecordCall(closing);
+          if (
+            salt !== NO_SALT ||
+            action !== Action.DeleteAccount ||
+            !current?.registryOwner ||
+            current.registryOwner !== owner
+          ) {
+            throw badRequest("BAD_RECORD", "That isn't this account's closing record.");
+          }
+        }
         const objectCount = await db.transaction(async (tx) => {
           const now = new Date();
           const tombstoned = await tombstoneObjects(tx, eq(objects.accountId, accountId) as SQL);
+          // Writes still queued must not run, or use a model, for an account that's gone.
+          const queued = await tx
+            .select({ id: jobs.id })
+            .from(jobs)
+            .where(
+              and(eq(jobs.accountId, accountId), notInArray(jobs.status, ["finalized", "failed"])),
+            );
+          for (const job of queued) {
+            await updateJob(tx, job.id, { status: "failed", error: "The account was deleted." });
+          }
+          if (queued.length > 0) {
+            await tx.delete(memoryInbox).where(
+              inArray(
+                memoryInbox.jobId,
+                queued.map((job) => job.id),
+              ),
+            );
+          }
           const owned = tx
             .select({ id: spaces.id })
             .from(spaces)
@@ -384,6 +442,16 @@ export function accountRoutes() {
             .set({ revokedAt: now })
             .where(and(eq(agents.accountId, accountId), isNull(agents.revokedAt)));
           await tx.delete(memoryConfig).where(eq(memoryConfig.accountId, accountId));
+          await tx
+            .delete(memorySettings)
+            .where(
+              inArray(
+                memorySettings.folderId,
+                tx.select({ id: folders.id }).from(folders).where(inArray(folders.spaceId, owned)),
+              ),
+            );
+          if (closing)
+            await enqueueChainTx(services.boss, tx, { action: "registry", calldata: closing });
           // The chain owner and sharing key go free, so the same wallet can start again.
           await tx
             .update(accounts)

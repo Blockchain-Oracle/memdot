@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { env } from "../env.js";
 import { badRequest, conflict, HttpError } from "../lib/errors.js";
-import { accountModels } from "../lib/namespaces.js";
+import { accountModels, spendSharedModel } from "../lib/namespaces.js";
 import { accountOf, requireAccountWide, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { fromBase64, toBase64 } from "../schemas.js";
@@ -182,12 +182,22 @@ export function configureRoutes(services: Services) {
           .where(eq(memoryConfig.accountId, accountId));
         const choose = (
           next: typeof body.llm,
+          choiceNow: unknown,
           sealedNow: Uint8Array | null | undefined,
         ): { choice: unknown; sealed: Uint8Array | null } => {
           if (!next) return { choice: null, sealed: null };
+          // A saved key only ever goes where it was saved for: a key that could be pointed at a
+          // new address could be read back by anyone holding an API key.
+          const saved = stored.safeParse(choiceNow);
+          const sameDestination =
+            saved.success &&
+            saved.data.provider === next.provider &&
+            (saved.data.baseUrl ?? undefined) === next.base_url;
           const sealed = next.api_key
             ? keys.sealForAccount(accountId, next.api_key)
-            : (sealedNow ?? null);
+            : sameDestination
+              ? (sealedNow ?? null)
+              : null;
           if (!sealed) throw conflict("KEY_REQUIRED", `Give an API key for ${next.provider}.`);
           return {
             choice: {
@@ -198,9 +208,12 @@ export function configureRoutes(services: Services) {
             sealed,
           };
         };
-        const llm = body.llm === undefined ? null : choose(body.llm, current?.llmKeySealed);
+        const llm =
+          body.llm === undefined ? null : choose(body.llm, current?.llm, current?.llmKeySealed);
         const embedder =
-          body.embedder === undefined ? null : choose(body.embedder, current?.embedderKeySealed);
+          body.embedder === undefined
+            ? null
+            : choose(body.embedder, current?.embedder, current?.embedderKeySealed);
         const values = {
           ...(llm ? { llm: llm.choice, llmKeySealed: llm.sealed } : {}),
           ...(embedder ? { embedder: embedder.choice, embedderKeySealed: embedder.sealed } : {}),
@@ -273,6 +286,7 @@ export function configureRoutes(services: Services) {
         },
       }),
       async (c) => {
+        await spendSharedModel(c);
         const models = await accountModels(c, services);
         const reason = (error: unknown) =>
           (error instanceof Error ? error.message : String(error)).slice(0, 300);
@@ -326,6 +340,7 @@ export function configureRoutes(services: Services) {
         if (!models.llm) {
           throw new HttpError(409, "MODEL_REQUIRED", "Set a model under Configuration first.");
         }
+        await spendSharedModel(c);
         return c.json(await generateInstructions(models.llm, c.req.valid("json").use_case), 200);
       },
     );

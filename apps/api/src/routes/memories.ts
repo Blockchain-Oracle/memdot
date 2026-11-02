@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { jobs, memories, memoryHistory, memoryInbox, objects } from "@memdot/db";
+import { folders, jobs, memories, memoryHistory, memoryInbox, objects } from "@memdot/db";
 import { enqueueMemory, JOB_KIND } from "@memdot/jobs";
 import { normalizeMessages } from "@memdot/memory-engine";
 import { rerankTexts, summarizeMemories } from "@memdot/memory-engine/llm";
@@ -24,21 +24,22 @@ import { and, asc, count, eq, inArray, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import type { Context } from "hono";
 import { db } from "../db.js";
-import { conflict, isUniqueViolation, notFound } from "../lib/errors.js";
+import { badRequest, conflict, isUniqueViolation, notFound } from "../lib/errors.js";
 import {
   accountModels,
   assertAssisted,
-  assertSharedBudget,
   loadMemory,
   loadNamespace,
   parseFilters,
   resolveAssisted,
+  searchEmbedder,
+  spendSharedModel,
 } from "../lib/namespaces.js";
 import { afterCursor, encodeCursor, newestFirst } from "../lib/pagination.js";
 import { accountOf, principalOf, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { IdParam } from "../schemas.js";
-import type { AppEnv, Services } from "../types.js";
+import type { AppEnv, Principal, Services } from "../types.js";
 import {
   AddAccepted,
   AddRequest,
@@ -56,6 +57,8 @@ import {
 } from "./memory-schemas.js";
 
 const MAX_BATCH = 1000;
+/** Pictures and documents one write may name; each is fetched and read by the model. */
+const MAX_ATTACHMENTS = 8;
 /** Memories a summary reads at most, newest first. */
 const SUMMARY_MEMORIES = 200;
 /** Results sent to the model for reordering. */
@@ -281,9 +284,20 @@ export function memoryRoutes(services: Services) {
           throw conflict("AGENT_REQUIRED", "A procedural memory needs agent_id.");
         }
         const namespace = await resolveAssisted(c, body.namespace_id);
-        if (body.infer) await assertSharedBudget(c);
+        if (body.infer) await spendSharedModel(c);
         const accountId = accountOf(c);
         const messages = normalizeMessages(body.messages as never);
+        const attachments = messages.reduce(
+          (sum, message) =>
+            sum +
+            (typeof message.content === "string"
+              ? 0
+              : message.content.filter((part) => part.type !== "text").length),
+          0,
+        );
+        if (attachments > MAX_ATTACHMENTS) {
+          throw badRequest("TOO_MANY_ATTACHMENTS", `Attach at most ${MAX_ATTACHMENTS} per write.`);
+        }
         const expiresAt = expiryDate(body.expiration_date);
         const sealed = sealWrite(keys, namespace.id, {
           kind: "add",
@@ -353,7 +367,7 @@ export function memoryRoutes(services: Services) {
       async (c) => {
         const body = c.req.valid("json");
         const namespace = await resolveAssisted(c, body.namespace_id);
-        const models = await accountModels(c, services);
+        const models = await searchEmbedder(c, services);
         const asOf = body.reference_date !== undefined ? whenOf(body.reference_date) : undefined;
         const ranked = await searchMemories(db, keys, {
           folderId: namespace.id,
@@ -384,6 +398,7 @@ export function memoryRoutes(services: Services) {
         });
         if (body.rerank && models.llm && results.length > 1) {
           // A failed rerank leaves the order as it was: it only ever refines.
+          await spendSharedModel(c);
           try {
             const scores = await rerankTexts(
               models.llm,
@@ -394,7 +409,8 @@ export function memoryRoutes(services: Services) {
               .map((memory, i) => ({ ...memory, rerank_score: scores[i] as number }))
               .sort((a, b) => (b.rerank_score as number) - (a.rerank_score as number));
           } catch (error) {
-            console.warn("[memories] rerank skipped:", error);
+            // Message only: a provider error object carries the request, which holds the text.
+            console.warn("[memories] rerank skipped:", (error as Error).message);
           }
         }
         return c.json({ results: results.slice(0, body.top_k) }, 200);
@@ -490,6 +506,7 @@ export function memoryRoutes(services: Services) {
         const texts = rows.flatMap((row) =>
           row.sealedText ? [openBody(keys, row.folderId, row.sealedText).text] : [],
         );
+        if (texts.length) await spendSharedModel(c);
         const summary = texts.length ? await summarizeMemories(models.llm, texts) : "";
         return c.json({ summary, count: texts.length }, 200);
       },
@@ -527,6 +544,7 @@ export function memoryRoutes(services: Services) {
             and(
               eq(jobs.accountId, accountOf(c)),
               inArray(jobs.kind, MEMORY_JOB_KINDS),
+              eventsVisibleTo(principalOf(c)),
               afterCursor(cursor, jobs.createdAt, jobs.id),
             ),
           )
@@ -566,6 +584,7 @@ export function memoryRoutes(services: Services) {
               eq(jobs.id, c.req.valid("param").id),
               eq(jobs.accountId, accountOf(c)),
               inArray(jobs.kind, MEMORY_JOB_KINDS),
+              eventsVisibleTo(principalOf(c)),
             ),
           );
         if (!row) throw notFound("Event");
@@ -924,6 +943,13 @@ export function memoryRoutes(services: Services) {
         const body = c.req.valid("json");
         const row = await loadMemory(c, body.memory_id);
         const reason = body.feedback ? (body.feedback_reason ?? null) : null;
+        // A reason is free text, and the server may hold no text for a Private memory.
+        if (reason && row.mode === "private") {
+          throw badRequest(
+            "PRIVATE_NAMESPACE",
+            "A Private memory's feedback can't carry a reason.",
+          );
+        }
         await db
           .update(memories)
           .set({ feedback: body.feedback, feedbackReason: reason })
@@ -1035,6 +1061,16 @@ export function memoryRoutes(services: Services) {
         return c.json({ message: `Forgot ${deleted} memories.`, deleted }, 200);
       },
     );
+}
+
+/** A key limited to some spaces only sees events about namespaces in those spaces. */
+function eventsVisibleTo(principal: Principal): SQL | undefined {
+  const allowed = principal.apiKey?.spaceIds;
+  if (!allowed) return undefined;
+  return inArray(
+    sql`(${jobs.payload}->>'folderId')::uuid`,
+    db.select({ id: folders.id }).from(folders).where(inArray(folders.spaceId, allowed)),
+  );
 }
 
 const conflictScope = () =>

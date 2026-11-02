@@ -1,4 +1,4 @@
-import { folders, memories, memoryConfig, spaces } from "@memdot/db";
+import { folders, memories, memoryConfig, memoryModelUsage, spaces } from "@memdot/db";
 import { FilterError, type FilterNode, parseFilter } from "@memdot/memory-engine";
 import { modelsFor } from "@memdot/memory-server";
 import { and, asc, eq, inArray, isNull, type SQL, sql } from "drizzle-orm";
@@ -100,24 +100,51 @@ export function accountModels(c: Context<AppEnv>, services: Services) {
   return modelsFor(db, services.memoryKeys, env, accountOf(c));
 }
 
-/** Writes on MemDot's shared model key are capped per day; an account's own key has no cap. */
-export async function assertSharedBudget(c: Context<AppEnv>): Promise<void> {
+type UsageColumn = "modelCalls" | "searches";
+
+/** Counts toward today's allowance and returns the new total. */
+async function countUsage(accountId: string, column: UsageColumn, by: number): Promise<number> {
+  const day = new Date().toISOString().slice(0, 10);
+  const [row] = await db
+    .insert(memoryModelUsage)
+    .values({ accountId, day, [column]: by })
+    .onConflictDoUpdate({
+      target: [memoryModelUsage.accountId, memoryModelUsage.day],
+      set: { [column]: sql`${memoryModelUsage[column]} + ${by}` },
+    })
+    .returning({ total: memoryModelUsage[column] });
+  return row?.total ?? by;
+}
+
+/**
+ * Every call on MemDot's shared model key counts against the account's daily allowance, whatever
+ * route makes it. An account's own key isn't counted. `calls` is how many model calls this will take.
+ */
+export async function spendSharedModel(c: Context<AppEnv>, calls = 1): Promise<void> {
   const accountId = accountOf(c);
   const [own] = await db
     .select({ key: memoryConfig.llmKeySealed })
     .from(memoryConfig)
     .where(eq(memoryConfig.accountId, accountId));
   if (own?.key) return;
-  const result = await db.execute<{ n: number }>(sql`
-    select count(*)::int as n from jobs
-     where account_id = ${accountId}
-       and kind = 'memory_add'
-       and created_at > now() - interval '1 day'`);
-  if ((result.rows[0]?.n ?? 0) >= env.MEMORY_DAILY_SHARED_WRITES) {
+  if ((await countUsage(accountId, "modelCalls", calls)) > env.MEMORY_DAILY_SHARED_WRITES) {
     throw new HttpError(
       429,
       "MODEL_LIMIT",
-      `This account has used its ${env.MEMORY_DAILY_SHARED_WRITES} writes for today on MemDot's model. Add your own key under Configuration, or store with infer: false.`,
+      `This account has used its ${env.MEMORY_DAILY_SHARED_WRITES} calls for today on MemDot's model. Add your own key under Configuration, or store with infer: false.`,
     );
   }
+}
+
+/** The embedder a search may use: past the daily allowance on MemDot's key, none, so keywords only. */
+export async function searchEmbedder(c: Context<AppEnv>, services: Services) {
+  const models = await accountModels(c, services);
+  const accountId = accountOf(c);
+  const [own] = await db
+    .select({ key: memoryConfig.embedderKeySealed })
+    .from(memoryConfig)
+    .where(eq(memoryConfig.accountId, accountId));
+  if (own?.key || !models.embedder) return { ...models };
+  const total = await countUsage(accountId, "searches", 1);
+  return total > env.MEMORY_DAILY_SHARED_SEARCHES ? { ...models, embedder: null } : { ...models };
 }

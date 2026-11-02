@@ -10,7 +10,7 @@ import { inArray } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 import { db } from "../db.js";
 import { HttpError } from "../lib/errors.js";
-import { accountModels, assertSharedBudget, resolveAssisted } from "../lib/namespaces.js";
+import { resolveAssisted, searchEmbedder, spendSharedModel } from "../lib/namespaces.js";
 import { accountOf, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import type { Services } from "../types.js";
@@ -78,11 +78,11 @@ export function chatRoutes(services: Services) {
         );
       }
       const namespace = await resolveAssisted(c, body.namespace_id);
-      const models = await accountModels(c, services);
+      const models = await searchEmbedder(c, services);
       if (!models.llm) {
         throw new HttpError(409, "MODEL_REQUIRED", "Set a model under Configuration first.");
       }
-      await assertSharedBudget(c);
+      await spendSharedModel(c);
       const accountId = accountOf(c);
       const llm = models.llm;
 

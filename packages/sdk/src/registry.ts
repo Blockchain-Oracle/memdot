@@ -71,9 +71,13 @@ export class RegistryLog {
     );
   }
 
-  /** The account's last record: whoever reads the registry sees this owner has left. */
-  deleteAccount(): Promise<void> {
-    return this.record(NO_SALT, Action.DeleteAccount, encodeRecord.deleteAccount());
+  /**
+   * The account's last record, signed but not sent: it goes with the delete request, so a refused
+   * delete leaves no record saying the account has gone.
+   */
+  deleteAccountCalldata(): Hex | null {
+    if (!this.ctx.vault.unlocked) return null;
+    return this.signedCall(NO_SALT, Action.DeleteAccount, encodeRecord.deleteAccount());
   }
 
   createSpace(spaceId: string, mode: "sponsored" | "self_signed"): Promise<void> {
@@ -151,24 +155,23 @@ export class RegistryLog {
     );
   }
 
+  private signedCall(salt: Hex, action: number, data: Hex): Hex {
+    const signer = signerFromSeed(ownerSeed(this.ctx.vault.amk()));
+    const owner = toHex(signer.publicKey) as Hex;
+    const nonce = randomNonce();
+    const message = signingMessage(REGISTRY_ADDRESS, owner, nonce, actionHash(salt, action, data));
+    const signature = signer.sign(hexToBytes(message));
+    return encodeFunctionData({
+      abi: memDotRegistryAbi,
+      functionName: "record",
+      args: [owner, salt, action, data, nonce, Array.from(signature) as never],
+    });
+  }
+
   private async record(salt: Hex, action: number, data: Hex): Promise<void> {
     if (!this.ctx.vault.unlocked) return;
     try {
-      const signer = signerFromSeed(ownerSeed(this.ctx.vault.amk()));
-      const owner = toHex(signer.publicKey) as Hex;
-      const nonce = randomNonce();
-      const message = signingMessage(
-        REGISTRY_ADDRESS,
-        owner,
-        nonce,
-        actionHash(salt, action, data),
-      );
-      const signature = signer.sign(hexToBytes(message));
-      const calldata = encodeFunctionData({
-        abi: memDotRegistryAbi,
-        functionName: "record",
-        args: [owner, salt, action, data, nonce, Array.from(signature) as never],
-      });
+      const calldata = this.signedCall(salt, action, data);
       await unwrap(this.ctx.transport.api.POST("/v1/registry/records", { body: { calldata } }));
     } catch (error) {
       console.warn("[memdot] registry record skipped:", error);

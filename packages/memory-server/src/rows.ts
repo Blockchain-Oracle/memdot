@@ -163,6 +163,12 @@ export async function forgetRows(
       embedding: null,
       entityTerms: null,
       metadata: null,
+      categories: null,
+      userId: null,
+      agentId: null,
+      runId: null,
+      sourceLabel: null,
+      feedbackReason: null,
       dedupeKey: null,
       termCount: 0,
     })

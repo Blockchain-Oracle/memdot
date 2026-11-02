@@ -14,7 +14,9 @@ export const memoryEnvSchema = z.object({
   MEMORY_EMBEDDING_MODEL: z.string().optional(),
   MEMORY_EMBEDDING_API_KEY: z.string().optional(),
   MEMORY_EMBEDDING_BASE_URL: z.url().optional(),
-  /** Writes per account per day on MemDot's own model key; your own key has no limit. */
+  /** Model calls per account per day on MemDot's own key; your own key has no limit. */
   MEMORY_DAILY_SHARED_WRITES: z.coerce.number().int().positive().default(100),
+  /** Searches embedded per account per day on MemDot's own key; past it, search is by keyword. */
+  MEMORY_DAILY_SHARED_SEARCHES: z.coerce.number().int().positive().default(1_000),
 });
 export type MemoryEnv = z.infer<typeof memoryEnvSchema>;

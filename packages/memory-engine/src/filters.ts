@@ -69,16 +69,39 @@ function conditionsFor(field: FilterField, value: unknown, path?: string): Filte
         `Unknown filter operator "${op}". Use one of: ${FILTER_OPERATORS.slice(0, -1).join(", ")}, or "*" for any value.`,
       );
     }
-    if (LIST_OPERATORS.has(op as FilterOperator) && !Array.isArray(operand)) {
-      throw new FilterError(`The "${op}" operator takes a list.`);
+    if (LIST_OPERATORS.has(op as FilterOperator)) {
+      if (!Array.isArray(operand)) throw new FilterError(`The "${op}" operator takes a list.`);
+      if (operand.length > MAX_FILTER_LIST) {
+        throw new FilterError(`The "${op}" operator takes up to ${MAX_FILTER_LIST} values.`);
+      }
     }
     return { type: "condition", field, ...at, op: op as FilterOperator, value: operand };
   });
 }
 
+/** More than any real query needs, and few enough that a filter can't become a costly statement. */
+const MAX_FILTER_DEPTH = 8;
+const MAX_FILTER_CONDITIONS = 64;
+const MAX_FILTER_LIST = 256;
+
 /** Parses a filter object, or throws a FilterError that says what to change. */
 export function parseFilter(raw: unknown): FilterNode {
+  const budget = { conditions: 0 };
+  return parseNode(raw, 1, budget);
+}
+
+function parseNode(raw: unknown, depth: number, budget: { conditions: number }): FilterNode {
   if (!isPlainObject(raw)) throw new FilterError("A filter must be an object.");
+  if (depth > MAX_FILTER_DEPTH) {
+    throw new FilterError(`A filter can nest ${MAX_FILTER_DEPTH} levels deep.`);
+  }
+  const counted = (nodes: FilterNode[]) => {
+    budget.conditions += nodes.length;
+    if (budget.conditions > MAX_FILTER_CONDITIONS) {
+      throw new FilterError(`A filter can hold ${MAX_FILTER_CONDITIONS} conditions.`);
+    }
+    return nodes;
+  };
   const children: FilterNode[] = [];
   for (const [key, value] of Object.entries(raw)) {
     const logical = LOGICAL[key];
@@ -88,16 +111,19 @@ export function parseFilter(raw: unknown): FilterNode {
       if (!items || items.length === 0) {
         throw new FilterError(`${key} takes a non-empty list of conditions.`);
       }
-      children.push({ type: logical, children: items.map(parseFilter) });
+      children.push({
+        type: logical,
+        children: items.map((item) => parseNode(item, depth + 1, budget)),
+      });
     } else if (key === "metadata") {
       if (!isPlainObject(value)) throw new FilterError("metadata takes an object of keys.");
       for (const [path, condition] of Object.entries(value)) {
-        children.push(...conditionsFor("metadata", condition, path));
+        children.push(...counted(conditionsFor("metadata", condition, path)));
       }
     } else if (key.startsWith("metadata.")) {
-      children.push(...conditionsFor("metadata", value, key.slice("metadata.".length)));
+      children.push(...counted(conditionsFor("metadata", value, key.slice("metadata.".length))));
     } else if (FILTER_FIELDS.includes(key as (typeof FILTER_FIELDS)[number])) {
-      children.push(...conditionsFor(key as FilterField, value));
+      children.push(...counted(conditionsFor(key as FilterField, value)));
     } else {
       throw new FilterError(
         `Can't filter on "${key}". Use AND, OR, NOT, ${FILTER_FIELDS.join(", ")} or metadata.`,

@@ -767,29 +767,31 @@ export class MemoriesApi {
     }
   }
 
+  /**
+   * The Private namespace holding a memory, or null if it's Assisted. Asked before anything is sent:
+   * text for a Private memory must never leave this device, not even to be refused.
+   */
+  private async holderOf(id: string): Promise<PrivateNamespace | null> {
+    for (const held of this.privateNamespaces.values()) {
+      if (held.holds(id)) return held;
+    }
+    try {
+      await unwrap(this.ctx.transport.api.GET("/v1/memories/{id}", { params: { path: { id } } }));
+      return null;
+    } catch (error) {
+      const held = await this.privateHolding(error);
+      if (!held) throw error;
+      return held;
+    }
+  }
+
   async update(
     id: string,
     change: MemoryUpdate,
     options: { wallet?: Wallet; wait?: boolean } = {},
   ): Promise<Memory> {
-    try {
-      return fromWire(
-        await unwrap(
-          this.ctx.transport.api.PUT("/v1/memories/{id}", {
-            params: { path: { id } },
-            body: {
-              ...(change.text !== undefined ? { text: change.text } : {}),
-              ...(change.metadata ? { metadata: change.metadata } : {}),
-              ...(change.expirationDate !== undefined
-                ? { expiration_date: change.expirationDate }
-                : {}),
-            },
-          }),
-        ),
-      );
-    } catch (error) {
-      const held = await this.privateHolding(error);
-      if (!held) throw error;
+    const held = await this.holderOf(id);
+    if (held) {
       const next = await held.update(
         id,
         {
@@ -801,6 +803,20 @@ export class MemoriesApi {
       );
       return fromEntry(next, held.id);
     }
+    return fromWire(
+      await unwrap(
+        this.ctx.transport.api.PUT("/v1/memories/{id}", {
+          params: { path: { id } },
+          body: {
+            ...(change.text !== undefined ? { text: change.text } : {}),
+            ...(change.metadata ? { metadata: change.metadata } : {}),
+            ...(change.expirationDate !== undefined
+              ? { expiration_date: change.expirationDate }
+              : {}),
+          },
+        }),
+      ),
+    );
   }
 
   /** Forgets one memory: out of search and lists at once, in both modes. */
@@ -872,11 +888,27 @@ export class MemoriesApi {
     }
   }
 
-  async batchUpdate(memories: { id: string; text?: string; metadata?: Record<string, unknown> }[]) {
-    return unwrap(
+  async batchUpdate(
+    memories: { id: string; text?: string; metadata?: Record<string, unknown> }[],
+    options: { wallet?: Wallet } = {},
+  ): Promise<void> {
+    const assisted: typeof memories = [];
+    for (const memory of memories) {
+      const held = await this.holderOf(memory.id);
+      if (!held) assisted.push(memory);
+      else {
+        await held.update(
+          memory.id,
+          { text: memory.text, metadata: memory.metadata },
+          { wallet: options.wallet, wait: false },
+        );
+      }
+    }
+    if (assisted.length === 0) return;
+    await unwrap(
       this.ctx.transport.api.PUT("/v1/batch", {
         body: {
-          memories: memories.map(({ id, text, metadata }) => ({
+          memories: assisted.map(({ id, text, metadata }) => ({
             memory_id: id,
             ...(text !== undefined ? { text } : {}),
             ...(metadata ? { metadata } : {}),
