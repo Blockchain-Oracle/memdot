@@ -13,11 +13,13 @@ if (!latestSeed) throw new Error("no seed evidence yet: run the seed script firs
 const latestSelfSigned = latest("s07-self-signed-");
 const latestMemory = latest("s08-seed-");
 const latestLive = latest("s08-live-");
+const latestAgents = latest("s09-agents-");
 
 const seed = read(`docs/evidence/${latestSeed}`);
 const selfSigned = latestSelfSigned ? read(`docs/evidence/${latestSelfSigned}`) : null;
 const memory = latestMemory ? read(`docs/evidence/${latestMemory}`) : null;
 const live = latestLive ? read(`docs/evidence/${latestLive}`) : null;
+const agents = latestAgents ? read(`docs/evidence/${latestAgents}`) : null;
 const registry = read("packages/contracts/deployments/portaldot-v3.json");
 const block = (n) => `[#${n.toLocaleString("en-US")}](${seed.app}/proof/block/${n})`;
 const tx = (hash) => `[\`${hash.slice(0, 10)}…${hash.slice(-6)}\`](${seed.app}/proof/tx/${hash})`;
@@ -98,6 +100,22 @@ const rows = [
           tx(live.extracted.txHash),
           block(live.extracted.block),
           cid(live.extracted.cid),
+        ],
+      ]
+    : []),
+  ...(agents
+    ? [
+        [
+          "A space's keys wrapped to a connected agent's own key",
+          tx(agents.grant.txHash),
+          block(agents.grant.block),
+          cid(agents.grant.wrappedKeyCid),
+        ],
+        [
+          "A Private memory written by that agent, with that key",
+          tx(agents.agentMemory.txHash),
+          block(agents.agentMemory.block),
+          cid(agents.agentMemory.cid),
         ],
       ]
     : []),

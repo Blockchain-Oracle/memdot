@@ -17,7 +17,7 @@
   <a href="https://api.84.46.247.92.sslip.io/docs"><b>API reference</b></a>
 </p>
 
-MemDot is a storage layer for Portaldot V3: a dashboard, a TypeScript SDK and a REST API that put files and app data on `TransactionStorage`, encrypted before they leave your device, and record who owns and may read them in a Solidity registry on `Revive`. A keeper renews everything before the chain's 7-day retention ends, so developers get storage that behaves like storage. Agent memory runs on the same layer: an agent remembers and recalls by meaning, and each memory is an encrypted entry on the chain, read either on your device or by a server you've chosen to trust with it.
+MemDot is a storage layer for Portaldot V3: a dashboard, a CLI, an MCP server, a TypeScript SDK and a REST API that put files and app data on `TransactionStorage`, encrypted before they leave your device, and record who owns and may read them in a Solidity registry on `Revive`. A keeper renews everything before the chain's 7-day retention ends, so developers get storage that behaves like storage. Agent memory runs on the same layer: an agent remembers and recalls by meaning, and each memory is an encrypted entry on the chain, read either on your device or by a server you've chosen to trust with it.
 
 Built for the [Portaldot Hacker House 2026](https://dorahacks.io/hackathon/portaldot-hacker-house-2026/detail) · Modular Cloud & Middleware. Jump to [how MemDot meets the hackathon](#how-memdot-meets-the-hackathon).
 
@@ -65,6 +65,7 @@ Every transaction is linked under [Proof](#proof).
 | An **Assisted** namespace's memories | Ciphertext | Reads the text to extract and search; stores it only sealed, with keywords as keyed hashes | Through MemDot | Readable, with or without MemDot |
 | An Assisted memory's search vector | Never | Yes. A vector can approximate the text it came from | No | Through MemDot |
 | An Assisted memory's user, agent and run ids, metadata and categories, and its namespace's instructions | Ciphertext | Yes, so they can be filtered and used | Through MemDot | Yes |
+| A connected agent's own key | Its public half | Its public half | No | On the machine it runs on |
 
 Revoking a share stops future access: the space moves to a new key epoch for new writes. What someone already decrypted can't be taken back, and MemDot says so in the dialog.
 
@@ -164,6 +165,9 @@ Earlier runs are in [`docs/evidence/`](docs/evidence): the first store and renew
 
 - **Dashboard:** passkey and wallet sign-in, recovery codes, spaces paid for by MemDot or by your own wallet, files with preview, versions, Verify and Renew now, sharing and revoking, API keys with roles, activity, renewals, usage, settings, and a command palette, on desktop and phone, in light and dark.
 - **Agent memory:** namespaces in two modes. Private extracts, embeds and searches on your device, with your own model key if you want extraction at all. Assisted does it on the server, for agents that only hold an API key. Both offer remember (distilled by a model or stored as written, with pictures and documents in Assisted), search by meaning and keywords with filters that nest AND, OR and NOT, update with history, forget, users, agents and runs, custom instructions and categories, restore from the chain, and importing another memory product's export. A file in a memory folder teaches its namespace, and deleting the file forgets what it taught.
+- **Agents:** `memdot login` makes a key pair on your machine and opens your browser. You choose which spaces it can reach, your browser wraps those spaces' keys to its public key, and it collects an API key only it can open. Revoke it under Agents and its next call fails. Hosted MCP clients sign in with OAuth instead, and reach Assisted namespaces only, because they hold no key.
+- **CLI:** `memdot` has memory verbs (`add`, `search`, `list`, `get`, `update`, `delete`, `history`, `import`, `export`, `restore`) and groups for files, spaces, folders, namespaces, entities, events, jobs, agents, keys, usage and logs. `--agent` answers with one JSON envelope and distinct exit codes, `help --json` describes every command, and anything that can't be undone asks first or needs `--force`.
+- **MCP:** run it locally with `memdot mcp`, which decrypts on your machine and reaches Private namespaces and files, or connect any client to the hosted server at `https://api.84.46.247.92.sslip.io/mcp`.
 - **Data:** export everything as a decrypted zip and bring it into a new account, or delete the account, which stops every renewal.
 - **TypeScript SDK:** [`packages/sdk`](packages/sdk) covers accounts, spaces, folders, files, sharing, jobs, memories in both modes, export and import, and self-signed stores with a wallet.
 - **REST API:** OpenAPI 3.1 and a [reference](https://api.84.46.247.92.sslip.io/docs), with API keys and per-key rate limits, plus `/v1/chat/completions`: point any OpenAI client at it, and each call recalls what's relevant and remembers the exchange.
@@ -190,6 +194,8 @@ Production images: [`apps/api/Dockerfile`](apps/api/Dockerfile), [`apps/worker/D
 | [`apps/api`](apps/api) | Hono REST API, auth and the CID gateway |
 | [`apps/worker`](apps/worker) | Relayer queue, keeper, indexer and alerts |
 | [`packages/sdk`](packages/sdk) | The TypeScript SDK |
+| [`packages/cli`](packages/cli) | `memdot`, the command line |
+| [`packages/mcp`](packages/mcp) | The MCP server, local and hosted |
 | [`packages/crypto`](packages/crypto) | Keys, key bundle, encryption, manifests and segments |
 | [`packages/chain`](packages/chain) | Portaldot V3 client: store, renew, read and contract calls |
 | [`packages/contracts`](packages/contracts) | `MemDotRegistry`, its tests and deployment record |
@@ -202,7 +208,11 @@ Production images: [`apps/api/Dockerfile`](apps/api/Dockerfile), [`apps/worker/D
 - **Testnet only.** Everything here runs on Portaldot V3 testnet, and the app is on a temporary address until its own domain is live. Accounts made on this address will need their recovery code after the move, because passkeys are tied to a domain.
 - **Sponsored storage is small.** The relayer pays about 105 tPOT per MiB from a testnet budget of a few hundred tPOT, so a sponsored space holds 128 KiB, up to 5 spaces per account. Stores pause if the relayer runs low; renewals keep going. A space can move to your own wallet at any point: it then has no quota, and the wallet pays for each store.
 - **Real extensions still being walked.** Wallet sign-in, MetaMask sign-in and wallet-paid stores ran in the dashboard on a local build against live V3, using test wallets that sign the way an extension does. Touch ID passkey unlock and Talisman or SubWallet unlock need a real authenticator and extension, and haven't been walked on the live site yet. The recovery code works everywhere.
-- **Not built yet:** the CLI, the MCP server, the Python SDK, agent plugins and the docs site. They're next in the build order, on the layer described here.
+- **Not built yet:** the Python SDK, agent plugins and the docs site. They're next in the build order, on the layer described here.
+- **An agent's reach is per space, not per namespace.** A space's key opens everything in it, so an agent you connect can read that space's files and namespaces. Keep what it shouldn't see in another space.
+- **A hosted agent reaches Assisted namespaces only,** and its names for them are the ones your browser gave it when you connected it.
+- **Revoking an agent stops its keys, not what it read.** It can't call MemDot any more and it never gets the space's next key, but anything it already decrypted may have been kept. Other agents in that space get the new key the next time you open MemDot, and can't read what's written after the change until then.
+- **What an agent stores isn't in the public registry right away.** Records take the owner's signature. Memory segments it wrote are recorded the next time you unlock; files it stored aren't recorded yet, though they're on chain and verifiable.
 - **The live service's shared model is on a free tier.** Each account gets 10 model calls and 100 embedded searches a day on it, and every account shares the key's daily quota. When it runs out, new memories are stored as written and search falls back to keywords. An account's own key, set under Configuration, has no limit.
 - **Assisted means trusting the server with the text.** It reads what you send, and it can open what it stored: its keys derive from one secret in the service's environment. The database alone opens nothing, and you can read every Assisted memory without MemDot, but use Private for anything MemDot shouldn't see.
 - **Forgetting is immediate in search, slower on chain.** A forgotten memory leaves search and lists at once. Its encrypted entry stays in its segment until the segment is rewritten or expires, and anything already read can't be recalled.

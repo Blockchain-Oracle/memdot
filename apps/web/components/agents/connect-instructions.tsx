@@ -5,7 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@memdot/ui/components/
 import { API_URL } from "@/lib/env";
 
 const MCP_URL = `${API_URL}/mcp`;
-const INSTALL = () => `npm install -g ${window.location.origin}/cli/memdot-cli.tgz`;
+/** The CLI is served from this site, so it needs nothing else to be up. */
+const INSTALL = () =>
+  `npm install -g ${typeof window === "undefined" ? "" : window.location.origin}/cli/memdot-cli.tgz`;
 
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
@@ -83,8 +85,8 @@ export function ConnectInstructions() {
             <>
               <LoginFirst />
               <Step n={2}>
-                <p>Add the server:</p>
-                <CodeBlock lang="bash" code="claude mcp add memdot -- memdot mcp" />
+                <p>Print the command that adds it, with full paths, and run what it prints:</p>
+                <CodeBlock lang="bash" code="memdot mcp config --client claude-code" />
               </Step>
             </>
           }
@@ -106,11 +108,8 @@ export function ConnectInstructions() {
             <>
               <LoginFirst />
               <Step n={2}>
-                <p>
-                  Add this to <code className="font-mono">claude_desktop_config.json</code> and
-                  restart Claude:
-                </p>
-                <CodeBlock lang="json" code={json({ command: "memdot", args: ["mcp"] })} />
+                <p>Add it to Claude's settings, then restart Claude:</p>
+                <CodeBlock lang="bash" code="memdot mcp config --client claude-desktop --write" />
               </Step>
             </>
           }
@@ -132,10 +131,8 @@ export function ConnectInstructions() {
             <>
               <LoginFirst />
               <Step n={2}>
-                <p>
-                  Add this to <code className="font-mono">~/.cursor/mcp.json</code>:
-                </p>
-                <CodeBlock lang="json" code={json({ command: "memdot", args: ["mcp"] })} />
+                <p>Add it to Cursor's settings:</p>
+                <CodeBlock lang="bash" code="memdot mcp config --client cursor --write" />
               </Step>
             </>
           }
