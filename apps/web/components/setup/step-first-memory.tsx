@@ -28,6 +28,9 @@ export function StepFirstMemory({ spaceId, onDone }: { spaceId: string; onDone: 
   const [added, setAdded] = useState<AddResult | null>(null);
   const [recalled, setRecalled] = useState<ScoredMemory[] | null>(null);
 
+  // The wait ended before the write did: not the same as it being known already.
+  const stillReading = added?.results.length === 0 && added.status !== "SUCCEEDED";
+
   const remember = async () => {
     setBusy(true);
     try {
@@ -100,14 +103,18 @@ export function StepFirstMemory({ spaceId, onDone }: { spaceId: string; onDone: 
         ) : (
           <>
             <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-1 p-3">
-              <span className="eyebrow">Remembered</span>
+              <span className="eyebrow">{stillReading ? "Still reading" : "Remembered"}</span>
               <ul className="flex flex-col gap-1.5 text-ui-sm">
                 {added.results.map((memory) => (
                   <li key={memory.id}>{memory.memory}</li>
                 ))}
               </ul>
               {added.results.length === 0 && (
-                <p className="text-ui-sm text-text-3">That was already known.</p>
+                <p className="text-ui-sm text-text-3">
+                  {stillReading
+                    ? "The model is busy, so this is taking longer than usual. You'll find it under Memory."
+                    : "That was already known."}
+                </p>
               )}
               {added.note && <p className="text-ui-sm text-warn-fg">{added.note}</p>}
             </div>

@@ -244,7 +244,7 @@ export default function ConfigurationPage() {
           <p className="text-ui-sm text-text-3">
             MemDot's server calls these. Your key is kept encrypted and is never shown again.
             {config.data
-              ? ` On MemDot's own key an account gets ${config.data.daily_shared_writes} writes a day; your own has no limit.`
+              ? ` On MemDot's own key an account gets ${config.data.daily_shared_writes} model calls a day; your own has no limit.`
               : ""}
           </p>
           {config.isPending ? (

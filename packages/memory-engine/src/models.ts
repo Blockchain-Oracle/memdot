@@ -37,9 +37,13 @@ const QUOTA_COOLDOWN_MS = 60_000;
 
 type ConcreteModel = Exclude<LanguageModel, string>;
 
-/** Over quota or down at the provider: another model may well answer. */
+/** Over quota, retired, down, or unreachable: another model may well answer. */
 const worthTryingNext = (error: unknown) =>
-  APICallError.isInstance(error) && (error.statusCode === 429 || (error.statusCode ?? 0) >= 500);
+  APICallError.isInstance(error) &&
+  (error.statusCode === undefined ||
+    error.statusCode === 404 ||
+    error.statusCode === 429 ||
+    error.statusCode >= 500);
 
 /** Asks each model in turn, skipping any that recently said it was over its quota. */
 function modelWithFallbacks(models: ConcreteModel[]): LanguageModel {

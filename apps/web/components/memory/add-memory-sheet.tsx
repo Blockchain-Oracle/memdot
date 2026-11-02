@@ -111,6 +111,8 @@ export function AddMemorySheet({
   };
 
   const scoped = Boolean(userId.trim() || agentId.trim() || runId.trim());
+  // The wait ended before the write did: not the same as there being nothing to remember.
+  const stillReading = result?.results.length === 0 && result.status !== "SUCCEEDED";
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col gap-0 sm:max-w-md">
@@ -125,15 +127,19 @@ export function AddMemorySheet({
           {result && (
             <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
               <span className="eyebrow">
-                {result.results.length === 0
-                  ? "Nothing new"
-                  : `Remembered ${result.results.length}`}
+                {stillReading
+                  ? "Still reading"
+                  : result.results.length === 0
+                    ? "Nothing new"
+                    : `Remembered ${result.results.length}`}
               </span>
               {result.results.length === 0 && (
                 <p className="text-ui-sm text-text-3">
-                  {result.duplicates > 0
-                    ? "That's already known, so nothing was added."
-                    : "Nothing in that looked worth keeping. Turn off the model to store it as written."}
+                  {stillReading
+                    ? "The model is busy, so this is taking longer than usual. It'll appear in the list when it's done."
+                    : result.duplicates > 0
+                      ? "That's already known, so nothing was added."
+                      : "Nothing in that looked worth keeping. Turn off the model to store it as written."}
                 </p>
               )}
               <ul className="flex flex-col gap-1.5 text-ui-sm">
