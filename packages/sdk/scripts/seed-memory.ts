@@ -12,7 +12,7 @@ const repo = (path: string) => new URL(`../../../${path}`, import.meta.url);
 // The sign-in material stays outside git: context/ is never published.
 const accounts = JSON.parse(
   await readFile(repo("context/memdot/demo-accounts.local.json"), "utf8"),
-) as { ownerRecoveryCode: string };
+) as { ownerRecoveryCode: string; recipientRecoveryCode?: string };
 
 const SPACE_NAME = "Agent memory demo";
 const ASSISTED = [
@@ -90,6 +90,41 @@ const privateVerified = await owner.memories.search("what should I drink?", {
 });
 const snapshotCid = await owner.memories.saveIndex(privateNs.id);
 const snapshot = await owner.proof.cid(snapshotCid);
+
+// Another account's filters must stop at its own namespace, whatever shape they take.
+if (accounts.recipientRecoveryCode) {
+  const other = MemDot.create({ baseUrl, origin, client: "seed-memory" });
+  await other.account.signInWithRecoveryCode(accounts.recipientRecoveryCode);
+  await other.account.unlockWithRecoveryCode(accounts.recipientRecoveryCode);
+  const otherSpace =
+    (await other.spaces.list())[0] ?? (await other.spaces.create({ name: "Filter check" }));
+  const otherNamespaces = await other.memories.namespaces(otherSpace.id);
+  const otherNamespace =
+    otherNamespaces.find((row) => row.mode === "assisted") ??
+    (await other.memories.createNamespace({
+      spaceId: otherSpace.id,
+      name: "Filter check",
+      mode: "assisted",
+    }));
+  let reached = 0;
+  for (const filters of [
+    { memory_ids: { nin: ["00000000-0000-0000-0000-000000000000"] } },
+    { user_id: { nin: ["x"] } },
+    { created_at: { nin: ["2020-01-01"] } },
+    { metadata: { team: { nin: ["x"] } } },
+    { NOT: [{ user_id: { nin: ["x"] } }] },
+  ]) {
+    const page = await other.memories.list({
+      namespaceId: otherNamespace.id,
+      filters,
+      showExpired: true,
+    });
+    reached += page.count;
+  }
+  if (reached !== 0) throw new Error(`another account's filters reached ${reached} memories`);
+  console.log("Another account's filters reach none of these memories.");
+  await other.close();
+}
 
 const evidence = {
   stage: "S08",

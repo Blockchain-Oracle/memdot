@@ -35,13 +35,14 @@ Working live on V3 today:
 - Sharing with one address and revoking, with key rotation for new writes.
 - `MemDotRegistry`, a Solidity contract on Revive. Each record is signed by the owner and checked on-chain with the `sr25519Verify` precompile, and space ids are derived with `hashBlake256`.
 - Verify and public proof pages that read directly from a Portaldot node in the browser.
+- Agent memory on this storage layer, in two modes. Private runs on the device; Assisted runs on the server for agents that only hold an API key. Remember, search by meaning and keywords, filters, history, forget, restore from the chain, and import from another memory product. On the live site, Assisted stores as written and searches by keyword until an account adds its own model key; model extraction has run on live V3 from a local build.
+- Export everything as a decrypted zip and re-import it into a new account, and account deletion that stops every renewal.
 - A dashboard on desktop and phone, in light and dark. A TypeScript SDK. A REST API with OpenAPI, API keys and rate limits.
 - Deployed: API, worker, web and Postgres on our own server, with health checks and daily database backups.
 
 ## Outstanding items
 
 - Walking real extensions and Touch ID on the live site. Wallet sign-in, MetaMask sign-in and wallet-paid stores have run in the dashboard on a local build against live V3 with test wallets; passkey and recovery-code flows have run end to end
-- Agent memory on this storage layer (remember and recall), in Private and Assisted modes
 - CLI and MCP server
 - Python SDK
 - Agent plugins and framework integrations

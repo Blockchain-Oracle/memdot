@@ -76,7 +76,7 @@ const rows = [
   ...(memory
     ? [
         [
-          "Agent memories stored as one encrypted segment, written by MemDot's server",
+          "An agent memory stored as an encrypted segment, written by MemDot's server",
           tx(memory.assisted.txHash),
           block(memory.assisted.block),
           cid(memory.assisted.cid),

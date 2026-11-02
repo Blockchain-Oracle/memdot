@@ -1,0 +1,32 @@
+{
+  "stage": "S08",
+  "at": "2026-11-02T09:52:11.823Z",
+  "app": "https://app.84.46.247.92.sslip.io",
+  "api": "https://api.84.46.247.92.sslip.io",
+  "spaceId": "070dbd73-b7db-46d8-9683-f54cdda736fd",
+  "assisted": {
+    "namespaceId": "b5312053-d4bd-463d-a577-ea7c5d2f4489",
+    "cid": "bafk2bzacebdu6pyrawfod3xzdpupki6tnsu6esu7psli65bsnqu3c5ff3ammk",
+    "txHash": "0xb079c4637544dbf0239e67c78c62f4c16229aa509a799871533dc3eee616e440",
+    "block": 290108,
+    "verified": [
+      {
+        "cid": "bafk2bzacebdu6pyrawfod3xzdpupki6tnsu6esu7psli65bsnqu3c5ff3ammk",
+        "retrievable": true,
+        "onChain": true,
+        "answered": true,
+        "block": 290108,
+        "index": 0
+      }
+    ]
+  },
+  "private": {
+    "namespaceId": "9881db2e-386d-41a3-b3d0-7ca59b62f6ef",
+    "recalledOnDevice": 1,
+    "snapshot": {
+      "cid": "bafk2bzaceby2izysafw5swfnfgrst2lcyekrylhlcb5qc23lorzjsxri65jze",
+      "txHash": "0xd2ad4b7a1f6d951a11bf1173f6f1dffedb358ce960352ab7884a3bd0df90b40f",
+      "block": 290146
+    }
+  }
+}

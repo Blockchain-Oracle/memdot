@@ -1,38 +1,38 @@
 {
   "stage": "S08",
-  "at": "2026-11-02T08:36:37.953Z",
+  "at": "2026-11-02T09:37:39.398Z",
   "assistedRecall": [
     {
-      "score": 0.6498529158285605,
+      "score": 0.6704817873487826,
       "breakdown": {
-        "semantic": 0.6441495862256607,
-        "bm25": 0.032054646458928006,
+        "semantic": 0.663448194587488,
+        "bm25": 0.04179797967610629,
         "entity": 0
       }
     },
     {
-      "score": 0.6292503872750962,
+      "score": 0.6273122563261424,
       "breakdown": {
-        "semantic": 0.625655274693215,
-        "bm25": 0.019207496934462418,
+        "semantic": 0.6273122563261424,
+        "bm25": 0,
         "entity": 0
       }
     }
   ],
   "assistedSegment": {
-    "txHash": "0x95897bd57e8617e2b5480e8040439195b5819308cf2992d898accf8b3a98fb7f",
-    "block": 289403
+    "txHash": "0x25ebecd83d3cde410c4f967a9c69eb590d5190188fd806234a7e18a9fcd508a9",
+    "block": 290008
   },
   "onChainMemory": {
-    "id": "350c2713-3385-4933-8854-c88af4f922d4",
-    "cid": "bafk2bzaced2l3zg6z6apss3v7dhbxtcti7wp44x5om4oyrsai6vlqvmnjyipk",
+    "id": "283cb916-4a72-4b16-9c08-c3893b59619e",
+    "cid": "bafk2bzacecvo7pu6svzsvxtmpcc72vbbs65zolbs7apjwyv4eetnmkrut7uu4",
     "status": "uploading",
     "block": null
   },
-  "indexSnapshot": "bafk2bzacecorxnseputw2kp5we3eywj3sx56oxz5zwrqwbfchjx5ts5pywsvq",
+  "indexSnapshot": "bafk2bzacec4huhhw6qb3ovm4l72ufhhmd63dxpsxkwvbzkaih6slqfavwcyne",
   "export": {
     "files": 1,
     "memories": 9,
-    "bytes": 2232
+    "bytes": 2150
   }
 }
