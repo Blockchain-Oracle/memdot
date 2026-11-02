@@ -22,6 +22,7 @@
     "commander": "15.0.0"
   },
   "devDependencies": {
+    "@huggingface/transformers": "^4.3.2",
     "@memdot/config": "workspace:*",
     "@memdot/mcp": "workspace:*",
     "@memdot/sdk": "workspace:*",

@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { StepAccount } from "@/components/setup/step-account";
 import { StepApiKey } from "@/components/setup/step-api-key";
+import { StepConnectAgent } from "@/components/setup/step-connect-agent";
 import { StepFirstFile } from "@/components/setup/step-first-file";
 import { StepFirstMemory } from "@/components/setup/step-first-memory";
 import { StepSecure } from "@/components/setup/step-secure";
@@ -29,7 +30,8 @@ const STEPS = [
   { title: "Account", description: "Passkey or wallet" },
   { title: "Recovery code", description: "Your key, on this device" },
   { title: "First space", description: "Where files live" },
-  { title: "API key", description: "For servers and agents" },
+  { title: "API key", description: "For servers and scripts" },
+  { title: "Connect an agent", description: "Claude, Cursor, the CLI" },
   { title: "First file", description: "Stored on Portaldot" },
   { title: "First memory", description: "Remember a fact" },
 ] as const;
@@ -151,10 +153,11 @@ export default function SetupPage() {
                   />
                 )}
                 {step === 4 && <StepApiKey onDone={() => setStep(5)} />}
-                {step === 5 && spaceId && (
-                  <StepFirstFile spaceId={spaceId} onDone={() => setStep(6)} />
+                {step === 5 && <StepConnectAgent onDone={() => setStep(6)} />}
+                {step === 6 && spaceId && (
+                  <StepFirstFile spaceId={spaceId} onDone={() => setStep(7)} />
                 )}
-                {step === 6 && spaceId && <StepFirstMemory spaceId={spaceId} onDone={finish} />}
+                {step === 7 && spaceId && <StepFirstMemory spaceId={spaceId} onDone={finish} />}
               </>
             )}
           </div>

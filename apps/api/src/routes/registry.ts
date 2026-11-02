@@ -19,6 +19,8 @@ const SPACE_ID_BYTES = 32;
 /** Records about the account itself rather than a space: key bundles, sharing keys, grant keys. */
 const ACCOUNT_ACTIONS = new Set<number>([
   Action.RegisterKey,
+  Action.RegisterAgent,
+  Action.RevokeAgent,
   Action.DeleteAccount,
   Action.AddObjects,
   Action.TombstoneObjects,

@@ -23,6 +23,7 @@ import { enqueueChainTx, updateJob } from "@memdot/jobs";
 import { Address, verifySignature } from "@talismn/siws";
 import { and, count, eq, inArray, isNull, ne, notInArray, type SQL } from "drizzle-orm";
 import { type Hex, verifyMessage } from "viem";
+import { isFresh } from "../auth/index.js";
 import { db } from "../db.js";
 import { badRequest, conflict, forbidden } from "../lib/errors.js";
 import { tombstoneObjects } from "../lib/lifecycle.js";
@@ -71,6 +72,8 @@ const Me = z
       passkeys: z.number().int(),
       wallets: z.array(z.object({ kind: z.enum(["substrate", "evm"]), id: z.string() })),
       recoveryCode: z.boolean(),
+      /** Recent enough for a change that outlives this session. */
+      fresh: z.boolean(),
     }),
   })
   .openapi("Me");
@@ -168,6 +171,10 @@ export function accountRoutes(services: Services) {
             user: { id: principal.userId, name: user?.name ?? "", image: user?.image ?? null },
             account: row ? serialize(row) : null,
             signIn: {
+              fresh:
+                principal.via === "session" &&
+                principal.sessionCreatedAt !== null &&
+                isFresh(principal.sessionCreatedAt),
               passkeys: passkeys?.n ?? 0,
               wallets: linked
                 .filter((a) => a.providerId === "siws" || a.providerId === "siwe")

@@ -41,6 +41,11 @@ export function useGate(): { gate: Gate; me: Me | null | undefined; retry: () =>
 
 export const HOME = "/overview";
 
+/** This page's address, to come back to after sign-in or unlock. */
+export function hereWithQuery(): string {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
 /** A same-site path to return to after unlocking (never an open redirect). */
 export function safeNext(next: string | null): string {
   return next?.startsWith("/") && !next.startsWith("//") ? next : HOME;

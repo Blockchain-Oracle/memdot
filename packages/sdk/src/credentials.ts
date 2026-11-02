@@ -1,6 +1,9 @@
+import { execFile } from "node:child_process";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { DEFAULT_API_URL } from "@memdot/config";
 import { localEmbedder } from "./local-embedder.js";
 import { MemDot } from "./memdot.js";
@@ -8,6 +11,9 @@ import { MemDot } from "./memdot.js";
 const DIR_MODE = 0o700;
 const FILE_MODE = 0o600;
 const FILE_NAME = "credentials.json";
+/** The model runtime is large, so it comes down the first time something needs it. */
+const RUNTIME_PACKAGE = "@huggingface/transformers";
+const RUNTIME_VERSION = "4.3.2";
 
 /** What `memdot login` leaves on this machine, readable only by you. */
 export interface Credentials {
@@ -124,6 +130,58 @@ export function resolveCredentials(
 }
 
 /**
+ * The local embedding runtime: already installed next to this code, or installed once under the
+ * credentials folder. Progress goes to stderr, since stdout may be an MCP connection.
+ */
+async function embeddingRuntime() {
+  const adopt = async (loaded: Record<string, unknown>) => {
+    const runtime = (loaded.pipeline ? loaded : loaded.default) as {
+      pipeline: never;
+      env: { cacheDir: string };
+    };
+    runtime.env.cacheDir = join(credentialsDir(), "models");
+    return runtime;
+  };
+  // Named indirectly so the package isn't bundled in, or looked for at build time.
+  const name: string = RUNTIME_PACKAGE;
+  try {
+    return await adopt(await import(name));
+  } catch {
+    // Not installed with this code: use our own copy.
+  }
+  const dir = join(credentialsDir(), "runtime");
+  const resolver = createRequire(join(dir, "package.json"));
+  const installed = () => {
+    try {
+      return resolver.resolve(RUNTIME_PACKAGE);
+    } catch {
+      return null;
+    }
+  };
+  if (!installed()) {
+    process.stderr.write("Downloading the local embedding runtime, once. This takes a minute…\n");
+    await mkdir(dir, { recursive: true, mode: DIR_MODE });
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        "npm",
+        [
+          "install",
+          "--prefix",
+          dir,
+          "--no-audit",
+          "--no-fund",
+          "--omit=dev",
+          `${RUNTIME_PACKAGE}@${RUNTIME_VERSION}`,
+        ],
+        { shell: process.platform === "win32" },
+        (error) => (error ? reject(error) : resolve()),
+      );
+    });
+  }
+  return adopt(await import(pathToFileURL(installed() as string).href));
+}
+
+/**
  * A client from resolved credentials. With an agent identity it opens what was shared with that
  * agent; with `MEMDOT_RECOVERY_CODE` it acts as the owner, for scripts that need to. The code is
  * only ever read from the environment, never stored.
@@ -132,7 +190,7 @@ export async function clientFor(resolved: ResolvedCredentials, client: string): 
   const memdot = MemDot.create({
     baseUrl: resolved.apiUrl,
     client,
-    embedder: localEmbedder(),
+    embedder: localEmbedder(embeddingRuntime),
     completeGrantsOnUnlock: false,
     ...(resolved.apiKey ? { apiKey: resolved.apiKey } : {}),
   });

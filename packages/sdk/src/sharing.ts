@@ -43,6 +43,7 @@ export interface ShareOptions {
 export class SharingApi {
   /** When an agent behind on a space's key may ask for it again. */
   private readonly keyRetryAt = new Map<string, number>();
+  private readonly keyLoads = new Map<string, Promise<void>>();
 
   constructor(
     private readonly ctx: Context,
@@ -152,7 +153,17 @@ export class SharingApi {
   async ensureKeys(spaceId: string, epoch: number): Promise<void> {
     const { vault } = this.ctx;
     if (!vault.isAgent || vault.newestEpoch(spaceId) >= epoch) return;
+    // Listing a space's namespaces asks for each at once, and they all need the one answer.
+    const loading = this.keyLoads.get(spaceId);
+    if (loading) return loading;
     if (Date.now() < (this.keyRetryAt.get(spaceId) ?? 0)) return;
+    const load = this.loadKeys(spaceId).finally(() => this.keyLoads.delete(spaceId));
+    this.keyLoads.set(spaceId, load);
+    return load;
+  }
+
+  private async loadKeys(spaceId: string): Promise<void> {
+    const { vault } = this.ctx;
     this.keyRetryAt.set(spaceId, Date.now() + KEY_RETRY_MS);
     const { items } = await this.list("received", spaceId);
     const grant = items.find((item) => item.status === "active" && !item.objectId);

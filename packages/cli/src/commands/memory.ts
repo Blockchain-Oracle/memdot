@@ -4,6 +4,7 @@ import type { Command } from "commander";
 import {
   confirmDestructive,
   connect,
+  namedScope,
   parseFraction,
   parseInteger,
   parseJson,
@@ -65,12 +66,11 @@ const untilDayEnds = (value: string): string => {
 /** Combines the scope with --filter, so `-u priya --filter ...` narrows by both. */
 function filtersFrom(
   command: Command,
-  resolved: Parameters<typeof scopeOf>[1],
   raw: string | undefined,
   extra: Record<string, unknown>[] = [],
 ): Record<string, unknown> | undefined {
   const parts = [
-    ...scopeFilter(scopeOf(command, resolved)),
+    ...scopeFilter(namedScope(command)),
     ...extra,
     ...(raw ? [parseJson<Record<string, unknown>>(raw, "--filter")] : []),
   ];
@@ -164,7 +164,7 @@ export function memoryCommands(program: Command): void {
       const { memdot, resolved } = await connect(command);
       const text = query ?? (await readStdin());
       if (!text) throw new CliError("Say what to search for.", EXIT.usage, "EMPTY");
-      const filters = filtersFrom(command, resolved, options.filter);
+      const filters = filtersFrom(command, options.filter);
       const results = await memdot.memories.search(text, {
         topK: options.topK,
         ...(resolved.namespaceId ? { namespaceId: resolved.namespaceId } : {}),
@@ -179,7 +179,7 @@ export function memoryCommands(program: Command): void {
       const fields: string[] | null = options.fields ? options.fields.split(",") : null;
       emit({
         count: results.length,
-        scope: scopeOf(command, resolved),
+        scope: namedScope(command),
         data: results.map((memory) => {
           const out = memoryOut(memory);
           return fields
@@ -210,7 +210,7 @@ export function memoryCommands(program: Command): void {
     .option("--show-expired", "include what has expired")
     .action(async (options, command: Command) => {
       const { memdot, resolved } = await connect(command);
-      const filters = filtersFrom(command, resolved, options.filter, [
+      const filters = filtersFrom(command, options.filter, [
         ...(options.category ? [{ categories: { in: [options.category] } }] : []),
         ...(options.after ? [{ created_at: { gte: options.after } }] : []),
         ...(options.before ? [{ created_at: { lte: options.before } }] : []),
@@ -224,7 +224,7 @@ export function memoryCommands(program: Command): void {
       });
       emit({
         count: page.results.length,
-        scope: scopeOf(command, resolved),
+        scope: namedScope(command),
         data: { results: page.results.map(memoryOut), next_cursor: page.nextCursor },
         table: { rows: page.results, columns: COLUMNS },
       });
@@ -309,7 +309,7 @@ export function memoryCommands(program: Command): void {
         return;
       }
 
-      const scope = scopeOf(command, resolved);
+      const scope = namedScope(command);
       if (Object.keys(scope).length === 0) {
         throw new CliError(
           "Name a scope with -u, --agent-id or --run-id: this won't forget a whole namespace.",
@@ -318,7 +318,7 @@ export function memoryCommands(program: Command): void {
         );
       }
       const namespace = resolved.namespaceId ? { namespaceId: resolved.namespaceId } : {};
-      const filters = filtersFrom(command, resolved, undefined);
+      const filters = filtersFrom(command, undefined);
       if (options.dryRun) {
         let total = 0;
         let cursor: string | undefined;

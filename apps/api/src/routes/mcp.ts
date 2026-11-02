@@ -59,6 +59,8 @@ export function mcpRoutes(app: () => Hono<AppEnv>) {
       mode: "hosted",
       namespaceId: hosted?.namespaceId ?? null,
       namespaces: hosted?.namespaces ?? null,
+      // A new memory has to be about someone; here that's the person who connected it.
+      userId: "me",
       readOnly: principal.apiKey?.role === "read_only",
     });
   });

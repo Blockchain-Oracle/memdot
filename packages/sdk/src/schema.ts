@@ -9037,6 +9037,7 @@ export interface components {
                     id: string;
                 }[];
                 recoveryCode: boolean;
+                fresh: boolean;
             };
         };
         /** @description Null until setup is finished */

@@ -1,4 +1,4 @@
 {
   "extends": "@memdot/config/tsconfig/node.json",
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

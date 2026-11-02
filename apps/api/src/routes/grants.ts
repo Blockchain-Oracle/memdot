@@ -2,22 +2,12 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { EVM_ACCOUNT_SUFFIX, SS58_PREFIX } from "@memdot/config";
 import { accounts, agents, grants, objects, spaces } from "@memdot/db";
 import { Address } from "@talismn/siws";
-import {
-  and,
-  desc,
-  eq,
-  inArray,
-  isNotNull,
-  isNull,
-  lt,
-  notInArray,
-  type SQL,
-} from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lt, notInArray, type SQL } from "drizzle-orm";
 import { db } from "../db.js";
-import { badRequest, conflict, HttpError, notFound } from "../lib/errors.js";
+import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { tombstoneObjects } from "../lib/lifecycle.js";
 import { loadObject, loadSpace } from "../lib/ownership.js";
-import { accountOf, assertSpaceAllowed, principalOf, requireScope } from "../lib/principal.js";
+import { accountOf, assertSpaceAllowed, can, principalOf, requireScope } from "../lib/principal.js";
 import { revokeGrants } from "../lib/revoke.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { Cid, IdParam } from "../schemas.js";
@@ -224,7 +214,6 @@ export function grantRoutes() {
         tags: ["Sharing"],
         summary: "Grants you gave, or grants given to you",
         security: authenticated,
-        middleware: [requireScope("grants", "read")] as const,
         request: {
           query: z.object({
             direction: z.enum(["given", "received"]).default("given"),
@@ -240,6 +229,16 @@ export function grantRoutes() {
       async (c) => {
         const accountId = accountOf(c);
         const query = c.req.valid("query");
+        // An agent can always ask what was shared with it: that's how it gets its keys.
+        const principal = principalOf(c);
+        if (
+          !(query.direction === "received" && principal.apiKey?.agentId) &&
+          !can(principal, "grants", "read")
+        ) {
+          throw forbidden(
+            `This API key (${principal.apiKey?.role}) cannot read grants. Use a key with more access.`,
+          );
+        }
         let scope: SQL | undefined;
         if (query.direction === "given") {
           if (query.spaceId) await loadSpace(c, query.spaceId);

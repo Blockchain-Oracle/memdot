@@ -7,6 +7,8 @@ import { buildServer } from "./server.js";
  * reaches Private namespaces. stdout is the protocol; everything else goes to stderr.
  */
 export async function serveLocal(version: string): Promise<void> {
+  // Anything a dependency prints must not land in the protocol stream.
+  console.log = console.error;
   const resolved = resolveCredentials(await loadCredentials());
   if (!resolved.apiKey) {
     process.stderr.write("MemDot isn't connected yet. Run: memdot login\n");

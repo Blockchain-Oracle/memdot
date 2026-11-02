@@ -8,6 +8,7 @@ import {
 } from "@memdot/ui/components/command-menu";
 import {
   ArrowUpRightIcon,
+  BotIcon,
   BrainIcon,
   FolderIcon,
   KeyRoundIcon,
@@ -79,6 +80,13 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
             onSelect={() => run(() => router.push("/keys?new=1"))}
           >
             New API key
+          </CommandMenuItem>
+          <CommandMenuItem
+            icon={<BotIcon />}
+            keywords={["mcp", "claude", "cursor", "cli"]}
+            onSelect={() => run(() => router.push("/agents?connect=1"))}
+          >
+            Connect an agent
           </CommandMenuItem>
         </CommandMenuGroup>
         <CommandMenuGroup heading="Go to">

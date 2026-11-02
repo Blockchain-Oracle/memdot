@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { hostname } from "node:os";
+import { hostname, userInfo } from "node:os";
 import { type ConnectStart, MemDot, MemDotError, newAgentIdentity } from "@memdot/sdk";
 import {
   type Credentials,
@@ -62,6 +62,8 @@ async function finishLogin(
       public_key: pending.public_key,
     },
     ...(collected.namespaceId ? { namespace_id: collected.namespaceId } : {}),
+    // A new memory has to be about someone; here that's you, until you say otherwise.
+    defaults: { user_id: userInfo().username, ...rest.defaults },
     created_at: new Date().toISOString(),
   });
   return syncKey(collected.apiKey);

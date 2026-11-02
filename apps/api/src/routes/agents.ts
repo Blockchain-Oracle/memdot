@@ -136,6 +136,8 @@ export function agentRoutes() {
         },
       }),
       async (c) => {
+        // A new agent outlives this session, so a stolen cookie mustn't be enough.
+        assertFreshSession(principalOf(c));
         const body = c.req.valid("json");
         try {
           const [row] = await db

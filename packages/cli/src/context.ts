@@ -45,23 +45,34 @@ export async function connect(
   return { memdot: await clientFor(resolved, CLIENT), resolved };
 }
 
+/** The scope named on this run. Reads and deletes use only this, never a saved default. */
+export function namedScope(command: Command): {
+  userId?: string;
+  agentId?: string;
+  runId?: string;
+} {
+  const { userId, agentId, runId } = globals(command);
+  return {
+    ...(userId ? { userId } : {}),
+    ...(agentId ? { agentId } : {}),
+    ...(runId ? { runId } : {}),
+  };
+}
+
 /**
- * If any scope is named on this run, only those count; otherwise the saved defaults do. Mixing the
- * two would quietly narrow a search to a default the caller didn't ask for.
+ * Who a new memory is about: what's named on this run, or else the saved defaults. Mixing the two
+ * would file it under a default the caller didn't ask for.
  */
 export function scopeOf(
   command: Command,
   resolved: ResolvedCredentials,
 ): { userId?: string; agentId?: string; runId?: string } {
-  const { userId, agentId, runId } = globals(command);
-  const named = userId || agentId || runId;
-  const scope = named
-    ? { userId, agentId, runId }
-    : { userId: resolved.userId, agentId: resolved.agentId, runId: resolved.runId };
+  const named = namedScope(command);
+  if (Object.keys(named).length > 0) return named;
   return {
-    ...(scope.userId ? { userId: scope.userId } : {}),
-    ...(scope.agentId ? { agentId: scope.agentId } : {}),
-    ...(scope.runId ? { runId: scope.runId } : {}),
+    ...(resolved.userId ? { userId: resolved.userId } : {}),
+    ...(resolved.agentId ? { agentId: resolved.agentId } : {}),
+    ...(resolved.runId ? { runId: resolved.runId } : {}),
   };
 }
 

@@ -2,7 +2,7 @@ import { Wordmark } from "@memdot/ui/components/brand";
 import Link from "next/link";
 
 /** The frame for sign-in, unlock and recovery: the mark, one centered card, the chain it runs on. */
-export function AuthFrame({ children }: { children: React.ReactNode }) {
+export function AuthFrame({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="flex min-h-svh flex-col">
       <header className="flex h-14 items-center justify-between px-4 sm:px-6">
@@ -14,7 +14,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
         </Link>
       </header>
       <main className="flex flex-1 items-start justify-center px-4 pt-[8vh] pb-16 sm:items-center sm:pt-0">
-        <div className="w-full max-w-[400px]">{children}</div>
+        <div className={wide ? "w-full max-w-[520px]" : "w-full max-w-[400px]"}>{children}</div>
       </main>
       <footer className="flex h-12 items-center justify-center gap-2 px-4 text-ui-sm text-text-3">
         <span className="size-1.5 rounded-full bg-ember" aria-hidden="true" />

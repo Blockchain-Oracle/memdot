@@ -17,14 +17,22 @@ export const ROLES: { value: Role; title: string; description: string }[] = [
 ];
 
 // From sean0205/c-radio-group-8 (21st.dev): full-width option rows inside one bordered card.
-export function RoleChoice({ value, onChange }: { value: Role; onChange: (role: Role) => void }) {
+export function RoleChoice({
+  value,
+  onChange,
+  roles = ROLES,
+}: {
+  value: Role;
+  onChange: (role: Role) => void;
+  roles?: typeof ROLES;
+}) {
   return (
     <RadioGroup
       value={value}
       onValueChange={(next) => onChange(next as Role)}
       className="gap-0 overflow-hidden rounded-xl border border-border bg-surface-1"
     >
-      {ROLES.map((role) => (
+      {roles.map((role) => (
         <Field key={role.value} className="border-b border-border last:border-0">
           <FieldLabel
             htmlFor={`role-${role.value}`}

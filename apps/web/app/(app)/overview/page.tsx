@@ -43,6 +43,7 @@ export default function OverviewPage() {
     queryKey: ["namespaces"],
     queryFn: () => memdot.memories.namespaces(),
   });
+  const agents = useQuery({ queryKey: ["agents"], queryFn: () => memdot.agents.list() });
 
   const firstSpace = spaces.data?.[0];
   const steps = [
@@ -66,6 +67,12 @@ export default function OverviewPage() {
       action: "Create",
     },
     {
+      title: "Connect an agent",
+      done: (agents.data?.length ?? 0) > 0,
+      href: "/agents?connect=1",
+      action: "Connect",
+    },
+    {
       title: "Remember your first fact",
       done: (namespaces.data ?? []).some((row) => row.totalMemories > 0),
       href: "/memory",
@@ -84,7 +91,7 @@ export default function OverviewPage() {
       action: "Set up",
     },
   ];
-  const loaded = [spaces, usage, keys, given, unlock, namespaces].every((q) => q.isSuccess);
+  const loaded = [spaces, usage, keys, given, unlock, namespaces, agents].every((q) => q.isSuccess);
   const done = steps.filter((s) => s.done).length;
 
   const u = usage.data;

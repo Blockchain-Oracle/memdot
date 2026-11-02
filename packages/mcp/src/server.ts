@@ -46,11 +46,14 @@ const ok = (data: unknown): ToolResult => ({
   content: [{ type: "text", text: JSON.stringify(data) }],
 });
 
-/** The message a person or a model can act on; a revoked agent is told so in words. */
-function failure(error: unknown): ToolResult {
+/** The message a person or a model can act on: a revoked agent is told so in words. */
+function failure(error: unknown, hosted: boolean): ToolResult {
   const known = error instanceof MemDotError ? error : null;
-  const message =
-    known?.status === 401
+  // The hosted server never holds keys, so "locked" only ever means a Private namespace.
+  const isPrivate = hosted && known?.code === "LOCKED";
+  const message = isPrivate
+    ? "This namespace is Private: only a device with its own key can read it. Use the local server, memdot mcp."
+    : known?.status === 401
       ? "This agent's access was revoked or has expired. Connect it again with `memdot login`."
       : error instanceof Error
         ? error.message
@@ -61,20 +64,14 @@ function failure(error: unknown): ToolResult {
       {
         type: "text",
         text: JSON.stringify({
-          error: { code: known?.code ?? "FAILED", message, request_id: known?.requestId ?? null },
+          error: {
+            code: isPrivate ? "PRIVATE_NAMESPACE" : (known?.code ?? "FAILED"),
+            message,
+            request_id: known?.requestId ?? null,
+          },
         }),
       },
     ],
-  };
-}
-
-function tool<T>(handler: (input: T) => Promise<unknown>) {
-  return async (input: T): Promise<ToolResult> => {
-    try {
-      return ok(await handler(input));
-    } catch (error) {
-      return failure(error);
-    }
   };
 }
 
@@ -125,6 +122,15 @@ export function buildServer(memdot: MemDot, options: ServerOptions): McpServer {
   );
   const local = options.mode === "local";
   const writable = !options.readOnly;
+  const tool =
+    <T>(handler: (input: T) => Promise<unknown>) =>
+    async (input: T): Promise<ToolResult> => {
+      try {
+        return ok(await handler(input));
+      } catch (error) {
+        return failure(error, !local);
+      }
+    };
 
   const scoped = (input: { user_id?: string; agent_id?: string; run_id?: string }) => {
     const userId = input.user_id ?? options.userId;

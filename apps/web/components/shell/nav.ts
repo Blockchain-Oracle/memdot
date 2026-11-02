@@ -1,5 +1,6 @@
 import {
   ActivityIcon,
+  BotIcon,
   BrainIcon,
   ContactRoundIcon,
   FolderIcon,
@@ -58,6 +59,12 @@ export const NAV: { label: string; items: NavItem[] }[] = [
   {
     label: "Developers",
     items: [
+      {
+        title: "Agents",
+        href: "/agents",
+        icon: BotIcon,
+        keywords: ["connect", "mcp", "claude", "cursor", "cli", "oauth", "revoke"],
+      },
       { title: "API keys", href: "/keys", icon: KeyRoundIcon, keywords: ["token", "secret"] },
       {
         title: "Configuration",

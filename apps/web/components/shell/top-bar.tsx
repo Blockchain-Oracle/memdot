@@ -18,6 +18,7 @@ import { Kbd } from "@memdot/ui/components/kbd";
 import { Separator } from "@memdot/ui/components/separator";
 import { SidebarTrigger } from "@memdot/ui/components/sidebar";
 import {
+  BotIcon,
   BrainIcon,
   FolderPlusIcon,
   KeyRoundIcon,
@@ -102,6 +103,9 @@ export function TopBar() {
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => router.push("/keys?new=1")}>
             <KeyRoundIcon /> New API key
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => router.push("/agents?connect=1")}>
+            <BotIcon /> Connect an agent
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

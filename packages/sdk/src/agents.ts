@@ -153,6 +153,24 @@ export class AgentsApi {
     return unwrap(this.ctx.transport.api.POST("/v1/agents/hosted", { body: input }));
   }
 
+  /** The client asking to connect, as it described itself. Nothing vouches for this name. */
+  oauthClient(clientId: string): Promise<{ client_name?: string; client_uri?: string }> {
+    return this.ctx.transport.json(
+      "GET",
+      `/api/auth/oauth2/public-client?client_id=${encodeURIComponent(clientId)}`,
+    );
+  }
+
+  /** Answers an OAuth request; send the browser to the address this returns. */
+  async answerOAuth(oauthQuery: string, accept: boolean): Promise<string> {
+    const { url } = await this.ctx.transport.json<{ url: string }>(
+      "POST",
+      "/api/auth/oauth2/consent",
+      { accept, oauth_query: oauthQuery },
+    );
+    return url;
+  }
+
   private async registered(request: ConnectRequest): Promise<Agent> {
     try {
       const agent = await unwrap(
