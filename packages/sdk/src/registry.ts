@@ -71,6 +71,11 @@ export class RegistryLog {
     );
   }
 
+  /** The account's last record: whoever reads the registry sees this owner has left. */
+  deleteAccount(): Promise<void> {
+    return this.record(NO_SALT, Action.DeleteAccount, encodeRecord.deleteAccount());
+  }
+
   createSpace(spaceId: string, mode: "sponsored" | "self_signed"): Promise<void> {
     const onChainMode = mode === "self_signed" ? SpaceMode.SelfSigned : SpaceMode.Sponsored;
     return this.record(saltOf(spaceId), Action.CreateSpace, encodeRecord.createSpace(onChainMode));
@@ -89,6 +94,19 @@ export class RegistryLog {
         [hashOfCid(input.rootCid)],
         [OBJECT_KIND[input.kind] ?? ObjectKind.File],
         [BigInt(input.size)],
+      ),
+    );
+  }
+
+  /** Several objects in one record, for the cost of one. */
+  addObjects(spaceId: string, items: { kind: string; rootCid: string; size: number }[]) {
+    return this.record(
+      saltOf(spaceId),
+      Action.AddObjects,
+      encodeRecord.addObjects(
+        items.map((item) => hashOfCid(item.rootCid)),
+        items.map((item) => OBJECT_KIND[item.kind] ?? ObjectKind.File),
+        items.map((item) => BigInt(item.size)),
       ),
     );
   }

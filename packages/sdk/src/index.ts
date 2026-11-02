@@ -24,6 +24,13 @@ export {
   installedWallets,
   SUBSTRATE_WALLETS,
 } from "./browser-wallet.js";
+export {
+  type ArchiveFile,
+  DataApi,
+  type ExportManifest,
+  type ExportProgress,
+  type ImportReport,
+} from "./data.js";
 export { LockedError, MemDotError } from "./errors.js";
 export {
   type FileInfo,
@@ -35,7 +42,24 @@ export {
 } from "./files.js";
 export { type Job, JobFailedError, JobsApi, type WaitOptions } from "./jobs.js";
 export { type ApiKey, KeysApi, type NewApiKey } from "./keys.js";
+export { localEmbedder } from "./local-embedder.js";
 export { MemDot, type MemDotOptions, type Usage } from "./memdot.js";
+export {
+  type AddOptions,
+  type AddResult,
+  type Entity,
+  type HistoryEvent,
+  type ListOptions,
+  MemoriesApi,
+  type Memory,
+  type MemoryEvent,
+  type MemoryMode,
+  type MemoryScope,
+  type MemoryUpdate,
+  type Namespace,
+  type ScoredMemory,
+  type SearchOptions,
+} from "./memories.js";
 export { passkeysSupported } from "./passkey.js";
 export {
   type CidProof,

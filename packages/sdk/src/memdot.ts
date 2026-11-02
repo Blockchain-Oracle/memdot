@@ -1,12 +1,15 @@
 import type { ChainClient } from "@memdot/chain";
 import { PORTALDOT_WSS } from "@memdot/config";
+import type { Embedder } from "@memdot/memory-engine";
 import { AccountApi } from "./account.js";
 import { ActivityApi } from "./activity.js";
 import type { Context, Schemas } from "./context.js";
+import { DataApi } from "./data.js";
 import { MemDotError } from "./errors.js";
 import { FilesApi } from "./files.js";
 import { JobsApi } from "./jobs.js";
 import { KeysApi } from "./keys.js";
+import { MemoriesApi } from "./memories.js";
 import { ProofApi } from "./proof.js";
 import { RegistryLog } from "./registry.js";
 import { SharingApi } from "./sharing.js";
@@ -21,6 +24,11 @@ export interface MemDotOptions extends TransportOptions {
   rpc?: string;
   /** Wrap keys for waiting grants after every unlock (default true). */
   completeGrantsOnUnlock?: boolean;
+  /**
+   * What Private namespaces embed with. Default: a local model, in this thread, downloaded once.
+   * In a browser, pass a Worker-backed one so typing never waits on it.
+   */
+  embedder?: Embedder;
 }
 
 /**
@@ -44,6 +52,8 @@ export class MemDot {
   readonly keys: KeysApi;
   readonly activity: ActivityApi;
   readonly proof: ProofApi;
+  readonly memories: MemoriesApi;
+  readonly data: DataApi;
 
   private readonly transport: Transport;
   private readonly registry: RegistryLog;
@@ -67,6 +77,8 @@ export class MemDot {
     this.folders = new FoldersApi(ctx, this.spaces);
     this.files = new FilesApi(ctx, this.spaces, this.jobs);
     this.sharing = new SharingApi(ctx, this.spaces);
+    this.memories = new MemoriesApi(ctx, this.spaces, this.folders, this.jobs, options.embedder);
+    this.data = new DataApi(ctx, this.spaces, this.folders, this.files, this.memories);
     this.account = new AccountApi(ctx, options.origin, () => this.afterUnlock());
   }
 
@@ -103,6 +115,10 @@ export class MemDot {
 
   private async afterUnlock(): Promise<void> {
     await this.registry.ensureRegistered();
+    // Records what the server stored while this device was away; never in the way of an unlock.
+    void this.memories.recordServerSegments().catch((error: unknown) => {
+      console.warn("[memdot] recording memory segments skipped:", error);
+    });
     if (this.options.completeGrantsOnUnlock === false) return;
     try {
       await this.sharing.completeReady();

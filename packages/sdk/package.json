@@ -22,7 +22,8 @@
     "generate:check": "openapi-typescript openapi.json -o src/schema.ts --check",
     "journey": "tsx scripts/journey-s05.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "seed:self-signed": "tsx scripts/self-signed-demo.ts"
+    "seed:self-signed": "tsx scripts/self-signed-demo.ts",
+    "journey:memory": "tsx scripts/journey-s08.ts"
   },
   "dependencies": {
     "@memdot/chain": "workspace:*",
@@ -33,7 +34,9 @@
     "@scure/base": "^2.4.0",
     "@talismn/siws": "^2.1.0",
     "openapi-fetch": "^0.17.0",
-    "viem": "^2.57.13"
+    "viem": "^2.57.13",
+    "@memdot/memory-engine": "workspace:*",
+    "fflate": "^0.8.3"
   },
   "devDependencies": {
     "@scure/bip39": "^2.4.0",
@@ -41,6 +44,15 @@
     "openapi-typescript": "7.13.0",
     "tsdown": "catalog:",
     "tsx": "^4.23.15",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "@huggingface/transformers": "^4.3.2"
+  },
+  "peerDependencies": {
+    "@huggingface/transformers": "^4.3.2"
+  },
+  "peerDependenciesMeta": {
+    "@huggingface/transformers": {
+      "optional": true
+    }
   }
 }

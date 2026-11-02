@@ -1,0 +1,38 @@
+{
+  "stage": "S08",
+  "at": "2026-11-02T08:36:37.953Z",
+  "assistedRecall": [
+    {
+      "score": 0.6498529158285605,
+      "breakdown": {
+        "semantic": 0.6441495862256607,
+        "bm25": 0.032054646458928006,
+        "entity": 0
+      }
+    },
+    {
+      "score": 0.6292503872750962,
+      "breakdown": {
+        "semantic": 0.625655274693215,
+        "bm25": 0.019207496934462418,
+        "entity": 0
+      }
+    }
+  ],
+  "assistedSegment": {
+    "txHash": "0x95897bd57e8617e2b5480e8040439195b5819308cf2992d898accf8b3a98fb7f",
+    "block": 289403
+  },
+  "onChainMemory": {
+    "id": "350c2713-3385-4933-8854-c88af4f922d4",
+    "cid": "bafk2bzaced2l3zg6z6apss3v7dhbxtcti7wp44x5om4oyrsai6vlqvmnjyipk",
+    "status": "uploading",
+    "block": null
+  },
+  "indexSnapshot": "bafk2bzacecorxnseputw2kp5we3eywj3sx56oxz5zwrqwbfchjx5ts5pywsvq",
+  "export": {
+    "files": 1,
+    "memories": 9,
+    "bytes": 2232
+  }
+}

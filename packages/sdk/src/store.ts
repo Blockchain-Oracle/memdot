@@ -28,6 +28,8 @@ export interface StoreInput {
   /** Self-signed spaces: the wallet that signs each `store`. */
   wallet?: Wallet;
   onBlob?: (done: number, total: number) => void;
+  /** Recorded later, together with others: a record costs more than a small store. */
+  skipRecord?: boolean;
 }
 
 const toBase64 = (bytes: Uint8Array) => {
@@ -94,7 +96,7 @@ export async function storeObject(ctx: Context, input: StoreInput): Promise<Decl
     }
   }
   // A key bundle is recorded by the account's RegisterKey record instead.
-  if (input.kind !== "key_bundle") {
+  if (input.kind !== "key_bundle" && !input.skipRecord) {
     await ctx.registry.addObject({
       kind: input.kind,
       rootCid: root.cid,
