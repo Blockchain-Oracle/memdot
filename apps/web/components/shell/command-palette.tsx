@@ -8,6 +8,7 @@ import {
 } from "@memdot/ui/components/command-menu";
 import {
   ArrowUpRightIcon,
+  BrainIcon,
   FolderIcon,
   KeyRoundIcon,
   LockIcon,
@@ -62,6 +63,13 @@ export function CommandPalette({ children }: { children: React.ReactNode }) {
               Upload files
             </CommandMenuItem>
           )}
+          <CommandMenuItem
+            icon={<BrainIcon />}
+            keywords={["remember", "fact", "namespace", "agent"]}
+            onSelect={() => run(() => router.push("/memory"))}
+          >
+            Add a memory
+          </CommandMenuItem>
           <CommandMenuItem icon={<PlusIcon />} onSelect={() => run(() => setCreating(true))}>
             New space
           </CommandMenuItem>

@@ -839,6 +839,9 @@ export function memoryRoutes(services: Services) {
             await queueUpdateWrite(tx, services, accountOf(c), folderId, ids);
           }
         });
+        for (const folderId of new Set(rows.map((row) => row.folderId))) {
+          await compactIfDue(db, services.boss, { accountId: accountOf(c), folderId });
+        }
         return c.json({ message: `Updated ${rows.length} memories.` }, 200);
       },
     )
@@ -873,10 +876,13 @@ export function memoryRoutes(services: Services) {
       }),
       async (c) => {
         const ids = c.req.valid("json").memories.map((item) => item.memory_id);
-        for (const id of ids) await loadMemory(c, id);
+        const rows = await Promise.all(ids.map((id) => loadMemory(c, id)));
         const deleted = await db.transaction((tx) =>
           forget(tx, inArray(memories.id, ids) as SQL, actorOf(c)),
         );
+        for (const folderId of new Set(rows.map((row) => row.folderId))) {
+          await compactIfDue(db, services.boss, { accountId: accountOf(c), folderId });
+        }
         return c.json({ message: `Forgot ${deleted} memories.` }, 200);
       },
     )

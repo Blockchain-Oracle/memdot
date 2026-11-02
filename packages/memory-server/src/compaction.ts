@@ -1,6 +1,6 @@
-import { type Database, jobs } from "@memdot/db";
+import { type Database, folders, jobs, memories, objects } from "@memdot/db";
 import { enqueueMemory, JOB_KIND } from "@memdot/jobs";
-import { and, eq, notInArray, sql } from "drizzle-orm";
+import { and, count, eq, isNull, notInArray, sql } from "drizzle-orm";
 import type { PgBoss } from "pg-boss";
 import { segmentHealth } from "./segments.js";
 
@@ -13,8 +13,26 @@ export async function compactIfDue(
   boss: PgBoss,
   scope: { accountId: string; folderId: string },
 ): Promise<void> {
+  // Only a device can rewrite a Private namespace; the server can't read it.
+  const [folder] = await db
+    .select({ mode: folders.memoryMode })
+    .from(folders)
+    .where(eq(folders.id, scope.folderId));
+  if (folder?.mode !== "assisted") return;
   const health = await segmentHealth(db, scope.folderId);
+  const [failed] = await db
+    .select({ n: count() })
+    .from(memories)
+    .innerJoin(objects, eq(objects.id, memories.segmentId))
+    .where(
+      and(
+        eq(memories.folderId, scope.folderId),
+        isNull(memories.deletedAt),
+        eq(objects.status, "failed"),
+      ),
+    );
   const due =
+    (failed?.n ?? 0) > 0 ||
     health.length > COMPACT_ABOVE_SEGMENTS ||
     health.some((segment) => segment.live * 2 < segment.entries);
   if (!due) return;

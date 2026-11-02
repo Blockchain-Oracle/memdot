@@ -23,7 +23,9 @@
     "journey": "tsx scripts/journey-s05.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "seed:self-signed": "tsx scripts/self-signed-demo.ts",
-    "journey:memory": "tsx scripts/journey-s08.ts"
+    "journey:memory": "tsx scripts/journey-s08.ts",
+    "smoke:memory": "tsx scripts/memory-smoke.ts",
+    "seed:memory": "tsx scripts/seed-memory.ts"
   },
   "dependencies": {
     "@memdot/chain": "workspace:*",

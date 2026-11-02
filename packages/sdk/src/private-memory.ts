@@ -496,6 +496,19 @@ export class PrivateNamespace {
     return { imported: fresh.length, duplicates };
   }
 
+  /** Who stores for this space: its owner's wallet if it's self-signed, else MemDot's relayer. */
+  private signerFor(space: { mode: string }, wallet: Wallet | undefined): Wallet | undefined {
+    if (space.mode !== "self_signed") return undefined;
+    if (!wallet) {
+      throw new MemDotError(
+        400,
+        "WALLET_REQUIRED",
+        "This space is self-signed: pass the wallet that signs each store.",
+      );
+    }
+    return wallet;
+  }
+
   /** One sealed segment on V3, then the ids at MemDot. Reused by add, update and compaction. */
   private async writeEntries(
     entries: MemoryEntry[],
@@ -512,6 +525,7 @@ export class PrivateNamespace {
       throw new MemDotError(400, "TOO_LARGE", "Write fewer memories at a time.");
     }
     const space = await this.deps.spaces.raw(this.spaceId);
+    const signer = this.signerFor(space, wallet);
     const recipient = this.ctx.vault.sealTo(this.spaceId, space.keyEpoch);
     const sealed = await sealSegment(packed, recipient);
     const declared = await storeObject(this.ctx, {
@@ -522,7 +536,7 @@ export class PrivateNamespace {
       sizeBytes: sealed.length,
       root: sealed,
       skipRecord: true,
-      ...(wallet ? { wallet } : {}),
+      ...(signer ? { wallet: signer } : {}),
     });
     await unwrap(
       this.ctx.transport.api.POST("/v1/namespaces/{id}/private/entries", {
@@ -672,6 +686,7 @@ export class PrivateNamespace {
     const previous = (await this.state()).snapshot;
     const snapshot = (this.index as LocalIndex).toSnapshot(new Date().toISOString());
     const space = await this.deps.spaces.raw(this.spaceId);
+    const signer = this.signerFor(space, options.wallet);
     const sealed = await sealTo(snapshot, [this.ctx.vault.sealTo(this.spaceId, space.keyEpoch)]);
     const declared = await storeObject(this.ctx, {
       kind: "index_snapshot",
@@ -680,7 +695,7 @@ export class PrivateNamespace {
       keyEpoch: space.keyEpoch,
       sizeBytes: sealed.length,
       root: sealed,
-      ...(options.wallet ? { wallet: options.wallet } : {}),
+      ...(signer ? { wallet: signer } : {}),
     });
     if (options.wait) await this.deps.jobs.waitFor(declared.job.id);
     if (previous) {

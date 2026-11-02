@@ -1,6 +1,7 @@
-import { objects } from "@memdot/db";
+import { memories, objects } from "@memdot/db";
 import { failObject } from "@memdot/jobs";
-import { and, eq, lt, sql } from "drizzle-orm";
+import { compactIfDue } from "@memdot/memory-server";
+import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import type { Deps } from "../deps.js";
 
 /** The activity log keeps 30 days of request metadata (R10); older rows are deleted daily. */
@@ -15,9 +16,20 @@ const HOUR_MS = 60 * 60 * 1000;
 export async function maintenance(deps: Deps): Promise<void> {
   const pruned = await pruneRequestLog(deps);
   const abandoned = await expireAbandonedUploads(deps);
+  const compacted = await compactNamespaces(deps);
   console.log(
-    `[maintenance] pruned ${pruned} request log rows, expired ${abandoned} abandoned uploads`,
+    `[maintenance] pruned ${pruned} request log rows, expired ${abandoned} abandoned uploads, checked ${compacted} namespaces`,
   );
+}
+
+/** Assisted namespaces with a segment that failed or is mostly forgotten get rewritten. */
+async function compactNamespaces(deps: Deps): Promise<number> {
+  const namespaces = await deps.db
+    .selectDistinct({ folderId: memories.folderId, accountId: memories.accountId })
+    .from(memories)
+    .where(and(eq(memories.mode, "assisted"), isNull(memories.deletedAt)));
+  for (const namespace of namespaces) await compactIfDue(deps.db, deps.boss, namespace);
+  return namespaces.length;
 }
 
 async function pruneRequestLog(deps: Deps): Promise<number> {

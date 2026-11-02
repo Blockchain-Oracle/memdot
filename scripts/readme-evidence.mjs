@@ -11,9 +11,11 @@ const latest = (prefix) =>
 const latestSeed = latest("s07-seed-");
 if (!latestSeed) throw new Error("no seed evidence yet: run the seed script first");
 const latestSelfSigned = latest("s07-self-signed-");
+const latestMemory = latest("s08-seed-");
 
 const seed = read(`docs/evidence/${latestSeed}`);
 const selfSigned = latestSelfSigned ? read(`docs/evidence/${latestSelfSigned}`) : null;
+const memory = latestMemory ? read(`docs/evidence/${latestMemory}`) : null;
 const registry = read("packages/contracts/deployments/portaldot-v3.json");
 const block = (n) => `[#${n.toLocaleString("en-US")}](${seed.app}/proof/block/${n})`;
 const tx = (hash) => `[\`${hash.slice(0, 10)}…${hash.slice(-6)}\`](${seed.app}/proof/tx/${hash})`;
@@ -71,6 +73,22 @@ const rows = [
         ],
       ]
     : []),
+  ...(memory
+    ? [
+        [
+          "Agent memories stored as one encrypted segment, written by MemDot's server",
+          tx(memory.assisted.txHash),
+          block(memory.assisted.block),
+          cid(memory.assisted.cid),
+        ],
+        [
+          "A Private namespace's search index, sealed on the device",
+          tx(memory.private.snapshot.txHash),
+          block(memory.private.snapshot.block),
+          cid(memory.private.snapshot.cid),
+        ],
+      ]
+    : []),
   ...seed.records.map((record) => [
     `Registry record: ${LABEL[record.action] ?? record.action}`,
     `\`${record.txHash.slice(0, 10)}…${record.txHash.slice(-6)}\``,
@@ -83,7 +101,7 @@ const table = [
   "|---|---|---|---|",
   ...rows.map((row) => `| ${row.join(" | ")} |`),
   "",
-  `Recorded by [\`docs/evidence/${latestSeed}\`](docs/evidence/${latestSeed})${latestSelfSigned ? ` and [\`docs/evidence/${latestSelfSigned}\`](docs/evidence/${latestSelfSigned})` : ""} on ${seed.at.slice(0, 10)}. Registry transaction hashes are the EVM hashes Revive's RPC reports.`,
+  `Recorded by [\`docs/evidence/${latestSeed}\`](docs/evidence/${latestSeed})${latestSelfSigned ? `, [\`docs/evidence/${latestSelfSigned}\`](docs/evidence/${latestSelfSigned})` : ""}${latestMemory ? ` and [\`docs/evidence/${latestMemory}\`](docs/evidence/${latestMemory})` : ""}. Registry transaction hashes are the EVM hashes Revive's RPC reports.`,
 ].join("\n");
 
 const readmeUrl = new URL("../README.md", import.meta.url);
