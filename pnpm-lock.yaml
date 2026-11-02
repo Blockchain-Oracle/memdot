@@ -291,6 +291,27 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
+  integrations/agent-plugin-core:
+    devDependencies:
+      '@memdot/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@scure/bip39':
+        specifier: ^2.4.0
+        version: 2.4.0
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.23.3(tsx@4.23.15)(typescript@6.0.3)
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/chain:
     dependencies:
       '@memdot/config':
@@ -335,10 +356,6 @@ importers:
         version: 6.0.3
 
   packages/cli:
-    dependencies:
-      commander:
-        specifier: 15.0.0
-        version: 15.0.0
     devDependencies:
       '@huggingface/transformers':
         specifier: ^4.3.2
@@ -355,6 +372,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
+      commander:
+        specifier: 15.0.0
+        version: 15.0.0
       tsdown:
         specifier: 'catalog:'
         version: 0.23.3(tsx@4.23.15)(typescript@6.0.3)

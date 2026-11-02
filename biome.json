@@ -16,6 +16,13 @@
       "!docs/evidence",
       "!**/*.md",
       "!python",
+      "!integrations/*-plugin",
+      "!marketplace.json",
+      "!.agents",
+      "!.claude-plugin",
+      "!.codex-plugin",
+      "!.cursor-plugin",
+      "!.kimi-plugin",
       "!pnpm-lock.yaml",
       "!packages/sdk/openapi.json",
       "!packages/sdk/src/schema.ts"

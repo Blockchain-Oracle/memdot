@@ -1,0 +1,23 @@
+{
+  "name": "@memdot/agent-plugin-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The one source every MemDot agent plugin is generated from: hooks, skills and tools for coding agents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "generate": "tsx scripts/generate.ts",
+    "check": "tsx scripts/generate.ts --check",
+    "conformance": "tsx scripts/conformance.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@memdot/config": "workspace:*",
+    "@scure/bip39": "^2.4.0",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}

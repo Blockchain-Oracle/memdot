@@ -1,0 +1,38 @@
+{
+  "memdot": {
+    "enabled": true,
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "node ./core/memdot-plugin.mjs hook antigravity SessionStart",
+        "timeout": 5
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node ./core/memdot-plugin.mjs hook antigravity PreInvocation",
+        "timeout": 15
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./core/memdot-plugin.mjs hook antigravity PostToolUse",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node ./core/memdot-plugin.mjs hook antigravity Stop",
+        "timeout": 5
+      }
+    ]
+  }
+}

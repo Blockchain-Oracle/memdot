@@ -11,8 +11,9 @@ import {
 import type { Command } from "commander";
 import { CliError, EXIT, interactive } from "./output.js";
 
-export const VERSION = "0.1.0";
-const CLIENT = `cli/${VERSION}`;
+export const VERSION = "0.1.1";
+/** What the activity log calls this caller. A plugin running the CLI names itself. */
+const CLIENT = process.env.MEMDOT_CLIENT?.trim() || `cli/${VERSION}`;
 
 export interface GlobalOptions extends CredentialFlags {
   apiKey?: string;

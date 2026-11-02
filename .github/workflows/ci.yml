@@ -30,6 +30,8 @@ jobs:
           git diff --exit-code packages/sdk/openapi.json
           pnpm --filter @memdot/sdk generate:check
       - run: pnpm test
+      - name: Every agent plugin matches its source and what its host accepts
+        run: pnpm --filter @memdot/agent-plugin-core conformance
 
   python:
     runs-on: ubuntu-latest

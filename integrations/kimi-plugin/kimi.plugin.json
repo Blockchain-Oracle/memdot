@@ -1,0 +1,78 @@
+{
+  "name": "memdot",
+  "version": "0.1.0",
+  "description": "Long-term memory for coding agents: encrypted on your device, stored on Portaldot V3, and yours to move or revoke.",
+  "keywords": [
+    "memory",
+    "coding-agents",
+    "encrypted",
+    "portaldot",
+    "mcp"
+  ],
+  "author": {
+    "name": "Blockchain-Oracle",
+    "url": "https://github.com/Blockchain-Oracle"
+  },
+  "homepage": "https://github.com/Blockchain-Oracle/memdot",
+  "license": "Apache-2.0",
+  "interface": {
+    "displayName": "MemDot",
+    "shortDescription": "Encrypted long-term memory on Portaldot V3",
+    "longDescription": "Long-term memory for coding agents: encrypted on your device, stored on Portaldot V3, and yours to move or revoke.",
+    "developerName": "Blockchain-Oracle",
+    "websiteURL": "https://github.com/Blockchain-Oracle/memdot"
+  },
+  "skills": "./skills/",
+  "mcpServers": {
+    "memdot": {
+      "command": "node",
+      "args": [
+        "./core/memdot-plugin.mjs",
+        "mcp",
+        "kimi"
+      ]
+    }
+  },
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "command": "node ./core/memdot-plugin.mjs hook kimi SessionStart",
+      "timeout": 5
+    },
+    {
+      "event": "UserPromptSubmit",
+      "command": "node ./core/memdot-plugin.mjs hook kimi UserPromptSubmit",
+      "timeout": 15
+    },
+    {
+      "event": "PostToolUse",
+      "command": "node ./core/memdot-plugin.mjs hook kimi PostToolUse",
+      "timeout": 5
+    },
+    {
+      "event": "PostToolUseFailure",
+      "command": "node ./core/memdot-plugin.mjs hook kimi PostToolUseFailure",
+      "timeout": 5
+    },
+    {
+      "event": "SubagentStart",
+      "command": "node ./core/memdot-plugin.mjs hook kimi SubagentStart",
+      "timeout": 5
+    },
+    {
+      "event": "Stop",
+      "command": "node ./core/memdot-plugin.mjs hook kimi Stop",
+      "timeout": 5
+    },
+    {
+      "event": "PreCompact",
+      "command": "node ./core/memdot-plugin.mjs hook kimi PreCompact",
+      "timeout": 5
+    },
+    {
+      "event": "SessionEnd",
+      "command": "node ./core/memdot-plugin.mjs hook kimi SessionEnd",
+      "timeout": 5
+    }
+  ]
+}

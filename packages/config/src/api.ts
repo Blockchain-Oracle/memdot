@@ -4,6 +4,9 @@
 /** Where the CLI and the MCP server connect unless told otherwise. */
 export const DEFAULT_API_URL = "https://api.84.46.247.92.sslip.io";
 
+/** Where the dashboard lives, and where the CLI's tarball is served from. */
+export const DEFAULT_APP_URL = "https://app.84.46.247.92.sslip.io";
+
 export const API_KEY_PREFIX = "md_";
 
 /** Random characters after the prefix (Better Auth default is 64). */

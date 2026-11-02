@@ -24,6 +24,10 @@ dist/
 
 # Packed from packages/cli when the web image is built.
 apps/web/public/cli/
+apps/web/public/plugins/
+
+# The plugin core's bundles before they're copied into each plugin.
+integrations/agent-plugin-core/.build/
 
 # Python
 .venv/

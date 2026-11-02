@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -15,7 +16,7 @@ from .._sync.client import MemDot
 from .output import EXIT, CliError, interactive
 
 VERSION = __version__
-CLIENT = f"cli-py/{VERSION}"
+CLIENT = os.environ.get("MEMDOT_CLIENT", "").strip() or f"cli-py/{VERSION}"
 _FLAGS = ("api_key", "api_url", "namespace", "user_id", "agent_id", "run_id")
 
 

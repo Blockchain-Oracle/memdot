@@ -109,6 +109,11 @@ def register(root: click.Group) -> None:
     @click.option("--expires", metavar="date", help="when it stops counting (YYYY-MM-DD)")
     @click.option("--timestamp", metavar="time", help="when it happened (ISO time or unix seconds)")
     @click.option("--prompt", metavar="text", help="custom instructions, for this call only")
+    @click.option(
+        "--categories",
+        metavar="json",
+        help="categories to file under, as a JSON array of {name, description}",
+    )
     @click.option("--wait-chain", is_flag=True, help="wait until it's finalized on Portaldot V3")
     @click.option("--no-wait", is_flag=True, help="return at once with an event to follow")
     @click.pass_context
@@ -137,6 +142,9 @@ def register(root: click.Group) -> None:
             memory_type="procedural_memory" if options["procedural"] else None,
             immutable=options["immutable"],
             prompt=options["prompt"],
+            categories=(
+                parse_json(options["categories"], "--categories") if options["categories"] else None
+            ),
             wait=False if options["no_wait"] else ("chain" if options["wait_chain"] else "indexed"),
             **scope,
             **kwargs,

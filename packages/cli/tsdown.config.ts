@@ -4,7 +4,7 @@ export default defineConfig({
   entry: ["src/index.ts"],
   format: "esm",
   platform: "node",
-  // One installable package: everything of ours is inside it, so it needs nothing unpublished.
-  noExternal: [/^@memdot\//, /^@polkadot-api\/descriptors/],
+  // One installable package with nothing to resolve: plugins unpack it without npm.
+  noExternal: [/^@memdot\//, /^@polkadot-api\/descriptors/, /^commander$/],
   dts: false,
 });

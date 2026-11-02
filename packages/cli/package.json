@@ -1,6 +1,6 @@
 {
   "name": "@memdot/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MemDot from your terminal: encrypted storage and agent memory on Portaldot V3.",
   "license": "Apache-2.0",
   "type": "module",
@@ -19,15 +19,13 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "tsx --test test/*.test.ts"
   },
-  "dependencies": {
-    "commander": "15.0.0"
-  },
   "devDependencies": {
     "@huggingface/transformers": "^4.3.2",
     "@memdot/config": "workspace:*",
     "@memdot/mcp": "workspace:*",
     "@memdot/sdk": "workspace:*",
     "@types/node": "catalog:",
+    "commander": "15.0.0",
     "tsdown": "catalog:",
     "tsx": "^4.23.15",
     "typescript": "catalog:"

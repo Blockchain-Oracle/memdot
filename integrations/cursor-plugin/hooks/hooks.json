@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/core/memdot-plugin.mjs\" hook cursor sessionStart",
+        "timeout": 5
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/core/memdot-plugin.mjs\" hook cursor beforeSubmitPrompt",
+        "timeout": 15
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/core/memdot-plugin.mjs\" hook cursor postToolUse",
+        "timeout": 5
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/core/memdot-plugin.mjs\" hook cursor postToolUseFailure",
+        "timeout": 5
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/core/memdot-plugin.mjs\" hook cursor afterAgentResponse",
+        "timeout": 5
+      }
+    ],
+    "stop": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/core/memdot-plugin.mjs\" hook cursor stop",
+        "timeout": 5
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/core/memdot-plugin.mjs\" hook cursor preCompact",
+        "timeout": 5
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT}/core/memdot-plugin.mjs\" hook cursor sessionEnd",
+        "timeout": 5
+      }
+    ]
+  }
+}

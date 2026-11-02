@@ -92,6 +92,10 @@ export function memoryCommands(program: Command): void {
     .option("--expires <date>", "when it stops counting (YYYY-MM-DD)")
     .option("--timestamp <time>", "when it happened (ISO time or unix seconds)")
     .option("--prompt <text>", "custom instructions, for this call only")
+    .option(
+      "--categories <json>",
+      "categories to file under, as a JSON array of {name, description}",
+    )
     .option("--wait-chain", "wait until it's finalized on Portaldot V3")
     .option("--no-wait", "return at once with an event to follow")
     .action(async (text: string | undefined, options, command: Command) => {
@@ -115,6 +119,9 @@ export function memoryCommands(program: Command): void {
         ...(options.expires ? { expirationDate: untilDayEnds(options.expires) } : {}),
         ...(options.timestamp ? { timestamp: options.timestamp } : {}),
         ...(options.prompt ? { prompt: options.prompt } : {}),
+        ...(options.categories
+          ? { categories: parseJson(options.categories, "--categories") }
+          : {}),
         wait: options.wait === false ? false : options.waitChain ? "chain" : "indexed",
       });
       emit({

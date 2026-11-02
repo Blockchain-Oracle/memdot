@@ -1,0 +1,19 @@
+{
+  "name": "memdot-plugins",
+  "interface": {
+    "displayName": "MemDot"
+  },
+  "plugins": [
+    {
+      "name": "memdot",
+      "description": "Long-term memory for coding agents: encrypted on your device, stored on Portaldot V3, and yours to move or revoke.",
+      "version": "0.1.0",
+      "source": "./integrations/memdot-agent-plugin",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "memdot-plugins",
+  "interface": {
+    "displayName": "MemDot"
+  },
+  "plugins": [
+    {
+      "name": "memdot",
+      "source": {
+        "source": "local",
+        "path": "./integrations/codex-plugin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "memdot": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/core/memdot-plugin.mjs",
+        "mcp",
+        "claude-code"
+      ],
+      "env": {
+        "MEMDOT_API_KEY": "${user_config.api_key}",
+        "MEMDOT_NAMESPACE": "${user_config.namespace}"
+      }
+    }
+  }
+}

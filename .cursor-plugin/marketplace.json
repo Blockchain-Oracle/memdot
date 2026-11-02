@@ -1,0 +1,17 @@
+{
+  "name": "memdot-plugins",
+  "owner": {
+    "name": "Blockchain-Oracle"
+  },
+  "metadata": {
+    "description": "Long-term memory for coding agents: encrypted on your device, stored on Portaldot V3, and yours to move or revoke."
+  },
+  "plugins": [
+    {
+      "name": "memdot",
+      "description": "Long-term memory for coding agents: encrypted on your device, stored on Portaldot V3, and yours to move or revoke.",
+      "version": "0.1.0",
+      "source": "./integrations/cursor-plugin"
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 packages:
   - apps/*
   - packages/*
-  - integrations/*
+  # The plugins beside it are generated output, not packages to install or build.
+  - integrations/agent-plugin-core
   - examples/*
 
 # Refuse versions published less than a day ago (supply-chain guard).
