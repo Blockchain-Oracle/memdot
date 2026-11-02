@@ -23,10 +23,11 @@ import {
 import { Skeleton } from "@memdot/ui/components/skeleton";
 import { Spinner } from "@memdot/ui/components/spinner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BotIcon, KeyRoundIcon, PlugIcon, PlusIcon } from "lucide-react";
+import { BotIcon, PlusIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ClientLogo } from "@/components/agents/client-logo";
 import { ConnectInstructions } from "@/components/agents/connect-instructions";
 import { ConfirmDialog } from "@/components/files/file-dialogs";
 import { Page, PageHeader } from "@/components/page-header";
@@ -124,7 +125,11 @@ function Agents() {
         open={revoking !== null}
         onOpenChange={(open) => !open && setRevoking(null)}
         title={`Revoke ${revoking?.label ?? "this agent"}?`}
-        description="Its next call fails, and its spaces move to a new key so it can't read what's written from now on. Anything it already read may have been kept."
+        description={
+          revoking?.kind === "hosted"
+            ? "Its next call fails and its sign-in is removed. To connect it again, you'd be asked again. Anything it already read may have been kept."
+            : "Its next call fails, and its spaces move to a new key so it can't read what's written from now on. Anything it already read may have been kept."
+        }
         action="Revoke"
         onConfirm={async () => {
           if (!revoking) return;
@@ -156,13 +161,7 @@ function AgentList({
     <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface-1">
       {agents.map((agent) => (
         <li key={agent.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2">
-            {agent.kind === "hosted" ? (
-              <PlugIcon className="size-4 text-text-2" aria-hidden="true" />
-            ) : (
-              <KeyRoundIcon className="size-4 text-text-2" aria-hidden="true" />
-            )}
-          </span>
+          <ClientLogo label={agent.label} client={agent.client} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="truncate text-ui font-medium">{agent.label}</span>

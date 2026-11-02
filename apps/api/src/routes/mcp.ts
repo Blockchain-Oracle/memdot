@@ -100,7 +100,8 @@ export function mcpRoutes(app: () => Hono<AppEnv>) {
         throw error;
       }
     },
-    { resource: MCP_RESOURCE },
+    // The keys come from this same process: no need to go out through the proxy and back.
+    { resource: MCP_RESOURCE, jwksUrl: `http://127.0.0.1:${env.PORT}/api/auth/jwks` },
   );
 
   return async (request: Request): Promise<Response> => {

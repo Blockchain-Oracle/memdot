@@ -3,19 +3,27 @@
 import { BrandMark } from "@memdot/ui/components/brand";
 import { Button } from "@memdot/ui/components/button";
 import { useQueryClient } from "@tanstack/react-query";
-import { BotIcon, ShieldCheckIcon } from "lucide-react";
+import { ShieldCheckIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { ClientLogo } from "@/components/agents/client-logo";
 import { useMemDot } from "@/lib/memdot";
 import { hereWithQuery } from "@/lib/session";
 
 /** The two sides of a connection, then what it's asking for. From supabase/oauth-consent-react. */
-export function ConsentHeader({ title, description }: { title: string; description: string }) {
+export function ConsentHeader({
+  title,
+  description,
+  client,
+}: {
+  title: string;
+  description: string;
+  /** Who's asking, as it describes itself. */
+  client?: string;
+}) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       <div className="flex items-center" aria-hidden="true">
-        <span className="flex size-11 items-center justify-center rounded-full border border-border bg-surface-1">
-          <BotIcon className="size-5 text-text-2" />
-        </span>
+        <ClientLogo label={client ?? ""} client="" className="size-11" />
         <span className="h-px w-8 bg-border" />
         <span className="flex size-11 items-center justify-center rounded-full border border-border bg-surface-1">
           <BrandMark className="size-5" />

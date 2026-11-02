@@ -7,8 +7,11 @@ ARG NEXT_PUBLIC_RPC_URL
 ARG NEXT_PUBLIC_DOCS_URL
 WORKDIR /repo
 COPY . .
-RUN pnpm install --frozen-lockfile --filter "@memdot/web..."
-RUN pnpm --filter "@memdot/web..." build
+RUN pnpm install --frozen-lockfile --filter "@memdot/web..." --filter "@memdot/cli..."
+RUN pnpm --filter "@memdot/web..." --filter "@memdot/cli..." build
+# The CLI is served from here, so installing it needs nothing but this site.
+RUN mkdir -p apps/web/public/cli && cd packages/cli && npm pack --pack-destination ../../apps/web/public/cli \
+  && mv ../../apps/web/public/cli/memdot-cli-*.tgz ../../apps/web/public/cli/memdot-cli.tgz
 
 FROM node:24-slim
 # curl is what Coolify's health check runs inside the container.

@@ -3,7 +3,6 @@
 import type { MemoryMode, Namespace, Space } from "@memdot/sdk";
 import { Checkbox } from "@memdot/ui/components/checkbox";
 import { Input } from "@memdot/ui/components/input";
-import { Label } from "@memdot/ui/components/label";
 import {
   Select,
   SelectContent,
@@ -12,13 +11,26 @@ import {
   SelectValue,
 } from "@memdot/ui/components/select";
 import { useId } from "react";
-import { ROLES, RoleChoice } from "@/components/keys/role-choice";
+import type { ROLES } from "@/components/keys/role-choice";
+import { RoleChoice } from "@/components/keys/role-choice";
 import { ModeBadge } from "@/components/memory/mode-badge";
 
 const NEW_NAMESPACE = "new";
 const NAMESPACE_MAX = 64;
 const NEVER = "never";
-const AGENT_ROLES = ROLES.filter((role) => role.value !== "management");
+const AGENT_ROLES: typeof ROLES = [
+  {
+    value: "read_write",
+    title: "Read and write",
+    description: "Remember and forget, store and delete, in these spaces.",
+  },
+  { value: "read_only", title: "Read only", description: "Search, read and verify. No changes." },
+];
+/** A hosted agent holds no key, so it can't touch files. */
+const HOSTED_ROLES: typeof ROLES = [
+  { value: "read_write", title: "Read and write", description: "Search, remember and forget." },
+  { value: "read_only", title: "Read only", description: "Search and read. No changes." },
+];
 const EXPIRES = [
   { value: "30", label: "In 30 days" },
   { value: "90", label: "In 90 days" },
@@ -158,16 +170,16 @@ export function AccessChooser({
         )}
         <p className="text-ui-sm text-text-3">
           {hosted
-            ? "It reaches Assisted namespaces in these spaces. Private ones stay out of reach: only a device with its own key can open them."
+            ? "It reaches Assisted namespaces in these spaces, and not their files. Private ones stay out of reach: only a device with its own key can open them."
             : "It can read everything in a space you tick: its files and its namespaces. Keys are per space, so use a separate space for what it shouldn't see."}
         </p>
       </fieldset>
 
       {value.spaceIds.length > 0 && (
         <div className="flex flex-col gap-2">
-          <Label htmlFor={`${id}-namespace`} className="eyebrow">
+          <label htmlFor={`${id}-namespace`} className="eyebrow">
             Where it remembers
-          </Label>
+          </label>
           <Select
             value={value.namespaceId ?? undefined}
             onValueChange={(namespaceId) => onChange({ ...value, namespaceId })}
@@ -225,15 +237,15 @@ export function AccessChooser({
         <span className="eyebrow">What it can do</span>
         <RoleChoice
           value={value.role}
-          roles={AGENT_ROLES}
+          roles={hosted ? HOSTED_ROLES : AGENT_ROLES}
           onChange={(role) => onChange({ ...value, role: role as AccessChoice["role"] })}
         />
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor={`${id}-expires`} className="eyebrow">
+        <label htmlFor={`${id}-expires`} className="eyebrow">
           When it stops working
-        </Label>
+        </label>
         <Select value={value.expires} onValueChange={(expires) => onChange({ ...value, expires })}>
           <SelectTrigger id={`${id}-expires`} className="w-full">
             <SelectValue />

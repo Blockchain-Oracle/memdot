@@ -33,6 +33,19 @@ export default function OAuthConsentPage() {
   );
 }
 
+/** Clients we'd show a logo for, once their address proves who they are. */
+const RECOGNISED_HOSTS = new Set(["claude.ai", "cursor.com", "openai.com", "chatgpt.com"]);
+
+/** A client whose id is a web address proved it controls that address when it was fetched. */
+function identifiedBy(clientId: string): string | null {
+  try {
+    const url = new URL(clientId);
+    return url.protocol === "https:" ? url.host : null;
+  } catch {
+    return null;
+  }
+}
+
 function hostOf(uri: string | null): string {
   if (!uri) return "Unknown";
   try {
@@ -44,21 +57,8 @@ function hostOf(uri: string | null): string {
 
 /** What the OAuth server shows before an MCP client gets a token. Nothing is wrapped: it holds no key. */
 function Consent() {
-  const memdot = useMemDot();
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const params = useSearchParams();
-  const clientId = params.get("client_id");
-  const redirectUri = params.get("redirect_uri");
   const { gate, me } = useGate();
-  const ready = gate === "ready";
-  const spaces = useSpaces();
-  const namespaces = useNamespaces();
-  const [choice, setChoice] = useState<AccessChoice>(() => ({
-    ...initialChoice(),
-    newNamespaceMode: "assisted",
-  }));
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const next = `?next=${encodeURIComponent(hereWithQuery())}`;
@@ -67,10 +67,29 @@ function Consent() {
     else if (gate === "unlock") router.replace(`/unlock${next}`);
   }, [gate, router]);
 
+  // Names are sealed: anything read before the unlock would come back, and stay, unnamed.
+  if (gate !== "ready") return <BrandLoader className="mx-auto" />;
+  return <ConsentForm fresh={me?.signIn.fresh ?? false} />;
+}
+
+function ConsentForm({ fresh }: { fresh: boolean }) {
+  const memdot = useMemDot();
+  const queryClient = useQueryClient();
+  const params = useSearchParams();
+  const clientId = params.get("client_id");
+  const redirectUri = params.get("redirect_uri");
+  const spaces = useSpaces();
+  const namespaces = useNamespaces();
+  const [choice, setChoice] = useState<AccessChoice>(() => ({
+    ...initialChoice(),
+    newNamespaceMode: "assisted",
+  }));
+  const [busy, setBusy] = useState(false);
+
   const client = useQuery({
     queryKey: ["oauth-client", clientId],
     queryFn: () => memdot.agents.oauthClient(clientId as string),
-    enabled: ready && Boolean(clientId),
+    enabled: Boolean(clientId),
     retry: false,
   });
 
@@ -79,9 +98,10 @@ function Consent() {
       <ConsentHeader title="Nothing to approve" description="This link is missing its request." />
     );
   }
-  if (!ready || client.isPending) return <BrandLoader className="mx-auto" />;
+  if (client.isPending) return <BrandLoader className="mx-auto" />;
 
   const name = client.data?.client_name ?? "An MCP client";
+  const verifiedHost = identifiedBy(clientId);
   const query = () => window.location.search.slice(1);
 
   const answer = async (accept: boolean) => {
@@ -120,19 +140,23 @@ function Consent() {
     <div className="flex flex-col gap-6">
       <ConsentHeader
         title={`Connect ${name}`}
+        {...(verifiedHost && RECOGNISED_HOSTS.has(verifiedHost) ? { client: name } : {})}
         description="It's asking to use your memories over MCP. It only gets what you choose here."
       />
       <ConsentFacts
         rows={[
           { label: "Calls itself", value: name },
+          ...(verifiedHost ? [{ label: "Identified by", value: verifiedHost }] : []),
           { label: "Sends you back to", value: hostOf(redirectUri) },
           { label: "Reaches", value: "Assisted namespaces only" },
         ]}
       />
       <p className="-mt-3 text-center text-ui-sm text-text-3">
-        Anything can call itself anything. If you didn't just add this, cancel.
+        {verifiedHost
+          ? "If you didn't just add this, cancel."
+          : "Anything can call itself anything. If you didn't just add this, cancel."}
       </p>
-      {me && !me.signIn.fresh ? (
+      {!fresh ? (
         <ConfirmItsYou />
       ) : spaces.isPending || namespaces.isPending ? (
         <BrandLoader className="mx-auto" />

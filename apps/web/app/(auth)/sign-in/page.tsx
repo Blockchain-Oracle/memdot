@@ -104,7 +104,10 @@ function SignIn() {
       />
 
       <div className="flex flex-col items-center gap-3 pt-2">
-        <Link href="/recover" className="text-ui-sm text-text-2 underline-offset-4 hover:underline">
+        <Link
+          href={next ? `/recover?next=${encodeURIComponent(next)}` : "/recover"}
+          className="text-ui-sm text-text-2 underline-offset-4 hover:underline"
+        >
           Lost your passkey? Use your recovery code
         </Link>
         <p className="flex items-center gap-1.5 text-ui-sm text-text-3">

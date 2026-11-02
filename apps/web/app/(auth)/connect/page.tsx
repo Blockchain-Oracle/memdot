@@ -53,17 +53,8 @@ const CLOSED: Record<string, { title: string; description: string }> = {
 
 /** The `memdot login` consent page: the owner chooses, and their browser wraps the keys. */
 function Connect() {
-  const memdot = useMemDot();
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const params = useSearchParams();
-  const id = params.get("request");
   const { gate, me } = useGate();
-  const ready = gate === "ready";
-  const spaces = useSpaces();
-  const namespaces = useNamespaces();
-  const [choice, setChoice] = useState<AccessChoice>(initialChoice);
-  const [stage, setStage] = useState<"idle" | "wrapping" | "done" | "denied">("idle");
 
   useEffect(() => {
     const next = `?next=${encodeURIComponent(hereWithQuery())}`;
@@ -72,10 +63,25 @@ function Connect() {
     else if (gate === "unlock") router.replace(`/unlock${next}`);
   }, [gate, router]);
 
+  // Names are sealed: anything read before the unlock would come back, and stay, unnamed.
+  if (gate !== "ready") return <BrandLoader className="mx-auto" />;
+  return <ConnectForm fresh={me?.signIn.fresh ?? false} />;
+}
+
+function ConnectForm({ fresh }: { fresh: boolean }) {
+  const memdot = useMemDot();
+  const queryClient = useQueryClient();
+  const params = useSearchParams();
+  const id = params.get("request");
+  const spaces = useSpaces();
+  const namespaces = useNamespaces();
+  const [choice, setChoice] = useState<AccessChoice>(initialChoice);
+  const [stage, setStage] = useState<"idle" | "wrapping" | "done" | "denied">("idle");
+
   const request = useQuery({
     queryKey: ["connect", id],
     queryFn: () => memdot.agents.connectRequest(id as string),
-    enabled: ready && Boolean(id),
+    enabled: Boolean(id),
     retry: false,
   });
 
@@ -87,7 +93,7 @@ function Connect() {
       />
     );
   }
-  if (!ready || request.isPending) return <BrandLoader className="mx-auto" />;
+  if (request.isPending) return <BrandLoader className="mx-auto" />;
   if (request.isError || !request.data) {
     return (
       <ConsentHeader
@@ -168,7 +174,7 @@ function Connect() {
       <p className="-mt-3 text-center text-ui-sm text-text-3">
         Check this code matches your terminal. If you didn't run memdot login, refuse.
       </p>
-      {me && !me.signIn.fresh ? (
+      {!fresh ? (
         <ConfirmItsYou />
       ) : spaces.isPending || namespaces.isPending ? (
         <BrandLoader className="mx-auto" />

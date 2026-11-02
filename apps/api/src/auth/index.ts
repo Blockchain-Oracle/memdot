@@ -109,6 +109,9 @@ export const auth = betterAuth({
       // Each new account costs a little (a sponsored space, a relayer-paid key bundle).
       "/passkey/generate-register-options": { window: 60, max: 10 },
       "/passkey/verify-registration": { window: 60, max: 10 },
+      // Anyone can register an OAuth client, so nobody gets to fill the table.
+      "/oauth2/register": { window: 60, max: 10 },
+      "/oauth2/token": { window: 60, max: 60 },
     },
   },
   advanced: {
