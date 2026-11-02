@@ -23,7 +23,7 @@ import { blocksToDuration } from "@/lib/time";
 
 const KIND: Record<string, string> = {
   file: "File chunk or manifest",
-  segment: "Segment of small files",
+  segment: "Segment of small items",
   key_bundle: "Key bundle",
   grant_key: "Wrapped share key",
   index_snapshot: "Index snapshot",
