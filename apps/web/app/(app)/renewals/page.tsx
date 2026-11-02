@@ -57,7 +57,27 @@ export default function RenewalsPage() {
 
   const u = usage.data;
   const head = files.data?.headBlock ?? u?.headBlock ?? null;
-  const soonest = [...(files.data?.items ?? [])]
+  // R2: memory segments and index snapshots are kept alive like any file. They hold no name.
+  const memoryNamespaces = useQuery({
+    queryKey: ["namespaces"],
+    queryFn: () => memdot.memories.namespaces(),
+  });
+  const memoryObjects = useQuery({
+    queryKey: ["renewals", "memory-objects"],
+    queryFn: async () => {
+      const [segments, snapshots] = await Promise.all([
+        memdot.files.list({ kind: "segment", limit: MAX_PAGE_SIZE }),
+        memdot.files.list({ kind: "index_snapshot", limit: MAX_PAGE_SIZE }),
+      ]);
+      return [...segments.items, ...snapshots.items];
+    },
+  });
+  const namespaceName = (id: string | null) =>
+    memoryNamespaces.data?.find((row) => row.id === id)?.name ?? "a namespace";
+  const memoryRows = (memoryObjects.data ?? []).filter((object) =>
+    memoryNamespaces.data?.some((row) => row.id === object.folderId),
+  );
+  const soonest = [...(files.data?.items ?? []), ...memoryRows]
     .filter((f) => f.status === "stored" || f.status === "lost")
     .sort(
       (a, b) =>
@@ -141,9 +161,16 @@ export default function RenewalsPage() {
                   return (
                     <tr key={file.id} className="border-b border-border last:border-0">
                       <td className="max-w-[240px] truncate px-4 py-2.5 text-ui">
-                        <Link href={`/spaces/${file.spaceId}`} className="hover:underline">
-                          {file.name ?? "Encrypted file"}
-                        </Link>
+                        {file.kind === "file" ? (
+                          <Link href={`/spaces/${file.spaceId}`} className="hover:underline">
+                            {file.name ?? "Encrypted file"}
+                          </Link>
+                        ) : (
+                          <Link href={`/memory/${file.folderId}`} className="hover:underline">
+                            {file.kind === "index_snapshot" ? "Memory index" : "Memories"} in{" "}
+                            {namespaceName(file.folderId)}
+                          </Link>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-ui-sm text-text-2">
                         {spaceName(file.spaceId)}

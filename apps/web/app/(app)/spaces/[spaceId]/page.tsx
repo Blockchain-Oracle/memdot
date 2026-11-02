@@ -397,6 +397,7 @@ function SpaceFiles() {
           space={space}
           folderId={folderId}
           folderName={currentFolder?.name}
+          memoryMode={currentFolder?.memoryMode}
         />
       )}
       <FileSheet
@@ -446,7 +447,7 @@ function SpaceFiles() {
             ? `Delete ${deleting[0]?.name ?? "this file"}?`
             : `Delete ${deleting?.length ?? 0} files?`
         }
-        description="MemDot stops renewing it and frees the quota. The encrypted bytes leave the chain when their 7-day window ends."
+        description="MemDot stops renewing it and frees the quota. The encrypted bytes leave the chain when their 7-day window ends. Any memories learned from it are forgotten too."
         action="Delete"
         onConfirm={async () => {
           for (const file of deleting ?? []) await memdot.files.delete(file.id);

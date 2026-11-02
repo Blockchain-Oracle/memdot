@@ -13,10 +13,11 @@ import {
 } from "@memdot/ui/components/sheet";
 import { cn } from "@memdot/ui/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { LockIcon, TrashIcon, UploadIcon } from "lucide-react";
+import { BrainIcon, LockIcon, TrashIcon, UploadIcon } from "lucide-react";
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
+import { READ_NOTICE } from "@/components/memory/remember-file";
 import { describeError, isCancelled } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
@@ -34,12 +35,15 @@ export function UploadSheet({
   space,
   folderId,
   folderName,
+  memoryMode,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   space: Space;
   folderId: string | null;
   folderName?: string | null;
+  /** A memory folder: what's stored here is also read for memories. */
+  memoryMode?: "off" | "private" | "assisted" | undefined;
 }) {
   const memdot = useMemDot();
   const queryClient = useQueryClient();
@@ -71,11 +75,14 @@ export function UploadSheet({
   const overQuota = sponsored && total > free;
   const walletReady = sponsored || (wallet !== null && (walletFree ?? 0n) >= planck);
 
+  const reading = memoryMode === "private" || memoryMode === "assisted";
+
   const store = () => {
     enqueue(files, {
       spaceId: space.id,
       folderId,
       ...(!sponsored && wallet ? { wallet } : {}),
+      ...(reading && folderId ? { rememberIn: folderId } : {}),
     });
     setFiles([]);
     onOpenChange(false);
@@ -110,6 +117,12 @@ export function UploadSheet({
         </SheetHeader>
 
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5 [&>*]:shrink-0">
+          {reading && (
+            <p className="flex items-start gap-2 rounded-lg border border-border bg-surface-1 p-3 text-ui-sm text-text-2">
+              <BrainIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              {READ_NOTICE[memoryMode]}
+            </p>
+          )}
           <div
             {...getRootProps()}
             className={cn(

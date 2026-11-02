@@ -648,6 +648,7 @@ export function memoryRoutes(services: Services) {
           }
           throw error;
         }
+        await compactIfDue(db, services.boss, row);
         const [memory] = await serialize(keys, await rowsById([row.id]));
         return c.json(memory as z.infer<typeof Memory>, 200);
       },

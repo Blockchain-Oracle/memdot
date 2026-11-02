@@ -17,6 +17,7 @@ import { MemDotError } from "./errors.js";
 import type { JobsApi } from "./jobs.js";
 import { localEmbedder } from "./local-embedder.js";
 import { PrivateNamespace } from "./private-memory.js";
+import type { paths } from "./schema.js";
 import type { FoldersApi, SpacesApi } from "./spaces.js";
 import { fromBase64, openText, toBase64 } from "./spaces.js";
 import { unwrap } from "./transport.js";
@@ -241,6 +242,10 @@ const expiry = (value: string | null | undefined) => {
 };
 const when = (value: number | string) =>
   typeof value === "number" ? new Date(value * 1000) : new Date(value);
+
+type ModelsChange = NonNullable<
+  paths["/v1/configure"]["put"]["requestBody"]
+>["content"]["application/json"];
 
 /** What a device keeps for Private memory: the model and key it extracts with. */
 interface PrivateSettings {
@@ -479,6 +484,21 @@ export class MemoriesApi {
       : null;
     await unwrap(this.ctx.transport.api.PUT("/v1/configure", { body: { private_sealed: sealed } }));
     this.privateSettings = llm ? settings : null;
+  }
+
+  /** The models Assisted namespaces use. Keys are never returned. */
+  configuration() {
+    return unwrap(this.ctx.transport.api.GET("/v1/configure"));
+  }
+
+  /** Chooses this account's models for Assisted namespaces. null goes back to MemDot's. */
+  setModels(change: ModelsChange) {
+    return unwrap(this.ctx.transport.api.PUT("/v1/configure", { body: change }));
+  }
+
+  /** Sends one short request to each configured model. */
+  testModels() {
+    return unwrap(this.ctx.transport.api.POST("/v1/configure/test"));
   }
 
   /** Drafts custom instructions from a description of what you're building. */

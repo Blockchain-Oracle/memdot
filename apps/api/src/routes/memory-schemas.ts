@@ -18,7 +18,7 @@ export const ExpirationDate = z
   .openapi({ example: "2027-01-31" });
 
 export const Filters = z.record(z.string(), z.unknown()).openapi({
-  description: `Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: ${FILTER_OPERATORS.slice(0, -1).join(", ")}; "*" means any value.`,
+  description: `Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, source_object_id, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: ${FILTER_OPERATORS.slice(0, -1).join(", ")}; "*" means any value.`,
   example: { AND: [{ user_id: "alice" }, { created_at: { gte: "2026-10-01" } }] },
 });
 

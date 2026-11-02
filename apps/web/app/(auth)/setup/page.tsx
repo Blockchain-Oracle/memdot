@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { StepAccount } from "@/components/setup/step-account";
 import { StepApiKey } from "@/components/setup/step-api-key";
 import { StepFirstFile } from "@/components/setup/step-first-file";
+import { StepFirstMemory } from "@/components/setup/step-first-memory";
 import { StepSecure } from "@/components/setup/step-secure";
 import { StepSpace } from "@/components/setup/step-space";
 import { clearAuthFlow } from "@/lib/auth-flow";
@@ -30,6 +31,7 @@ const STEPS = [
   { title: "First space", description: "Where files live" },
   { title: "API key", description: "For servers and agents" },
   { title: "First file", description: "Stored on Portaldot" },
+  { title: "First memory", description: "Remember a fact" },
 ] as const;
 
 export default function SetupPage() {
@@ -149,7 +151,10 @@ export default function SetupPage() {
                   />
                 )}
                 {step === 4 && <StepApiKey onDone={() => setStep(5)} />}
-                {step === 5 && spaceId && <StepFirstFile spaceId={spaceId} onDone={finish} />}
+                {step === 5 && spaceId && (
+                  <StepFirstFile spaceId={spaceId} onDone={() => setStep(6)} />
+                )}
+                {step === 6 && spaceId && <StepFirstMemory spaceId={spaceId} onDone={finish} />}
               </>
             )}
           </div>

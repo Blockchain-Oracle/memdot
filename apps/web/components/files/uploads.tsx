@@ -8,6 +8,7 @@ import { cn } from "@memdot/ui/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDownIcon, XIcon } from "lucide-react";
 import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { rememberFile } from "@/components/memory/remember-file";
 import { describeError } from "@/lib/errors";
 import { formatBytes } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
@@ -31,7 +32,13 @@ interface UploadsValue {
   /** Queues files; they are encrypted and stored one at a time (one relayer, one nonce line). */
   enqueue: (
     files: File[],
-    target: { spaceId: string; folderId: string | null; wallet?: BrowserWallet },
+    target: {
+      spaceId: string;
+      folderId: string | null;
+      wallet?: BrowserWallet;
+      /** A memory folder: read each file for memories once it's stored. */
+      rememberIn?: string;
+    },
   ) => void;
   clearFinished: () => void;
   /** The wallet paying for self-signed spaces, chosen once per tab. */
@@ -62,6 +69,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
       spaceId: string;
       folderId: string | null;
       wallet?: BrowserWallet;
+      rememberIn?: string;
     }[]
   >([]);
   const running = useRef(false);
@@ -128,6 +136,10 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
           results.forEach((result, i) => {
             const id = ids[i];
             if (id) patch([id], { state: "done", job: result.job, file: result.file });
+            const original = tiny[i]?.file;
+            if (batch.rememberIn && original) {
+              void rememberFile(memdot, original, result.file, batch.rememberIn);
+            }
           });
         } catch (error) {
           patch(ids, { state: "failed", error: describeError(error).title });
@@ -145,6 +157,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
             onBlob: (done, total) => patch([upload.id], { signing: { done, total } }),
           });
           patch([upload.id], { state: "done", job: result.job, file: result.file });
+          if (batch.rememberIn) void rememberFile(memdot, file, result.file, batch.rememberIn);
         } catch (error) {
           patch([upload.id], { state: "failed", error: describeError(error).title });
         }
@@ -176,6 +189,7 @@ export function UploadsProvider({ children }: { children: React.ReactNode }) {
         spaceId: target.spaceId,
         folderId: target.folderId,
         ...(target.wallet ? { wallet: target.wallet } : {}),
+        ...(target.rememberIn ? { rememberIn: target.rememberIn } : {}),
       });
       setUploads((list) => [...items.map((i) => i.upload), ...list]);
       void drain();

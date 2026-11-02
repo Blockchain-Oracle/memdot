@@ -39,6 +39,11 @@ export default function OverviewPage() {
     queryFn: () => memdot.account.unlockMethods(),
   });
 
+  const namespaces = useQuery({
+    queryKey: ["namespaces"],
+    queryFn: () => memdot.memories.namespaces(),
+  });
+
   const firstSpace = spaces.data?.[0];
   const steps = [
     {
@@ -61,6 +66,12 @@ export default function OverviewPage() {
       action: "Create",
     },
     {
+      title: "Remember your first fact",
+      done: (namespaces.data ?? []).some((row) => row.totalMemories > 0),
+      href: "/memory",
+      action: "Remember",
+    },
+    {
       title: "Share a space with someone",
       done: (given.data?.items.length ?? 0) > 0,
       href: firstSpace ? `/spaces/${firstSpace.id}?share=1` : "/files",
@@ -73,7 +84,7 @@ export default function OverviewPage() {
       action: "Set up",
     },
   ];
-  const loaded = [spaces, usage, keys, given, unlock].every((q) => q.isSuccess);
+  const loaded = [spaces, usage, keys, given, unlock, namespaces].every((q) => q.isSuccess);
   const done = steps.filter((s) => s.done).length;
 
   const u = usage.data;
@@ -162,6 +173,27 @@ export default function OverviewPage() {
           hint="Stores and renewals, paid by MemDot"
         />
       </StatRow>
+
+      {(namespaces.data?.length ?? 0) > 0 && (
+        <Link
+          href="/memory"
+          className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface-1 px-4 py-3 shadow-card transition-colors duration-(--motion-instant) hover:border-border-strong"
+        >
+          <span className="flex flex-col gap-0.5">
+            <span className="text-ui font-medium">
+              {formatNumber(
+                (namespaces.data ?? []).reduce((sum, row) => sum + row.totalMemories, 0),
+              )}{" "}
+              memories
+            </span>
+            <span className="text-ui-sm text-text-3">
+              In {namespaces.data?.length} namespace{namespaces.data?.length === 1 ? "" : "s"},
+              encrypted on Portaldot
+            </span>
+          </span>
+          <ArrowRightIcon className="size-4 text-text-4" aria-hidden="true" />
+        </Link>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <section className="flex flex-col gap-3">

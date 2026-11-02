@@ -24,6 +24,7 @@ export {
   installedWallets,
   SUBSTRATE_WALLETS,
 } from "./browser-wallet.js";
+export type { Schemas } from "./context.js";
 export {
   type ArchiveFile,
   DataApi,

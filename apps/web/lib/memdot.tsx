@@ -2,6 +2,7 @@
 
 import { MemDot } from "@memdot/sdk";
 import { createContext, useContext, useState, useSyncExternalStore } from "react";
+import { deviceEmbedder } from "./device-embedder";
 import { API_URL, RPC_URL } from "./env";
 
 const MemDotContext = createContext<MemDot | null>(null);
@@ -12,7 +13,12 @@ const MemDotContext = createContext<MemDot | null>(null);
  */
 export function MemDotProvider({ children }: { children: React.ReactNode }) {
   const [client] = useState(() =>
-    MemDot.create({ baseUrl: API_URL, rpc: RPC_URL, client: "web/0.0.0" }),
+    MemDot.create({
+      baseUrl: API_URL,
+      rpc: RPC_URL,
+      client: "web/0.0.0",
+      embedder: deviceEmbedder,
+    }),
   );
   return <MemDotContext value={client}>{children}</MemDotContext>;
 }

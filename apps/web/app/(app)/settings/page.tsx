@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { WalletPicker } from "@/components/auth/wallet-picker";
 import { ConfirmDialog } from "@/components/files/file-dialogs";
 import { Page, PageHeader } from "@/components/page-header";
+import { DataSection } from "@/components/settings/data-section";
 import { clearAuthFlow } from "@/lib/auth-flow";
 import { describeError, isCancelled } from "@/lib/errors";
 import { formatRelative } from "@/lib/format";
@@ -40,6 +41,8 @@ const SECTIONS = [
   { id: "security", label: "Unlock methods" },
   { id: "appearance", label: "Appearance" },
   { id: "sessions", label: "Sessions" },
+  { id: "data", label: "Data" },
+  { id: "danger", label: "Danger zone" },
 ];
 const THEMES = [
   { value: "light", label: "Light" },
@@ -386,6 +389,8 @@ export default function SettingsPage() {
               </span>
             </Line>
           </Section>
+
+          <DataSection />
         </div>
       </div>
 

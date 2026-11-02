@@ -15,6 +15,7 @@ export const FILTER_FIELDS = [
   "categories",
   "memory_ids",
   "keywords",
+  "source_object_id",
 ] as const;
 export type FilterField = (typeof FILTER_FIELDS)[number] | "metadata";
 
@@ -119,6 +120,7 @@ export interface FilterableMemory {
   expiresAt?: string | null | undefined;
   categories?: string[] | null | undefined;
   metadata?: Record<string, unknown> | null | undefined;
+  sourceObjectId?: string | null | undefined;
 }
 
 const isDateField = (field: FilterField) =>
@@ -153,6 +155,8 @@ function fieldValue(memory: FilterableMemory, node: FilterNode & { type: "condit
       return memory.id;
     case "keywords":
       return memory.text;
+    case "source_object_id":
+      return memory.sourceObjectId;
     case "metadata":
       return memory.metadata?.[node.path as string];
   }

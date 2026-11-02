@@ -114,6 +114,21 @@ export function FileSheet({
         : { own, holder: own };
     },
   });
+  const folderId = file?.folderId;
+  // In a memory folder, what the model learned from this file.
+  const learned = useQuery({
+    queryKey: ["memories", folderId, "from", id],
+    enabled: Boolean(id && folderId),
+    retry: false,
+    queryFn: async () => {
+      const namespaces = await memdot.memories.namespaces();
+      if (!namespaces.some((row) => row.id === folderId)) return { results: [] };
+      return memdot.memories.list({
+        namespaceId: folderId as string,
+        filters: { source_object_id: id as string },
+      });
+    },
+  });
   const versions = useQuery({
     queryKey: ["file", id, "versions"],
     enabled: Boolean(id),
@@ -439,6 +454,23 @@ export function FileSheet({
                 <Share2Icon data-icon="inline-start" /> Manage access
               </Button>
             </Section>
+
+            {learned.data && learned.data.results.length > 0 && file?.folderId && (
+              <Section title="Learned from this file">
+                <ul className="flex flex-col gap-1.5 text-ui-sm">
+                  {learned.data.results.map((memory) => (
+                    <li key={memory.id}>{memory.memory}</li>
+                  ))}
+                </ul>
+                <p className="text-ui-sm text-text-3">Deleting this file forgets these memories.</p>
+                <Link
+                  href={`/memory/${file.folderId}`}
+                  className="text-ui-sm text-text-3 underline-offset-2 hover:underline"
+                >
+                  Open in Memory
+                </Link>
+              </Section>
+            )}
 
             <Section title="Versions">
               {versions.isPending ? (

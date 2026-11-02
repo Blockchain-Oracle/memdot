@@ -9,6 +9,10 @@ const COLUMNS: Record<string, PgColumn> = {
   agent_id: memories.agentId,
   run_id: memories.runId,
 };
+const UUID_COLUMNS: Record<string, PgColumn> = {
+  memory_ids: memories.id,
+  source_object_id: memories.sourceObjectId,
+};
 const DATE_COLUMNS: Record<string, PgColumn> = {
   created_at: memories.createdAt,
   updated_at: memories.updatedAt,
@@ -134,7 +138,8 @@ export function filterToSql(keys: AssistedKeys, folderId: string, node: FilterNo
       if (node.field === "keywords") return keywordCondition(keys, folderId, node);
       if (node.field === "categories") return categoryCondition(node);
       if (node.field === "metadata") return metadataCondition(node);
-      if (node.field === "memory_ids") return textCondition(sql`${memories.id}::text`, node);
+      const uuid = UUID_COLUMNS[node.field];
+      if (uuid) return textCondition(sql`${uuid}::text`, node);
       const date = DATE_COLUMNS[node.field];
       if (date) return dateCondition(date, node);
       return textCondition(sql`${COLUMNS[node.field] as PgColumn}`, node);

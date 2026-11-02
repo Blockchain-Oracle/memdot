@@ -14,6 +14,11 @@ export const JOB_LABEL: Record<string, string> = {
   store_object: "Store",
   renew: "Renew",
   restore: "Restore",
+  memory_add: "Remember",
+  memory_update: "Update memory",
+  memory_import: "Import memories",
+  memory_restore: "Rebuild index",
+  memory_compact: "Compact memories",
 };
 
 /** The top-bar chip: in-flight chain transactions as the mark glyph, with their stages. */

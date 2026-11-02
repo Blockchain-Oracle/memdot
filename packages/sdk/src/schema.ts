@@ -6680,7 +6680,7 @@ export interface paths {
                         /** Format: uuid */
                         namespace_id?: string;
                         /**
-                         * @description Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; "*" means any value.
+                         * @description Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, source_object_id, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; "*" means any value.
                          * @example {
                          *       "AND": [
                          *         {
@@ -9139,7 +9139,7 @@ export interface components {
             /** Format: uuid */
             namespace_id?: string;
             /**
-             * @description Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; "*" means any value.
+             * @description Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, source_object_id, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; "*" means any value.
              * @example {
              *       "AND": [
              *         {
@@ -9190,7 +9190,7 @@ export interface components {
             /** Format: uuid */
             namespace_id?: string;
             /**
-             * @description Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; "*" means any value.
+             * @description Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, source_object_id, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; "*" means any value.
              * @example {
              *       "AND": [
              *         {

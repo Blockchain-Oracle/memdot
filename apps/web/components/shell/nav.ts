@@ -1,5 +1,7 @@
 import {
   ActivityIcon,
+  BrainIcon,
+  ContactRoundIcon,
   FolderIcon,
   GaugeIcon,
   KeyRoundIcon,
@@ -7,6 +9,7 @@ import {
   type LucideIcon,
   RefreshCwIcon,
   SettingsIcon,
+  SlidersHorizontalIcon,
   UsersIcon,
 } from "lucide-react";
 
@@ -33,6 +36,18 @@ export const NAV: { label: string; items: NavItem[] }[] = [
         keywords: ["storage", "upload", "space"],
       },
       {
+        title: "Memory",
+        href: "/memory",
+        icon: BrainIcon,
+        keywords: ["remember", "recall", "search", "namespace", "agent"],
+      },
+      {
+        title: "Entities",
+        href: "/entities",
+        icon: ContactRoundIcon,
+        keywords: ["users", "agents", "runs", "people"],
+      },
+      {
         title: "Shared with me",
         href: "/shared",
         icon: UsersIcon,
@@ -44,6 +59,12 @@ export const NAV: { label: string; items: NavItem[] }[] = [
     label: "Developers",
     items: [
       { title: "API keys", href: "/keys", icon: KeyRoundIcon, keywords: ["token", "secret"] },
+      {
+        title: "Configuration",
+        href: "/configuration",
+        icon: SlidersHorizontalIcon,
+        keywords: ["model", "llm", "embedder", "provider", "gemini", "openai", "anthropic", "key"],
+      },
       {
         title: "Activity",
         href: "/activity",

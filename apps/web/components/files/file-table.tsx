@@ -240,7 +240,7 @@ export function FileTable({
                 </span>
                 <span className="hidden xl:block" />
                 <span role="cell" className="text-ui-sm text-text-3">
-                  Folder
+                  {entry.folder.memoryMode === "off" ? "Folder" : "Memory"}
                 </span>
                 <span className="hidden md:block" />
                 <span role="cell" className="hidden text-right text-ui-sm text-text-3 md:block">

@@ -27,7 +27,9 @@
     "react-dom": "19.3.1",
     "react-dropzone": "^20.1.4",
     "sonner": "^2.0.8",
-    "viem": "^2.57.13"
+    "viem": "^2.57.13",
+    "@huggingface/transformers": "^4.3.2",
+    "@memdot/memory-engine": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

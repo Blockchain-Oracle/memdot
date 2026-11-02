@@ -17,7 +17,14 @@ import {
 import { Kbd } from "@memdot/ui/components/kbd";
 import { Separator } from "@memdot/ui/components/separator";
 import { SidebarTrigger } from "@memdot/ui/components/sidebar";
-import { FolderPlusIcon, KeyRoundIcon, PlusIcon, SearchIcon, UploadIcon } from "lucide-react";
+import {
+  BrainIcon,
+  FolderPlusIcon,
+  KeyRoundIcon,
+  PlusIcon,
+  SearchIcon,
+  UploadIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -87,6 +94,9 @@ export function TopBar() {
               <UploadIcon /> Upload files
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onSelect={() => router.push("/memory")}>
+            <BrainIcon /> Add a memory
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setCreating(true)}>
             <FolderPlusIcon /> New space
           </DropdownMenuItem>

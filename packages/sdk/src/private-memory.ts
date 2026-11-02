@@ -67,6 +67,7 @@ const toFilterable = (entry: MemoryEntry): FilterableMemory => ({
   expiresAt: entry.expiresAt,
   categories: entry.categories,
   metadata: entry.metadata,
+  sourceObjectId: entry.source?.objectId,
 });
 
 export interface PrivateAdd {
