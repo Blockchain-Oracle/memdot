@@ -1,6 +1,7 @@
 // S08: a live check of memory on a deployed service, with no model key involved anywhere. Assisted
 // memories stored as written and found by keyword, Private ones embedded on this machine, the chain
-// underneath both, then the account deleted. Spends about 1.5 tPOT from the relayer.
+// underneath both, then the account deleted. Spends several tPOT from the relayer, and makes accounts,
+// so run it on a local stack.
 // Usage: API_URL=… WEB_ORIGIN=… pnpm --filter @memdot/sdk smoke:memory
 
 import { writeFile } from "node:fs/promises";

@@ -1,7 +1,8 @@
 // S08 "done when", through the SDK against a running API and worker on live Portaldot V3: Kofi's
 // agent memory journey in both modes, restore, source links, importing another product's export,
 // export and re-import, and account deletion stopping renewals.
-// Needs a model key for the Private half. Spends about 3 tPOT from the relayer.
+// Needs a model key for the Private half. Spends roughly 10 tPOT from the relayer: registry records
+// cost more than the stores they describe, and each new account makes several.
 // Usage: GEMINI_API_KEY=… pnpm --filter @memdot/sdk journey:memory
 // WIPE_INDEX_SQL="docker exec -i memdot-postgres-1 psql -U memdot -d memdot" also wipes the Assisted
 // index behind the API's back first, so Restore has only the chain to work from (local only).
