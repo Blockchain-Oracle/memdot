@@ -1,6 +1,7 @@
 import { openWith, sealTo } from "@memdot/crypto";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
 import type { Context, Schemas } from "./context.js";
+import { MemDotError } from "./errors.js";
 import { unwrap } from "./transport.js";
 
 export type RawSpace = Schemas["Space"];
@@ -48,6 +49,13 @@ export class SpacesApi {
    * (epoch 0) before the API ever sees it.
    */
   async create(input: { name: string; mode?: RawSpace["mode"] }): Promise<Space> {
+    if (this.ctx.vault.isAgent) {
+      throw new MemDotError(
+        403,
+        "OWNER_ONLY",
+        "Only the owner can create a space, since it needs their key. Do it in the dashboard.",
+      );
+    }
     const id = crypto.randomUUID();
     const encryptedName = await sealText(input.name, this.ctx.vault.sealTo(id, 0));
     const raw = await unwrap(

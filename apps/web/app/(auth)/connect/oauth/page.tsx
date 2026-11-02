@@ -75,9 +75,7 @@ function Consent() {
 function ConsentForm({ fresh }: { fresh: boolean }) {
   const memdot = useMemDot();
   const queryClient = useQueryClient();
-  const params = useSearchParams();
-  const clientId = params.get("client_id");
-  const redirectUri = params.get("redirect_uri");
+  const oauthQuery = useSearchParams().toString();
   const spaces = useSpaces();
   const namespaces = useNamespaces();
   const [choice, setChoice] = useState<AccessChoice>(() => ({
@@ -86,23 +84,25 @@ function ConsentForm({ fresh }: { fresh: boolean }) {
   }));
   const [busy, setBusy] = useState(false);
 
-  const client = useQuery({
-    queryKey: ["oauth-client", clientId],
-    queryFn: () => memdot.agents.oauthClient(clientId as string),
-    enabled: Boolean(clientId),
+  // Everything shown here comes from what the OAuth server signed, not from this page's address.
+  const request = useQuery({
+    queryKey: ["oauth-request", oauthQuery],
+    queryFn: () => memdot.agents.hostedRequest(oauthQuery),
     retry: false,
   });
 
-  if (!clientId) {
+  if (request.isPending) return <BrandLoader className="mx-auto" />;
+  if (!request.data) {
     return (
-      <ConsentHeader title="Nothing to approve" description="This link is missing its request." />
+      <ConsentHeader
+        title="This link isn't valid"
+        description="Nothing was connected. Start again from the app that asked."
+      />
     );
   }
-  if (client.isPending) return <BrandLoader className="mx-auto" />;
 
-  const name = client.data?.client_name ?? "An MCP client";
-  const verifiedHost = identifiedBy(clientId);
-  const query = () => window.location.search.slice(1);
+  const name = request.data.clientName ?? "An MCP client";
+  const verifiedHost = identifiedBy(request.data.clientId);
 
   const answer = async (accept: boolean) => {
     setBusy(true);
@@ -121,7 +121,7 @@ function ConsentForm({ fresh }: { fresh: boolean }) {
           .map((row) => ({ id: row.id, name: row.name }));
         const namespaceId = made?.id ?? (choice.namespaceId as string);
         await memdot.agents.allowHosted({
-          clientId,
+          oauthQuery,
           role: choice.role,
           spaceIds: choice.spaceIds,
           namespaces: [...reachable, ...(made ? [{ id: made.id, name: made.name }] : [])],
@@ -129,7 +129,7 @@ function ConsentForm({ fresh }: { fresh: boolean }) {
           ...expiryDays(choice),
         });
       }
-      window.location.assign(await memdot.agents.answerOAuth(query(), accept));
+      window.location.assign(await memdot.agents.answerOAuth(oauthQuery, accept));
     } catch (error) {
       setBusy(false);
       toast.error(describeError(error).title);
@@ -147,7 +147,7 @@ function ConsentForm({ fresh }: { fresh: boolean }) {
         rows={[
           { label: "Calls itself", value: name },
           ...(verifiedHost ? [{ label: "Identified by", value: verifiedHost }] : []),
-          { label: "Sends you back to", value: hostOf(redirectUri) },
+          { label: "Sends you back to", value: hostOf(request.data.redirectUri) },
           { label: "Reaches", value: "Assisted namespaces only" },
         ]}
       />

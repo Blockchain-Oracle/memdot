@@ -1,5 +1,6 @@
-import { readFile, stat, writeFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { basename, dirname, isAbsolute, parse, relative, resolve, sep } from "node:path";
 import { type MemDot, MemDotError, type Memory, type ScoredMemory } from "@memdot/sdk";
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
@@ -563,18 +564,23 @@ export function buildServer(memdot: MemDot, options: ServerOptions): McpServer {
     {
       title: "Read a file",
       description: `Fetches a file and decrypts it here. Text under ${MAX_INLINE_BYTES / 1024} KiB comes back in the result; for anything else, pass save_to.`,
-      annotations: { ...READ, readOnlyHint: false, destructiveHint: false },
+      // Writing a file to this machine is why this isn't marked read-only.
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         file_id: FileId,
-        save_to: z.string().optional().describe("A path on this machine. Won't overwrite."),
+        save_to: z
+          .string()
+          .optional()
+          .describe("A path inside the folder this server may use. Won't overwrite."),
       }),
     },
     tool(async ({ file_id, save_to }) => {
       const { data, name, mime } = await memdot.files.get(file_id);
       const about = { id: file_id, name, mime, size: data.length };
       if (save_to) {
-        await writeFile(save_to, data, { flag: "wx" });
-        return { ...about, saved_to: save_to };
+        const path = await allowedPath(save_to, true);
+        await writeFile(path, data, { flag: "wx" });
+        return { ...about, saved_to: path };
       }
       const text = data.length <= MAX_INLINE_BYTES ? decodeText(data) : null;
       if (text === null) {
@@ -616,11 +622,12 @@ export function buildServer(memdot: MemDot, options: ServerOptions): McpServer {
       {
         title: "Store a file",
         description:
-          "Encrypts a file on this machine and stores it on Portaldot V3. Send a local path, or text. Spends the space's storage allowance.",
-        annotations: WRITE,
+          "Encrypts a file on this machine and stores it on Portaldot V3. Send text, or a path inside the folder this server may use. Spends the space's storage allowance. Only store what the person asked you to.",
+        // It reads from this machine and sends the result elsewhere, so a client should ask.
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
         inputSchema: z.object({
           space_id: z.string().uuid(),
-          path: z.string().optional().describe("A file on this machine"),
+          path: z.string().optional().describe("A file inside the folder this server may use"),
           text: z.string().optional().describe("Content to store, instead of a path"),
           name: z.string().max(256).optional().describe("Needed with text"),
           folder_id: z.string().uuid().optional(),
@@ -733,15 +740,46 @@ export function buildServer(memdot: MemDot, options: ServerOptions): McpServer {
   return server;
 }
 
+/**
+ * A tool's arguments come from a model, which can be talked into things by what it reads: a stored
+ * memory could ask it to upload ~/.ssh/id_ed25519. So paths stay inside one folder, and hidden files
+ * and folders stay out even there. An app that started this server from the top of the disk or from
+ * home hasn't chosen a folder, so nothing is reachable until MEMDOT_FILES_DIR names one.
+ */
+async function allowedPath(path: string, creating: boolean): Promise<string> {
+  const configured = process.env.MEMDOT_FILES_DIR?.trim();
+  const root = resolve(configured || process.cwd());
+  if (!configured && (root === parse(root).root || root === homedir())) {
+    throw new Error("Set MEMDOT_FILES_DIR to the folder this server may read and write.");
+  }
+  const target = resolve(root, path);
+  const realRoot = await realpath(root);
+  const real = creating
+    ? resolve(await realpath(dirname(target)), basename(target))
+    : await realpath(target);
+  const inside = relative(realRoot, real);
+  if (
+    inside === "" ||
+    inside.startsWith(`..${sep}`) ||
+    inside === ".." ||
+    isAbsolute(inside) ||
+    inside.split(sep).some((part) => part.startsWith("."))
+  ) {
+    throw new Error(`That path is outside what this server may use: ${root}, no hidden files.`);
+  }
+  return real;
+}
+
 async function uploadBody(input: {
   path?: string | undefined;
   text?: string | undefined;
   name?: string | undefined;
 }): Promise<{ data: Uint8Array; name: string }> {
   if (input.path) {
-    const { size } = await stat(input.path);
+    const path = await allowedPath(input.path, false);
+    const { size } = await stat(path);
     if (size > MAX_UPLOAD_BYTES) throw new Error("That file is too large to send from here.");
-    return { data: await readFile(input.path), name: input.name ?? basename(input.path) };
+    return { data: await readFile(path), name: input.name ?? basename(path) };
   }
   if (input.text === undefined) throw new Error("Send a path or text.");
   if (!input.name) throw new Error("Text needs a name.");

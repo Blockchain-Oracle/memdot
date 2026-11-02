@@ -1,7 +1,8 @@
 import { x25519 } from "@noble/curves/ed25519.js";
 import { hkdf } from "@noble/hashes/hkdf.js";
+import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { randomBytes, utf8ToBytes } from "@noble/hashes/utils.js";
+import { bytesToHex, randomBytes, utf8ToBytes } from "@noble/hashes/utils.js";
 import { bech32 } from "@scure/base";
 
 export const KEY_BYTES = 32;
@@ -16,6 +17,7 @@ export const INFO = {
   spaceKey: "memdot/space-key/v1",
   recoverySignIn: "memdot/recovery-signin-ed25519/v1",
   owner: "memdot/owner-sr25519/v1",
+  grantTag: "memdot/grant-tag/v1",
 } as const;
 
 export interface X25519KeyPair {
@@ -54,6 +56,31 @@ export function userKeyPair(accountMasterKey: Uint8Array): X25519KeyPair {
  */
 export function ownerSeed(accountMasterKey: Uint8Array): Uint8Array {
   return deriveKey(accountMasterKey, INFO.owner);
+}
+
+/**
+ * Proves this account's own client meant to share this. It's made here and checked here, so a key
+ * for the API, or the server itself, can't get the client to wrap keys for anyone else.
+ */
+export function grantTag(
+  accountMasterKey: Uint8Array,
+  grant: {
+    spaceId: string;
+    objectId: string | null;
+    granteeKind: string;
+    grantee: string;
+    scope: string;
+  },
+): string {
+  const message = [
+    grant.spaceId,
+    grant.objectId ?? "",
+    grant.granteeKind,
+    grant.grantee,
+    grant.scope,
+  ].join("\n");
+  const tag = hmac(sha256, deriveKey(accountMasterKey, INFO.grantTag), utf8ToBytes(message));
+  return bytesToHex(tag);
 }
 
 /** The account's age recipient: what others seal shares to (its `encryptionKey`). */

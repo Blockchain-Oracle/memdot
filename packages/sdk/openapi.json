@@ -1184,6 +1184,12 @@
           "keyEpoch": {
             "type": "integer",
             "minimum": 0
+          },
+          "ownerTag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Made from the owner's master key. Their client only wraps keys for a grant that carries a tag it can check."
           }
         },
         "required": [
@@ -1208,12 +1214,20 @@
           "recipientKey": {
             "type": "string",
             "description": "Seal the key or manifest to this"
+          },
+          "ownerTag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Check this before wrapping anything: only your own client can have made it"
           }
         },
         "required": [
           "grant",
           "reason",
-          "recipientKey"
+          "recipientKey",
+          "ownerTag"
         ]
       },
       "SharedSpace": {
@@ -1541,13 +1555,36 @@
           "publicKey"
         ]
       },
-      "NewHostedAgent": {
+      "HostedRequest": {
         "type": "object",
         "properties": {
           "clientId": {
+            "type": "string"
+          },
+          "clientName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "redirectUri": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "clientName",
+          "redirectUri"
+        ]
+      },
+      "NewHostedAgent": {
+        "type": "object",
+        "properties": {
+          "oauthQuery": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 512
+            "maxLength": 8192,
+            "description": "The query the OAuth server signed when it sent the owner to the consent page"
           },
           "role": {
             "type": "string",
@@ -1603,7 +1640,7 @@
           }
         },
         "required": [
-          "clientId",
+          "oauthQuery",
           "spaceIds",
           "namespaces",
           "namespaceId"
@@ -1641,18 +1678,22 @@
             "type": "string",
             "format": "uuid"
           },
-          "code": {
-            "type": "string",
-            "description": "Shown here and in the terminal, to compare"
-          },
           "label": {
-            "type": "string"
+            "type": "string",
+            "description": "What it calls itself. Nothing vouches for this."
           },
           "client": {
             "type": "string"
           },
           "publicKey": {
             "type": "string"
+          },
+          "requestedFrom": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address it asked from"
           },
           "status": {
             "type": "string",
@@ -1671,10 +1712,10 @@
         },
         "required": [
           "id",
-          "code",
           "label",
           "client",
           "publicKey",
+          "requestedFrom",
           "status",
           "expiresAt"
         ]
@@ -1749,13 +1790,21 @@
               "null"
             ],
             "format": "uuid"
+          },
+          "ownerAccount": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The account that approved it, so the device can say whose it is"
           }
         },
         "required": [
           "status",
           "sealedKey",
           "agentId",
-          "namespaceId"
+          "namespaceId",
+          "ownerAccount"
         ]
       },
       "Usage": {
@@ -8192,13 +8241,123 @@
         }
       }
     },
+    "/v1/agents/hosted/request": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "See what an OAuth request is asking",
+        "description": "What the consent page shows, read from the query the OAuth server signed rather than from the page's address.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "oauthQuery": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8192,
+                    "description": "The query the OAuth server signed when it sent the owner to the consent page"
+                  }
+                },
+                "required": [
+                  "oauthQuery"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostedRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/agents/hosted": {
       "post": {
         "tags": [
           "Agents"
         ],
         "summary": "Allow a hosted agent",
-        "description": "What the consent page sends just before it accepts an OAuth request: which spaces this client may reach and how. Assisted namespaces only, since nothing can be unwrapped for a client that holds no key. Asking again replaces what it had.",
+        "description": "What the consent page sends just before it accepts an OAuth request: which spaces this client may reach and how. It can use every Assisted namespace in those spaces, including ones made later; nothing can be unwrapped for a client that holds no key. Asking again replaces what it had.",
         "security": [
           {
             "ApiKey": []
@@ -8535,7 +8694,7 @@
           "Agents"
         ],
         "summary": "Ask to connect a device",
-        "description": "Needs no sign-in: nothing happens until the owner approves it in their browser. Keep the poll secret; it is the only way to collect the result.",
+        "description": "Needs no sign-in: nothing happens until the owner types the code in their browser and approves. Show them the code. Keep the poll secret; it is the only way to collect the result.",
         "requestBody": {
           "required": true,
           "content": {
@@ -8559,7 +8718,8 @@
                       "format": "uuid"
                     },
                     "code": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "The owner types this into the page"
                     },
                     "url": {
                       "type": "string",
@@ -8651,12 +8811,13 @@
         }
       }
     },
-    "/v1/connect/{id}": {
-      "get": {
+    "/v1/connect/{id}/claim": {
+      "post": {
         "tags": [
           "Agents"
         ],
-        "summary": "See what's asking to connect",
+        "summary": "Claim a device's request with its code",
+        "description": "The owner types the code the terminal shows. From then on only their account can answer it.",
         "security": [
           {
             "ApiKey": []
@@ -8677,6 +8838,26 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 32
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The request",
@@ -8757,7 +8938,7 @@
           "Agents"
         ],
         "summary": "Approve a device",
-        "description": "Call this after registering the agent and creating its grants: only the owner's client can wrap the keys. Mints the device's API key and seals it to the device.",
+        "description": "Call this after claiming the request, registering the agent and creating its grants: only the owner's client can wrap the keys. Mints the device's API key and seals it to the device.",
         "security": [
           {
             "ApiKey": []
@@ -8879,6 +9060,7 @@
           "Agents"
         ],
         "summary": "Refuse a device",
+        "description": "Only the account that claimed the request can refuse it.",
         "security": [
           {
             "ApiKey": []

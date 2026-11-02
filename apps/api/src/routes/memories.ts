@@ -147,6 +147,11 @@ async function rowsById(ids: string[]): Promise<MemoryRow[]> {
   });
 }
 
+/** A hosted agent reaches Assisted namespaces only, and that includes forgetting by id. */
+async function refuseHostedOnPrivate(c: Context<AppEnv>, folderId: string): Promise<void> {
+  if (principalOf(c).apiKey?.hosted) assertAssisted(await loadNamespace(c, folderId));
+}
+
 const actorOf = (c: Context<AppEnv>) =>
   c.req.header("x-memdot-client")?.slice(0, 64) ??
   (principalOf(c).via === "session" ? "dashboard" : (principalOf(c).apiKey?.start ?? null));
@@ -693,6 +698,7 @@ export function memoryRoutes(services: Services) {
       }),
       async (c) => {
         const row = await loadMemory(c, c.req.valid("param").id);
+        await refuseHostedOnPrivate(c, row.folderId);
         await db.transaction((tx) => forget(tx, eq(memories.id, row.id) as SQL, actorOf(c)));
         await compactIfDue(db, services.boss, row);
         return c.json({ message: "Memory forgotten." }, 200);
@@ -896,6 +902,9 @@ export function memoryRoutes(services: Services) {
       async (c) => {
         const ids = c.req.valid("json").memories.map((item) => item.memory_id);
         const rows = await Promise.all(ids.map((id) => loadMemory(c, id)));
+        for (const folderId of new Set(rows.map((row) => row.folderId))) {
+          await refuseHostedOnPrivate(c, folderId);
+        }
         const deleted = await db.transaction((tx) =>
           forget(tx, inArray(memories.id, ids) as SQL, actorOf(c)),
         );

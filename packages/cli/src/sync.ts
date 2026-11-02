@@ -1,6 +1,7 @@
 import { chmod, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { API_KEY_FORMAT } from "@memdot/sdk";
 
 const VARIABLE = "MEMDOT_API_KEY";
 /** `[ \t]`, not `\s`: a trailing newline must stay where it is. */
@@ -12,7 +13,7 @@ async function replace(path: string, content: string): Promise<void> {
   const { mode } = await stat(path);
   const temporary = join(dirname(path), `.${basename(path)}.${process.pid}.tmp`);
   try {
-    await writeFile(temporary, content);
+    await writeFile(temporary, content, { mode: mode & 0o777 });
     await chmod(temporary, mode);
     await rename(temporary, path);
   } catch (error) {
@@ -34,7 +35,7 @@ async function syncShell(path: string, key: string): Promise<boolean> {
   const raw = await readFile(path, "utf8");
   const match = raw.match(EXPORT_LINE);
   if (!match) return false;
-  const next = raw.replace(EXPORT_LINE, `$1"${key}"`);
+  const next = raw.replace(EXPORT_LINE, (_line, prefix: string) => `${prefix}"${key}"`);
   if (next === raw) return false;
   await replace(path, next);
   return true;
@@ -46,6 +47,8 @@ async function syncShell(path: string, key: string): Promise<boolean> {
  * didn't have one. A file it can't read or parse is left alone.
  */
 export async function syncKey(key: string): Promise<string[]> {
+  // This goes into shell files, and the server chose it: anything but a key is refused here.
+  if (!API_KEY_FORMAT.test(key)) return [];
   const home = homedir();
   const changed: string[] = [];
   const attempt = async (path: string, sync: (p: string, k: string) => Promise<boolean>) => {

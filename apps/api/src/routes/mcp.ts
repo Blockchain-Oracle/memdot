@@ -5,6 +5,7 @@ import { MemDot } from "@memdot/sdk";
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import type { Hono } from "hono";
 import { auth, MCP_RESOURCE } from "../auth/index.js";
+import { MCP_SCOPE } from "../auth/roles.js";
 import { env } from "../env.js";
 import { HttpError } from "../lib/errors.js";
 import { hitKeyLimit, principalForKey, principalForOAuth } from "../lib/principal.js";
@@ -101,7 +102,11 @@ export function mcpRoutes(app: () => Hono<AppEnv>) {
       }
     },
     // The keys come from this same process: no need to go out through the proxy and back.
-    { resource: MCP_RESOURCE, jwksUrl: `http://127.0.0.1:${env.PORT}/api/auth/jwks` },
+    {
+      resource: MCP_RESOURCE,
+      jwksUrl: `http://127.0.0.1:${env.PORT}/api/auth/jwks`,
+      requiredScopes: [MCP_SCOPE],
+    },
   );
 
   return async (request: Request): Promise<Response> => {

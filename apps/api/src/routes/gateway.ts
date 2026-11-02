@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { bitswapGet, contentHashFromCid, IntegrityError, toHex } from "@memdot/chain";
-import { blobStaging, storedItems } from "@memdot/db";
-import { and, eq } from "drizzle-orm";
+import { blobStaging, objects, storedItems } from "@memdot/db";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db.js";
 import { HttpError } from "../lib/errors.js";
 import { clientIp, RateLimiter, rateLimit } from "../lib/rate-limit.js";
@@ -19,15 +19,22 @@ export type Source = "staging" | "cache" | "chain";
  * Ciphertext the API accepted but the chain does not hold yet. Only its owner can read it here
  * (to open a file right after uploading it); everyone else reads what is actually stored.
  */
-async function staged(cid: string, accountId: string): Promise<Uint8Array | null> {
+async function staged(
+  cid: string,
+  accountId: string,
+  spaceIds: string[] | null,
+): Promise<Uint8Array | null> {
   const [row] = await db
     .select({ data: blobStaging.data })
     .from(blobStaging)
     .innerJoin(storedItems, eq(storedItems.id, blobStaging.storedItemId))
+    .leftJoin(objects, eq(objects.id, storedItems.objectId))
     .where(
       and(
         eq(storedItems.contentHash, toHex(contentHashFromCid(cid))),
         eq(storedItems.accountId, accountId),
+        // A key limited to some spaces doesn't get what's still on its way to another one.
+        spaceIds ? inArray(objects.spaceId, spaceIds) : undefined,
       ),
     )
     .limit(1);
@@ -44,8 +51,9 @@ export function createBlobReader(services: Services) {
   return async function read(
     cid: string,
     accountId: string | null,
+    spaceIds: string[] | null = null,
   ): Promise<{ bytes: Uint8Array; source: Source }> {
-    const pending = accountId ? await staged(cid, accountId) : null;
+    const pending = accountId ? await staged(cid, accountId, spaceIds) : null;
     if (pending) return { bytes: pending, source: "staging" };
     const cached = await cache.get(cid);
     if (cached) return { bytes: cached, source: "cache" };
@@ -101,7 +109,12 @@ export function gatewayRoutes(services: Services) {
       const { cid } = c.req.valid("param");
       const etag = `"${cid}"`;
       if (c.req.header("if-none-match") === etag) return c.body(null, 304);
-      const { bytes, source } = await read(cid, c.get("principal")?.accountId ?? null);
+      const principal = c.get("principal");
+      const { bytes, source } = await read(
+        cid,
+        principal?.accountId ?? null,
+        principal?.apiKey?.spaceIds ?? null,
+      );
       // Node buffers here are never shared memory, so the narrower view type is safe.
       return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
         "content-type": "application/octet-stream",

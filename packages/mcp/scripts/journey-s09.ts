@@ -32,6 +32,7 @@ function check(label: string, ok: boolean, detail?: unknown): void {
 // A throwaway home: nothing here can touch the real ~/.memdot or ~/.claude.
 await rm(join(home, "credentials.json"), { force: true });
 await mkdir(join(home, ".claude"), { recursive: true });
+await mkdir(join(home, "files"), { recursive: true });
 await writeFile(
   join(home, ".claude", "settings.json"),
   JSON.stringify({ env: { MEMDOT_API_KEY: "old" }, keep: true }),
@@ -124,8 +125,21 @@ check("nothing usable is saved before approval", !pendingFile.api_key, pendingFi
 const waiting = await cli<{ state: string }>("login", "--continue", "--wait", "1");
 check("--continue says it's still waiting", waiting.out.data.state === "pending", waiting);
 
-const request = await owner.agents.connectRequest(requestId);
-check("the owner sees the same code", request.code === started.out.data.code, request);
+const wrongCode = await owner.agents.claimConnect(requestId, "AAAA-AAAA").catch((error) => error);
+check("a wrong code gets nowhere", wrongCode.code === "CONNECT_CODE", wrongCode);
+const stranger = MemDot.create({ baseUrl, origin, client: "journey-s09" });
+await stranger.account.create(walletFromMnemonic(generateMnemonic(wordlist)), { name: "Stranger" });
+const request = await owner.agents.claimConnect(requestId, started.out.data.code.toLowerCase());
+check("the right code claims it, however it's typed", request.status === "pending", request);
+const otherClaim = await stranger.agents
+  .claimConnect(requestId, started.out.data.code)
+  .catch((error) => error);
+check(
+  "and no other account can take it after that",
+  otherClaim.code === "CONNECT_CLOSED",
+  otherClaim,
+);
+await stranger.close();
 await owner.agents.approveConnect(request, {
   spaceIds: [space.id],
   role: "read_write",
@@ -133,13 +147,18 @@ await owner.agents.approveConnect(request, {
   expiresInDays: 30,
 });
 
-const finished = await cli<{ connected: boolean; synced: string[] }>(
+const finished = await cli<{ connected: boolean; synced: string[]; owner_account: string }>(
   "login",
   "--continue",
   "--wait",
   "20",
 );
 check("--continue collects the key", finished.out.data.connected === true, finished);
+check(
+  "and says whose account it joined",
+  finished.out.data.owner_account === (await owner.account.me()).account?.ownerAccount,
+  finished.out.data,
+);
 const saved = JSON.parse(await readFile(join(home, "credentials.json"), "utf8"));
 check(
   "the key is on disk, with the agent's own identity",
@@ -258,6 +277,55 @@ check(
   tree.subcommands.length,
 );
 
+// A share nobody asked for: a stolen management key can add the row, but the owner's client won't
+// wrap anything for it, because only that client can make the tag.
+const stolen = await owner.keys.create({ name: "stolen", role: "management" });
+const thief = await fetch(new URL("/v1/grants", baseUrl), {
+  method: "POST",
+  headers: { authorization: `Bearer ${stolen.key}`, "content-type": "application/json" },
+  body: JSON.stringify({
+    spaceId: other.id,
+    grantee: { kind: "account", address: `0x${"ab".repeat(32)}` },
+    scope: "read",
+  }),
+});
+check("a share that waits needs the owner's tag", thief.status === 400, thief.status);
+const forgedTag = await fetch(new URL("/v1/grants", baseUrl), {
+  method: "POST",
+  headers: { authorization: `Bearer ${stolen.key}`, "content-type": "application/json" },
+  body: JSON.stringify({
+    spaceId: other.id,
+    grantee: { kind: "account", address: `0x${"ab".repeat(32)}` },
+    scope: "read",
+    ownerTag: "ab".repeat(32),
+  }),
+});
+check("a made-up tag is accepted as a row", forgedTag.status === 201, forgedTag.status);
+await owner.sharing.completeReady();
+const forgedRow = (await owner.sharing.list("given", other.id)).items.find(
+  (grant) => grant.grantee === `0x${"ab".repeat(32)}`,
+);
+check(
+  "but nothing gets wrapped for it",
+  forgedRow?.status === "pending" && !forgedRow.wrappedKeyCid,
+  forgedRow,
+);
+await owner.keys.revoke(stolen.id);
+
+const elsewhere = await new Promise<{ exit: number; stdout: string }>((resolve) => {
+  execFile(
+    "node",
+    [CLI, "--agent", "status", "--api-url", "http://127.0.0.1:9"],
+    { env: { ...agentEnv, MEMDOT_API_URL: "" } },
+    (error, stdout) => resolve({ exit: error ? (error.code as number) : 0, stdout }),
+  );
+});
+check(
+  "the saved key isn't offered to another address",
+  JSON.parse(elsewhere.stdout).data.key === "none",
+  elsewhere.stdout,
+);
+
 // ── The local MCP server ────────────────────────────────────────────────────────────────────
 
 async function call(client: Client, name: string, args: Record<string, unknown>) {
@@ -271,7 +339,7 @@ await local.connect(
   new StdioClientTransport({
     command: "node",
     args: [CLI, "mcp"],
-    env: agentEnv as Record<string, string>,
+    env: { ...(agentEnv as Record<string, string>), MEMDOT_FILES_DIR: join(home, "files") },
     stderr: "inherit",
   }),
 );
@@ -392,8 +460,31 @@ check(
   consentUrl.pathname,
 );
 
+const forged = await owner.agents
+  .allowHosted({
+    oauthQuery: new URLSearchParams({
+      client_id: registered.client_id,
+      redirect_uri: "https://claude.ai/callback",
+    }).toString(),
+    role: "read_write",
+    spaceIds: [space.id],
+    namespaces: [{ id: assisted.id, name: "Team memory" }],
+    namespaceId: assisted.id,
+  })
+  .catch((error) => error);
+check(
+  "a request the OAuth server didn't sign changes nothing",
+  forged.code === "BAD_OAUTH_REQUEST",
+  forged,
+);
+const shown = await owner.agents.hostedRequest(consentUrl.search.slice(1));
+check(
+  "the page reads who's asking from the signed request",
+  shown.clientName === "Journey client",
+  shown,
+);
 await owner.agents.allowHosted({
-  clientId: registered.client_id,
+  oauthQuery: consentUrl.search.slice(1),
   role: "read_write",
   spaceIds: [space.id],
   namespaces: [{ id: assisted.id, name: "Team memory" }],
@@ -474,6 +565,8 @@ check(
 );
 const reachOther = await call(hosted, "get_memories", { namespace_id: offLimits.id });
 check("hosted MCP can't reach another space", reachOther.isError, reachOther);
+const forgetPrivate = await call(hosted, "delete_memory", { memory_id: privateId });
+check("hosted MCP can't forget a Private memory by its id", forgetPrivate.isError, forgetPrivate);
 
 // ── Revoking stops them ─────────────────────────────────────────────────────────────────────
 

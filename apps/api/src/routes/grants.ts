@@ -2,7 +2,18 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { EVM_ACCOUNT_SUFFIX, SS58_PREFIX } from "@memdot/config";
 import { accounts, agents, grants, objects, spaces } from "@memdot/db";
 import { Address } from "@talismn/siws";
-import { and, desc, eq, inArray, isNotNull, isNull, lt, notInArray, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  notInArray,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { db } from "../db.js";
 import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { tombstoneObjects } from "../lib/lifecycle.js";
@@ -61,6 +72,9 @@ const ReadyGrant = z
         "pending: the recipient just set up MemDot. rotated: the space moved to a new key epoch after a revoke.",
     }),
     recipientKey: z.string().openapi({ description: "Seal the key or manifest to this" }),
+    ownerTag: z.string().nullable().openapi({
+      description: "Check this before wrapping anything: only your own client can have made it",
+    }),
   })
   .openapi("ReadyGrant");
 
@@ -258,6 +272,9 @@ export function grantRoutes() {
                 ),
               );
             scope = and(eq(grants.granteeKind, "agent"), eq(grants.grantee, agent?.key ?? ""));
+          } else if (principal.apiKey?.spaceIds) {
+            // A key limited to some spaces acts for those, not for what others shared with its owner.
+            scope = sql`false`;
           } else {
             const owner = await ownerAccountOf(accountId);
             scope = and(eq(grants.granteeKind, "account"), eq(grants.grantee, owner ?? ""));
@@ -308,6 +325,10 @@ export function grantRoutes() {
                   expiresAt: z.iso.datetime().optional(),
                   wrappedKeyCid: Cid.optional(),
                   keyEpoch: z.number().int().min(0).optional(),
+                  ownerTag: z.string().min(1).max(128).optional().openapi({
+                    description:
+                      "Made from the owner's master key. Their client only wraps keys for a grant that carries a tag it can check.",
+                  }),
                 })
                 .openapi("NewGrant"),
             ),
@@ -331,6 +352,12 @@ export function grantRoutes() {
         }
         if (body.expiresAt && new Date(body.expiresAt) <= new Date()) {
           throw badRequest("EXPIRY", "The expiry must be in the future.");
+        }
+        if (!body.wrappedKeyCid && !body.ownerTag) {
+          throw badRequest(
+            "OWNER_TAG",
+            "A share that waits needs the owner's tag: use the SDK, unlocked, to make it.",
+          );
         }
         if (body.wrappedKeyCid) {
           await assertOwnGrantKey(accountId, body.wrappedKeyCid);
@@ -381,6 +408,7 @@ export function grantRoutes() {
             status: body.wrappedKeyCid ? "active" : "pending",
             wrappedKeyCid: body.wrappedKeyCid ?? null,
             keyEpoch: body.wrappedKeyCid && !body.objectId ? space.keyEpoch : null,
+            ownerTag: body.ownerTag ?? null,
             expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
           })
           .returning();
@@ -465,6 +493,7 @@ export function grantRoutes() {
               grant: serializeGrant(r.grant, owner, r.spaceKeyEpoch),
               reason: "pending" as const,
               recipientKey: r.recipientKey ?? "",
+              ownerTag: r.grant.ownerTag,
             })),
           ...rotated
             .filter((r) => unexpired(r.grant))
@@ -479,6 +508,7 @@ export function grantRoutes() {
                       grant: serializeGrant(r.grant, owner, r.spaceKeyEpoch),
                       reason: "rotated" as const,
                       recipientKey,
+                      ownerTag: r.grant.ownerTag,
                     },
                   ]
                 : [];

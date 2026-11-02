@@ -8,7 +8,13 @@ import { and, eq } from "drizzle-orm";
 import { decodeFunctionData, type Hex, hexToBytes } from "viem";
 import { db } from "../db.js";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
-import { accountOf, assertSpaceAllowed, principalOf, requireScope } from "../lib/principal.js";
+import {
+  accountOf,
+  assertSpaceAllowed,
+  isAccountWide,
+  principalOf,
+  requireScope,
+} from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import type { Services } from "../types.js";
 
@@ -69,6 +75,11 @@ export function registryRoutes(services: Services) {
     }),
     async (c) => {
       const accountId = accountOf(c);
+      const principal = principalOf(c);
+      // Records carry the owner's signature, which an agent can't make; it would only spend gas.
+      if (principal.apiKey?.agentId) {
+        throw forbidden("Only the owner's own client can add registry records.");
+      }
       const calldata = c.req.valid("json").calldata as Hex;
       const [owner, salt, action] = decodeRecordCall(calldata);
 
@@ -90,6 +101,11 @@ export function registryRoutes(services: Services) {
         if (!ACCOUNT_ACTIONS.has(action)) {
           throw badRequest("BAD_RECORD", "That record must name a space.");
         }
+        if (!isAccountWide(principal)) {
+          throw forbidden(
+            "This API key is limited to some spaces, so it can't record for the account.",
+          );
+        }
       } else {
         // A deleted space still counts: its deletion is recorded after it happens.
         const [space] = await db
@@ -98,7 +114,7 @@ export function registryRoutes(services: Services) {
           .where(and(eq(spaces.id, bytes32ToUuid(salt)), eq(spaces.accountId, accountId)))
           .limit(1);
         if (!space) throw notFound("Space");
-        assertSpaceAllowed(principalOf(c), bytes32ToUuid(salt));
+        assertSpaceAllowed(principal, bytes32ToUuid(salt));
         if (action === Action.CreateSpace && !space.chainSpaceId) {
           const preimage = new Uint8Array([...hexToBytes(owner), ...hexToBytes(salt)]);
           chainSpaceId = toHex(blake2b(preimage, { dkLen: SPACE_ID_BYTES }));

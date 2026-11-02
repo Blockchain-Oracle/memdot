@@ -1,6 +1,7 @@
 import {
   deriveSpaceKeys,
   type FileManifest,
+  grantTag,
   openManifest,
   openSpaceKeyring,
   sealManifest,
@@ -124,7 +125,26 @@ export class SharingApi {
    */
   async completeReady(): Promise<number> {
     const { items } = await unwrap(this.ctx.transport.api.GET("/v1/grants/ready"));
-    for (const { grant, recipientKey } of items) {
+    let completed = 0;
+    const amk = this.ctx.vault.amk("sharing");
+    for (const { grant, recipientKey, ownerTag } of items) {
+      // Only what this account's own client asked to share. A row added any other way, by a stolen
+      // key or by the server itself, gets nothing wrapped for it.
+      const expected = grantTag(amk, {
+        spaceId: grant.spaceId,
+        objectId: grant.objectId,
+        granteeKind: grant.granteeKind,
+        grantee: grant.grantee,
+        scope: grant.scope,
+      });
+      if (
+        ownerTag !== expected ||
+        (grant.granteeKind === "agent" && recipientKey !== grant.grantee)
+      ) {
+        console.warn(`[memdot] skipped a share this account's client didn't make: ${grant.id}`);
+        continue;
+      }
+      completed += 1;
       if (grant.objectId) {
         const manifest = await this.ownManifest(await this.detail(grant.objectId));
         const wrappedKeyCid = await this.storeGrantKey(
@@ -143,7 +163,7 @@ export class SharingApi {
       );
       await this.complete(grant.id, { wrappedKeyCid, keyEpoch: grant.spaceKeyEpoch });
     }
-    return items.length;
+    return completed;
   }
 
   /**
@@ -171,6 +191,9 @@ export class SharingApi {
     vault.forgetReceived(grant.id);
     const keys = await this.open(grant.id);
     if (keys.kind === "space") {
+      if (keys.spaceId !== spaceId) {
+        throw new MemDotError(409, "BAD_KEYRING", "That keyring is for another space.");
+      }
       vault.setKeyring(spaceId, keys.keys);
       this.keyRetryAt.delete(spaceId);
     }
@@ -303,15 +326,27 @@ export class SharingApi {
     wrappedKeyCid?: string;
     keyEpoch?: number;
   }): Promise<Grant> {
+    const scope = input.options.scope ?? "read";
+    const ownerTag = grantTag(this.ctx.vault.amk("sharing"), {
+      spaceId: input.spaceId,
+      objectId: input.objectId ?? null,
+      granteeKind: "address" in input.to ? "account" : "agent",
+      grantee:
+        "address" in input.to
+          ? (await this.recipient(input.to.address)).accountId
+          : input.to.agentKey,
+      scope,
+    });
     const grant = await unwrap(
       this.ctx.transport.api.POST("/v1/grants", {
         body: {
+          ownerTag,
           spaceId: input.spaceId,
           grantee:
             "address" in input.to
               ? { kind: "account", address: input.to.address }
               : { kind: "agent", agentId: input.to.agentId },
-          scope: input.options.scope ?? "read",
+          scope,
           ...(input.objectId ? { objectId: input.objectId } : {}),
           ...(input.options.expiresAt ? { expiresAt: input.options.expiresAt } : {}),
           ...(input.wrappedKeyCid ? { wrappedKeyCid: input.wrappedKeyCid } : {}),

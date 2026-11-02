@@ -91,8 +91,8 @@ if (!assisted || !privateNs) throw new Error("no demo namespaces: run seed:memor
 
 const started = await cli<{ url: string; code: string }>("login", "--label", "Live check");
 const requestId = new URL(started.out.data.url).searchParams.get("request") as string;
-const request = await owner.agents.connectRequest(requestId);
-check("the owner sees the code the CLI printed", request.code === started.out.data.code, request);
+const request = await owner.agents.claimConnect(requestId, started.out.data.code);
+check("the code the CLI printed claims the request", request.status === "pending", request);
 await owner.agents.approveConnect(request, {
   spaceIds: [space.id],
   role: "read_write",
@@ -195,7 +195,7 @@ check(
   consent.pathname,
 );
 await owner.agents.allowHosted({
-  clientId: registered.client_id,
+  oauthQuery: consent.search.slice(1),
   role: "read_only",
   spaceIds: [space.id],
   namespaces: [{ id: assisted.id, name: assisted.name }],

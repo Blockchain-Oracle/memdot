@@ -27,15 +27,19 @@ const accountCache = new TtlCache<string | null>(ACCOUNT_CACHE_MS, CACHE_ENTRIES
 /** Per-key budget, enforced here because cached principals skip the plugin's own counter. */
 const keyLimiter = new RateLimiter(API_KEY_RATE_MAX, API_KEY_RATE_WINDOW_MS);
 
+/** Moves on whenever keys are forgotten, so a lookup already under way can't put one back. */
+let keyGeneration = 0;
+
 /** Call after a key is deleted or rotated, or an agent revoked: cached keys stop working at once. */
 export function forgetApiKeys(): void {
+  keyGeneration += 1;
   keyCache.clear();
 }
 
 /** Call after account setup changes, so the next request sees the account. */
 export function forgetAccount(userId: string): void {
   accountCache.delete(userId);
-  keyCache.clear();
+  forgetApiKeys();
 }
 
 /** `Authorization: Bearer md_…` (SDKs, CLI) or `x-api-key: md_…` (integrations that only set one header). */
@@ -73,15 +77,24 @@ function metadataOf(raw: unknown): ApiKeyMetadata {
   };
 }
 
-/** Connected agents show when they last called; at most one write per cache window. */
-async function touchAgent(agentId: string): Promise<void> {
-  await db.update(agents).set({ lastUsedAt: new Date() }).where(eq(agents.id, agentId));
+/**
+ * Connected agents show when they last called, at most one write per cache window. Says whether the
+ * agent is still connected: a key can outlive one revoked while it was being made.
+ */
+async function touchAgent(agentId: string): Promise<boolean> {
+  const touched = await db
+    .update(agents)
+    .set({ lastUsedAt: new Date() })
+    .where(and(eq(agents.id, agentId), isNull(agents.revokedAt)))
+    .returning({ id: agents.id });
+  return touched.length > 0;
 }
 
 export async function principalForKey(key: string): Promise<Principal> {
   const digest = createHash("sha256").update(key).digest("hex");
   const cached = keyCache.get(digest);
   if (cached) return cached;
+  const generation = keyGeneration;
   const result = await auth.api.verifyApiKey({ body: { key } });
   if (!result.valid || !result.key) {
     throw unauthorized("That API key is not valid. It may have been revoked, rotated or expired.");
@@ -101,8 +114,10 @@ export async function principalForKey(key: string): Promise<Principal> {
       agentId: metadata.agentId ?? null,
     },
   };
-  keyCache.set(digest, principal);
-  if (metadata.agentId) await touchAgent(metadata.agentId);
+  if (metadata.agentId && !(await touchAgent(metadata.agentId))) {
+    throw unauthorized("That API key is not valid. It may have been revoked, rotated or expired.");
+  }
+  if (generation === keyGeneration) keyCache.set(digest, principal);
   return principal;
 }
 
@@ -114,6 +129,7 @@ export async function principalForOAuth(userId: string, clientId: string): Promi
   const cacheKey = `oauth:${userId}:${clientId}`;
   const cached = keyCache.get(cacheKey);
   if (cached) return cached;
+  const generation = keyGeneration;
   const accountId = await accountIdOf(userId);
   const [agent] = accountId
     ? await db
@@ -148,8 +164,8 @@ export async function principalForOAuth(userId: string, clientId: string): Promi
       hosted: { namespaceId: agent.namespaceId, namespaces: agent.namespaces },
     },
   };
-  keyCache.set(cacheKey, principal);
   await touchAgent(agent.id);
+  if (generation === keyGeneration) keyCache.set(cacheKey, principal);
   return principal;
 }
 

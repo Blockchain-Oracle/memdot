@@ -9,7 +9,13 @@ import { db } from "../db.js";
 import { env } from "../env.js";
 import { badRequest, conflict, HttpError } from "../lib/errors.js";
 import { accountModels, spendSharedModel } from "../lib/namespaces.js";
-import { accountOf, requireAccountWide, requireScope } from "../lib/principal.js";
+import {
+  accountOf,
+  isAccountWide,
+  principalOf,
+  requireAccountWide,
+  requireScope,
+} from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { fromBase64, toBase64 } from "../schemas.js";
 import type { Services } from "../types.js";
@@ -136,7 +142,12 @@ export function configureRoutes(services: Services) {
           .select()
           .from(memoryConfig)
           .where(eq(memoryConfig.accountId, accountOf(c)));
-        return c.json(serialize(row), 200);
+        // The owner's own sealed settings are for their device, not for a key limited to some spaces.
+        const config = serialize(row);
+        return c.json(
+          isAccountWide(principalOf(c)) ? config : { ...config, private_sealed: null },
+          200,
+        );
       },
     )
     .openapi(
@@ -267,7 +278,8 @@ export function configureRoutes(services: Services) {
         summary: "Try the configured models",
         description: "Sends one short request to each, and reports what they said back.",
         security: authenticated,
-        middleware: [requireScope("memories", "write")] as const,
+        // It spends the owner's model key on text the caller chooses.
+        middleware: [requireScope("memories", "write"), requireAccountWide] as const,
         responses: {
           200: {
             description: "Result",
@@ -318,7 +330,8 @@ export function configureRoutes(services: Services) {
         tags: ["Configuration"],
         summary: "Draft a namespace's custom instructions from a use case",
         security: authenticated,
-        middleware: [requireScope("memories", "write")] as const,
+        // It spends the owner's model key on text the caller chooses.
+        middleware: [requireScope("memories", "write"), requireAccountWide] as const,
         request: {
           body: {
             content: jsonContent(z.object({ use_case: z.string().trim().min(1).max(2_000) })),

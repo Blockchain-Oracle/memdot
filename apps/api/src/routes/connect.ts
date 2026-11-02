@@ -1,8 +1,8 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sealTo } from "@memdot/crypto";
-import { agents, apikey, connectRequests, folders } from "@memdot/db";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { accounts, agents, apikey, connectRequests, folders } from "@memdot/db";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { env } from "../env.js";
 import { badRequest, conflict, HttpError, notFound } from "../lib/errors.js";
@@ -27,11 +27,12 @@ const POLL_SECRET_BYTES = 32;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_EXPIRY_DAYS = 365;
 const KEY_NAME_MAX = 32;
-/** No 0/O or 1/I/L: people read this off one screen and compare it with another. */
+/** No 0/O or 1/I/L: people read this off one screen and type it into another. */
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const CODE_GROUP = 4;
 
 const startLimiter = new RateLimiter(20, 60_000);
+const claimLimiter = new RateLimiter(20, 60_000);
 const pollLimiter = new RateLimiter(120, 60_000);
 
 const hashSecret = (secret: string) => createHash("sha256").update(secret).digest();
@@ -42,13 +43,22 @@ function newCode(): string {
   return `${group()}-${group()}`;
 }
 
-const Pending = z
+/** However someone typed it: lower case, or without the dash. */
+const normalizedCode = (code: string) => code.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+function sameCode(typed: string, expected: string): boolean {
+  const a = hashSecret(normalizedCode(typed));
+  const b = hashSecret(normalizedCode(expected));
+  return timingSafeEqual(a, b);
+}
+
+const Claimed = z
   .object({
     id: z.uuid(),
-    code: z.string().openapi({ description: "Shown here and in the terminal, to compare" }),
-    label: z.string(),
+    label: z.string().openapi({ description: "What it calls itself. Nothing vouches for this." }),
     client: z.string(),
     publicKey: z.string(),
+    requestedFrom: z.string().nullable().openapi({ description: "The address it asked from" }),
     status: z.enum(["pending", "approved", "denied", "delivered", "expired"]),
     expiresAt: z.iso.datetime(),
   })
@@ -56,7 +66,7 @@ const Pending = z
 
 type RequestRow = typeof connectRequests.$inferSelect;
 
-const stateOf = (row: RequestRow): z.infer<typeof Pending>["status"] =>
+const stateOf = (row: RequestRow): z.infer<typeof Claimed>["status"] =>
   row.status === "pending" && row.expiresAt <= new Date() ? "expired" : row.status;
 
 async function loadRequest(id: string): Promise<RequestRow> {
@@ -66,10 +76,12 @@ async function loadRequest(id: string): Promise<RequestRow> {
 }
 
 /**
- * `memdot login`: a device with a fresh key pair asks, the owner's browser decides. The owner's
- * client wraps space keys to that public key and creates the grants; this route then mints an API
- * key limited to those spaces and seals it to the same public key, so only the device that asked
- * can open what it collects.
+ * `memdot login`: a device with a fresh key pair asks, and the owner's browser decides. The owner
+ * types the code the terminal shows, which claims the request for their account: a link alone
+ * reaches nothing, so someone can't be phished into one click. Their client then wraps space keys
+ * to that public key and creates the grants, and this route mints an API key limited to those
+ * spaces and seals it to the same public key, so only the device that asked can open what it
+ * collects.
  */
 export function connectRoutes() {
   return createRouter()
@@ -80,7 +92,7 @@ export function connectRoutes() {
         tags: ["Agents"],
         summary: "Ask to connect a device",
         description:
-          "Needs no sign-in: nothing happens until the owner approves it in their browser. Keep the poll secret; it is the only way to collect the result.",
+          "Needs no sign-in: nothing happens until the owner types the code in their browser and approves. Show them the code. Keep the poll secret; it is the only way to collect the result.",
         middleware: [rateLimit(startLimiter, (c) => `connect:${clientIp(c)}`)] as const,
         request: {
           body: {
@@ -102,7 +114,7 @@ export function connectRoutes() {
             content: jsonContent(
               z.object({
                 id: z.uuid(),
-                code: z.string(),
+                code: z.string().openapi({ description: "The owner types this into the page" }),
                 url: z.string().openapi({ description: "Where the owner approves it" }),
                 pollSecret: z.string(),
                 pollIntervalSeconds: z.number().int(),
@@ -123,13 +135,13 @@ export function connectRoutes() {
             ...body,
             code,
             pollHash: hashSecret(pollSecret).toString("hex"),
+            requestedFrom: clientIp(c),
             expiresAt: new Date(Date.now() + REQUEST_TTL_MS),
           })
           .returning();
         if (!row) throw new Error("connect request insert returned no row");
         const url = new URL("/connect", env.WEB_ORIGIN);
         url.searchParams.set("request", row.id);
-        url.searchParams.set("code", code);
         return c.json(
           {
             id: row.id,
@@ -145,30 +157,59 @@ export function connectRoutes() {
     )
     .openapi(
       createRoute({
-        method: "get",
-        path: "/v1/connect/{id}",
+        method: "post",
+        path: "/v1/connect/{id}/claim",
         tags: ["Agents"],
-        summary: "See what's asking to connect",
+        summary: "Claim a device's request with its code",
+        description:
+          "The owner types the code the terminal shows. From then on only their account can answer it.",
         security: authenticated,
-        middleware: [requireScope("agents", "write"), requireAccountWide] as const,
-        request: { params: IdParam },
+        middleware: [
+          requireScope("agents", "write"),
+          requireAccountWide,
+          rateLimit(claimLimiter, (c) => `connect-claim:${clientIp(c)}`),
+        ] as const,
+        request: {
+          params: IdParam,
+          body: {
+            content: jsonContent(z.object({ code: z.string().trim().min(1).max(32) })),
+            required: true,
+          },
+        },
         responses: {
-          200: { description: "The request", content: jsonContent(Pending) },
+          200: { description: "The request", content: jsonContent(Claimed) },
           ...errorResponses,
         },
       }),
       async (c) => {
-        accountOf(c);
-        const row = await loadRequest(c.req.valid("param").id);
+        const accountId = accountOf(c);
+        const { id } = c.req.valid("param");
+        const row = await loadRequest(id);
+        if (!sameCode(c.req.valid("json").code, row.code)) {
+          throw badRequest("CONNECT_CODE", "That code doesn't match. Check your terminal.");
+        }
+        const [claimed] = await db
+          .update(connectRequests)
+          .set({ accountId })
+          .where(
+            and(
+              eq(connectRequests.id, id),
+              or(isNull(connectRequests.accountId), eq(connectRequests.accountId, accountId)),
+            ),
+          )
+          .returning();
+        if (!claimed) {
+          throw conflict("CONNECT_CLOSED", "Another account already answered this request.");
+        }
         return c.json(
           {
-            id: row.id,
-            code: row.code,
-            label: row.label,
-            client: row.client,
-            publicKey: row.publicKey,
-            status: stateOf(row),
-            expiresAt: row.expiresAt.toISOString(),
+            id: claimed.id,
+            label: claimed.label,
+            client: claimed.client,
+            publicKey: claimed.publicKey,
+            requestedFrom: claimed.requestedFrom,
+            status: stateOf(claimed),
+            expiresAt: claimed.expiresAt.toISOString(),
           },
           200,
         );
@@ -181,7 +222,7 @@ export function connectRoutes() {
         tags: ["Agents"],
         summary: "Approve a device",
         description:
-          "Call this after registering the agent and creating its grants: only the owner's client can wrap the keys. Mints the device's API key and seals it to the device.",
+          "Call this after claiming the request, registering the agent and creating its grants: only the owner's client can wrap the keys. Mints the device's API key and seals it to the device.",
         security: authenticated,
         middleware: [requireScope("agents", "write"), requireAccountWide] as const,
         request: {
@@ -249,19 +290,21 @@ export function connectRoutes() {
           }
         }
 
-        // Taken first, so two tabs can't mint two keys for one device.
-        const [claimed] = await db
+        // Taken first, so two tabs can't mint two keys for one device. Only the account that
+        // claimed it with the code can do this.
+        const [taken] = await db
           .update(connectRequests)
-          .set({ status: "approved", accountId, agentId: agent.id })
+          .set({ status: "approved", agentId: agent.id })
           .where(
             and(
               eq(connectRequests.id, id),
+              eq(connectRequests.accountId, accountId),
               eq(connectRequests.status, "pending"),
               sql`${connectRequests.expiresAt} > now()`,
             ),
           )
           .returning({ id: connectRequests.id });
-        if (!claimed) {
+        if (!taken) {
           throw conflict(
             "CONNECT_CLOSED",
             "This request was already answered or has expired. Run memdot login again.",
@@ -271,12 +314,14 @@ export function connectRoutes() {
         const expiresAt = body.expiresInDays
           ? new Date(Date.now() + body.expiresInDays * DAY_MS)
           : null;
+        let mintedId: string | null = null;
         try {
           const created = await mint(principal.userId, {
             name: request.label.slice(0, KEY_NAME_MAX),
             metadata: { role: body.role, spaceIds: body.spaceIds, agentId: agent.id },
             expiresAt,
           });
+          mintedId = created.id;
           const sealed = await sealTo(new TextEncoder().encode(created.key), [request.publicKey]);
           await db
             .update(agents)
@@ -295,10 +340,11 @@ export function connectRoutes() {
             })
             .where(eq(connectRequests.id, id));
         } catch (error) {
-          await db.delete(apikey).where(sql`${apikey.metadata}::jsonb ->> 'agentId' = ${agent.id}`);
+          // Only the key made just now: an agent can already hold others.
+          if (mintedId) await db.delete(apikey).where(eq(apikey.id, mintedId));
           await db
             .update(connectRequests)
-            .set({ status: "pending", accountId: null, agentId: null })
+            .set({ status: "pending", agentId: null })
             .where(eq(connectRequests.id, id));
           throw error;
         }
@@ -311,6 +357,7 @@ export function connectRoutes() {
         path: "/v1/connect/{id}/deny",
         tags: ["Agents"],
         summary: "Refuse a device",
+        description: "Only the account that claimed the request can refuse it.",
         security: authenticated,
         middleware: [requireScope("agents", "write"), requireAccountWide] as const,
         request: { params: IdParam },
@@ -323,12 +370,17 @@ export function connectRoutes() {
         },
       }),
       async (c) => {
-        accountOf(c);
         const { id } = c.req.valid("param");
         await db
           .update(connectRequests)
           .set({ status: "denied" })
-          .where(and(eq(connectRequests.id, id), eq(connectRequests.status, "pending")));
+          .where(
+            and(
+              eq(connectRequests.id, id),
+              eq(connectRequests.accountId, accountOf(c)),
+              eq(connectRequests.status, "pending"),
+            ),
+          );
         return c.json({ denied: true as const }, 200);
       },
     )
@@ -358,6 +410,9 @@ export function connectRoutes() {
                   sealedKey: z.string().nullable(),
                   agentId: z.uuid().nullable(),
                   namespaceId: z.uuid().nullable(),
+                  ownerAccount: z.string().nullable().openapi({
+                    description: "The account that approved it, so the device can say whose it is",
+                  }),
                 })
                 .openapi("ConnectResult"),
             ),
@@ -373,7 +428,7 @@ export function connectRoutes() {
         if (presented.length !== expected.length || !timingSafeEqual(presented, expected)) {
           throw new HttpError(403, "FORBIDDEN", "That isn't this request's poll secret.");
         }
-        const empty = { sealedKey: null, agentId: null, namespaceId: null };
+        const empty = { sealedKey: null, agentId: null, namespaceId: null, ownerAccount: null };
         const state = stateOf(row);
         // Approved, but the key isn't sealed yet: a moment more.
         if (state === "approved" && !row.sealedKey) {
@@ -387,12 +442,19 @@ export function connectRoutes() {
           .where(and(eq(connectRequests.id, id), eq(connectRequests.status, "approved")))
           .returning({ id: connectRequests.id });
         if (!taken) return c.json({ status: "delivered" as const, ...empty }, 200);
+        const [owner] = row.accountId
+          ? await db
+              .select({ ownerAccount: accounts.ownerAccount })
+              .from(accounts)
+              .where(eq(accounts.id, row.accountId))
+          : [];
         return c.json(
           {
             status: "approved" as const,
             sealedKey: row.sealedKey,
             agentId: row.agentId,
             namespaceId: row.namespaceId,
+            ownerAccount: owner?.ownerAccount ?? null,
           },
           200,
         );

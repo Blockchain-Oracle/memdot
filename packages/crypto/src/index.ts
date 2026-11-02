@@ -23,6 +23,7 @@ export {
   ageRecipient,
   deriveKey,
   generateX25519,
+  grantTag,
   INFO,
   KEY_BYTES,
   ownerSeed,

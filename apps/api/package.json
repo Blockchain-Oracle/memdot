@@ -21,6 +21,7 @@
     "@better-auth/cimd": "1.7.15",
     "@better-auth/drizzle-adapter": "^1.7.15",
     "@better-auth/mcp": "1.7.15",
+    "@better-auth/oauth-provider": "1.7.15",
     "@better-auth/passkey": "^1.7.15",
     "@hono/node-server": "^2.1.5",
     "@hono/zod-openapi": "^1.6.3",

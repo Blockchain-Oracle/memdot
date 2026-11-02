@@ -15,6 +15,7 @@ export { ActivityApi, type ChainTransaction, type RequestLogEntry } from "./acti
 export {
   type Agent,
   AgentsApi,
+  API_KEY_FORMAT,
   type ApproveConnect,
   type ConnectRequest,
   type ConnectResult,

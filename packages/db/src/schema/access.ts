@@ -35,6 +35,11 @@ export const grants = pgTable(
     /** For space grants: the newest epoch the wrapped keyring holds. Behind the space's epoch
      * after a revoke, until the owner's client re-wraps it. */
     keyEpoch: integer("key_epoch"),
+    /**
+     * Made from the owner's master key when they shared this. Their client wraps keys for a grant
+     * only if this checks out, so nothing server-side can ask it to share with someone new.
+     */
+    ownerTag: text("owner_tag"),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     createdAt: createdAt(),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
@@ -86,8 +91,10 @@ export const connectRequests = pgTable(
   "connect_requests",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    /** Shown in the terminal and on the consent page, so the owner can tell it's their terminal. */
+    /** Shown in the terminal; the owner types it, so a link alone reaches nothing. */
     code: text("code").notNull(),
+    /** Where it asked from, shown on the consent page. */
+    requestedFrom: text("requested_from"),
     /** Only the device that asked can collect the result. */
     pollHash: text("poll_hash").notNull(),
     publicKey: text("public_key").notNull(),

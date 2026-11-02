@@ -13,6 +13,9 @@ import {
   memoryConfig,
   memoryInbox,
   memorySettings,
+  oauthAccessToken,
+  oauthConsent,
+  oauthRefreshToken,
   objects,
   passkey,
   session,
@@ -150,6 +153,17 @@ export function accountRoutes(services: Services) {
       }),
       async (c) => {
         const principal = principalOf(c);
+        // A connected agent acts for its owner, and doesn't need to know their wallets or passkeys.
+        if (principal.apiKey?.agentId) {
+          return c.json(
+            {
+              user: { id: principal.userId, name: "", image: null },
+              account: null,
+              signIn: { fresh: false, passkeys: 0, wallets: [], recoveryCode: false },
+            },
+            200,
+          );
+        }
         const [user] = await db
           .select({ name: authUser.name, image: authUser.image })
           .from(authUser)
@@ -443,8 +457,8 @@ export function accountRoutes(services: Services) {
             .where(eq(spaces.accountId, accountId));
           await tx
             .update(agents)
-            .set({ revokedAt: now })
-            .where(and(eq(agents.accountId, accountId), isNull(agents.revokedAt)));
+            .set({ revokedAt: now, namespaces: null })
+            .where(eq(agents.accountId, accountId));
           await tx.delete(memoryConfig).where(eq(memoryConfig.accountId, accountId));
           await tx
             .delete(memorySettings)
@@ -469,6 +483,9 @@ export function accountRoutes(services: Services) {
             })
             .where(eq(accounts.id, accountId));
           await tx.delete(apikey).where(eq(apikey.referenceId, principal.userId));
+          await tx.delete(oauthAccessToken).where(eq(oauthAccessToken.userId, principal.userId));
+          await tx.delete(oauthRefreshToken).where(eq(oauthRefreshToken.userId, principal.userId));
+          await tx.delete(oauthConsent).where(eq(oauthConsent.userId, principal.userId));
           await tx.delete(passkey).where(eq(passkey.userId, principal.userId));
           await tx.delete(authAccount).where(eq(authAccount.userId, principal.userId));
           await tx.delete(walletAddress).where(eq(walletAddress.userId, principal.userId));

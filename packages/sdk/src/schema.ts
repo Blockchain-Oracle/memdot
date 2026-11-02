@@ -3788,6 +3788,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/agents/hosted/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * See what an OAuth request is asking
+         * @description What the consent page shows, read from the query the OAuth server signed rather than from the page's address.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** @description The query the OAuth server signed when it sent the owner to the consent page */
+                        oauthQuery: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The request */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HostedRequest"];
+                    };
+                };
+                /** @description The request is not valid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Sign in or pass an API key. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The API key lacks this permission or space. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Conflicts with the current state. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limited. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/agents/hosted": {
         parameters: {
             query?: never;
@@ -3799,7 +3899,7 @@ export interface paths {
         put?: never;
         /**
          * Allow a hosted agent
-         * @description What the consent page sends just before it accepts an OAuth request: which spaces this client may reach and how. Assisted namespaces only, since nothing can be unwrapped for a client that holds no key. Asking again replaces what it had.
+         * @description What the consent page sends just before it accepts an OAuth request: which spaces this client may reach and how. It can use every Assisted namespace in those spaces, including ones made later; nothing can be unwrapped for a client that holds no key. Asking again replaces what it had.
          */
         post: {
             parameters: {
@@ -4078,7 +4178,7 @@ export interface paths {
         put?: never;
         /**
          * Ask to connect a device
-         * @description Needs no sign-in: nothing happens until the owner approves it in their browser. Keep the poll secret; it is the only way to collect the result.
+         * @description Needs no sign-in: nothing happens until the owner types the code in their browser and approves. Show them the code. Keep the poll secret; it is the only way to collect the result.
          */
         post: {
             parameters: {
@@ -4102,6 +4202,7 @@ export interface paths {
                         "application/json": {
                             /** Format: uuid */
                             id: string;
+                            /** @description The owner types this into the page */
                             code: string;
                             /** @description Where the owner approves it */
                             url: string;
@@ -4174,15 +4275,20 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/connect/{id}": {
+    "/v1/connect/{id}/claim": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** See what's asking to connect */
-        get: {
+        get?: never;
+        put?: never;
+        /**
+         * Claim a device's request with its code
+         * @description The owner types the code the terminal shows. From then on only their account can answer it.
+         */
+        post: {
             parameters: {
                 query?: never;
                 header?: never;
@@ -4191,7 +4297,13 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody: {
+                content: {
+                    "application/json": {
+                        code: string;
+                    };
+                };
+            };
             responses: {
                 /** @description The request */
                 200: {
@@ -4258,8 +4370,6 @@ export interface paths {
                 };
             };
         };
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4277,7 +4387,7 @@ export interface paths {
         put?: never;
         /**
          * Approve a device
-         * @description Call this after registering the agent and creating its grants: only the owner's client can wrap the keys. Mints the device's API key and seals it to the device.
+         * @description Call this after claiming the request, registering the agent and creating its grants: only the owner's client can wrap the keys. Mints the device's API key and seals it to the device.
          */
         post: {
             parameters: {
@@ -4377,7 +4487,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Refuse a device */
+        /**
+         * Refuse a device
+         * @description Only the account that claimed the request can refuse it.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -9355,6 +9468,8 @@ export interface components {
              */
             wrappedKeyCid?: string;
             keyEpoch?: number;
+            /** @description Made from the owner's master key. Their client only wraps keys for a grant that carries a tag it can check. */
+            ownerTag?: string;
         };
         ReadyGrant: {
             grant: components["schemas"]["Grant"];
@@ -9365,6 +9480,8 @@ export interface components {
             reason: "pending" | "rotated";
             /** @description Seal the key or manifest to this */
             recipientKey: string;
+            /** @description Check this before wrapping anything: only your own client can have made it */
+            ownerTag: string | null;
         };
         SharedSpace: {
             /** Format: uuid */
@@ -9457,8 +9574,14 @@ export interface components {
             /** @description The agent's X25519 public key (age recipient); grants are wrapped to it */
             publicKey: string;
         };
-        NewHostedAgent: {
+        HostedRequest: {
             clientId: string;
+            clientName: string | null;
+            redirectUri: string;
+        };
+        NewHostedAgent: {
+            /** @description The query the OAuth server signed when it sent the owner to the consent page */
+            oauthQuery: string;
             /**
              * @default read_write
              * @enum {string}
@@ -9484,11 +9607,12 @@ export interface components {
         ConnectRequest: {
             /** Format: uuid */
             id: string;
-            /** @description Shown here and in the terminal, to compare */
-            code: string;
+            /** @description What it calls itself. Nothing vouches for this. */
             label: string;
             client: string;
             publicKey: string;
+            /** @description The address it asked from */
+            requestedFrom: string | null;
             /** @enum {string} */
             status: "pending" | "approved" | "denied" | "delivered" | "expired";
             /** Format: date-time */
@@ -9515,6 +9639,8 @@ export interface components {
             agentId: string | null;
             /** Format: uuid */
             namespaceId: string | null;
+            /** @description The account that approved it, so the device can say whose it is */
+            ownerAccount: string | null;
         };
         Usage: {
             spaces: {

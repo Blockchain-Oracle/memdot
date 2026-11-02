@@ -106,26 +106,37 @@ export async function removeCredentials(): Promise<void> {
   await rm(credentialsPath(), { force: true });
 }
 
+function sameOrigin(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+}
+
 /** Flags beat the environment, which beats the file. */
 export function resolveCredentials(
   file: Credentials | null,
   flags: CredentialFlags = {},
 ): ResolvedCredentials {
   const fromEnv = env("MEMDOT_API_KEY");
-  const apiKey = flags.apiKey ?? fromEnv ?? file?.api_key ?? null;
+  const apiUrl = flags.apiUrl ?? env("MEMDOT_API_URL") ?? file?.api_url ?? DEFAULT_API_URL;
+  // The saved key goes only where it was saved for: pointing at another address mustn't hand it over.
+  const savedKey = file?.api_key && sameOrigin(apiUrl, file.api_url) ? file.api_key : null;
+  const apiKey = flags.apiKey ?? fromEnv ?? savedKey;
   return {
-    apiUrl: flags.apiUrl ?? env("MEMDOT_API_URL") ?? file?.api_url ?? DEFAULT_API_URL,
+    apiUrl,
     apiKey,
     // A key from somewhere else isn't this file's agent, so it doesn't get that agent's identity.
     identity:
       env("MEMDOT_AGENT_IDENTITY") ??
-      (apiKey && apiKey === file?.api_key ? (file?.agent?.identity ?? null) : null),
+      (apiKey && apiKey === savedKey ? (file?.agent?.identity ?? null) : null),
     namespaceId: flags.namespace ?? env("MEMDOT_NAMESPACE") ?? file?.namespace_id ?? null,
     userId: flags.userId ?? env("MEMDOT_USER_ID") ?? file?.defaults?.user_id ?? null,
     agentId: flags.agentId ?? env("MEMDOT_AGENT_ID") ?? file?.defaults?.agent_id ?? null,
     runId: flags.runId ?? env("MEMDOT_RUN_ID") ?? file?.defaults?.run_id ?? null,
     recoveryCode: env("MEMDOT_RECOVERY_CODE"),
-    apiKeySource: flags.apiKey ? "flag" : fromEnv ? "env" : file?.api_key ? "file" : null,
+    apiKeySource: flags.apiKey ? "flag" : fromEnv ? "env" : savedKey ? "file" : null,
   };
 }
 
@@ -167,10 +178,12 @@ async function embeddingRuntime() {
         [
           "install",
           "--prefix",
-          dir,
+          process.platform === "win32" ? `"${dir}"` : dir,
           "--no-audit",
           "--no-fund",
           "--omit=dev",
+          // Its binaries ship in the packages, so nothing here needs to run at install time.
+          "--ignore-scripts",
           `${RUNTIME_PACKAGE}@${RUNTIME_VERSION}`,
         ],
         { shell: process.platform === "win32" },

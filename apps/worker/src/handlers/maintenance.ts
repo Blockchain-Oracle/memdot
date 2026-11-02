@@ -1,7 +1,7 @@
-import { connectRequests, memories, objects } from "@memdot/db";
+import { connectRequests, memories, oauthClient, oauthConsent, objects } from "@memdot/db";
 import { failObject } from "@memdot/jobs";
 import { compactIfDue } from "@memdot/memory-server";
-import { and, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, notExists, sql } from "drizzle-orm";
 import type { Deps } from "../deps.js";
 
 /** The activity log keeps 30 days of request metadata (R10); older rows are deleted daily. */
@@ -12,15 +12,38 @@ const PRUNE_BATCH = 10_000;
 const ABANDONED_UPLOAD_HOURS = 24;
 const MAX_ABANDONED_PER_RUN = 500;
 const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const UNUSED_OAUTH_CLIENT_DAYS = 7;
 
 export async function maintenance(deps: Deps): Promise<void> {
   const pruned = await pruneRequestLog(deps);
   const abandoned = await expireAbandonedUploads(deps);
   const compacted = await compactNamespaces(deps);
   const connects = await pruneConnectRequests(deps);
+  const clients = await pruneOAuthClients(deps);
   console.log(
-    `[maintenance] pruned ${pruned} request log rows, expired ${abandoned} abandoned uploads, checked ${compacted} namespaces, removed ${connects} old connect requests`,
+    `[maintenance] pruned ${pruned} request log rows, expired ${abandoned} abandoned uploads, checked ${compacted} namespaces, removed ${connects} old connect requests and ${clients} unused OAuth clients`,
   );
+}
+
+/** Anyone can register an OAuth client, so one nobody ever agreed to doesn't stay. */
+async function pruneOAuthClients(deps: Deps): Promise<number> {
+  const cutoff = new Date(Date.now() - UNUSED_OAUTH_CLIENT_DAYS * DAY_MS);
+  const gone = await deps.db
+    .delete(oauthClient)
+    .where(
+      and(
+        lt(oauthClient.createdAt, cutoff),
+        notExists(
+          deps.db
+            .select({ id: oauthConsent.id })
+            .from(oauthConsent)
+            .where(eq(oauthConsent.clientId, oauthClient.clientId)),
+        ),
+      ),
+    )
+    .returning({ id: oauthClient.id });
+  return gone.length;
 }
 
 /** A `memdot login` nobody answered: it can't be approved or collected any more. */

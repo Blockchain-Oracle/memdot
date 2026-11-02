@@ -83,7 +83,12 @@ async function collect(
       pending.identity,
     );
     if (result.status === "approved" && result.apiKey) {
-      return { apiKey: result.apiKey, agentId: result.agentId, namespaceId: result.namespaceId };
+      return {
+        apiKey: result.apiKey,
+        agentId: result.agentId,
+        namespaceId: result.namespaceId,
+        ownerAccount: result.ownerAccount,
+      };
     }
     if (result.status === "denied") {
       throw new CliError("The request was refused in the browser.", EXIT.auth, "CONNECT_DENIED");
@@ -189,9 +194,13 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
         connected: true,
         agent_id: collected.agentId,
         namespace_id: collected.namespaceId,
+        owner_account: collected.ownerAccount,
         synced,
       },
-      text: () => console.log(`${good("Connected.")} Saved to ${credentialsPath()}`),
+      text: () => {
+        console.log(`${good("Connected")} to ${collected.ownerAccount ?? "your account"}.`);
+        console.log(dim(`Saved to ${credentialsPath()}`));
+      },
     });
     return;
   }
@@ -219,7 +228,8 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
       },
       text: () => {
         console.log(`Open ${started.url}`);
-        console.log(`Check the code says ${strong(started.code)}, then come back and run:`);
+        console.log(`Type this code there: ${strong(started.code)}`);
+        console.log("Then come back and run:");
         console.log("  memdot login --continue");
       },
     });
@@ -227,7 +237,7 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
   }
 
   console.error(`\nOpen ${started.url}`);
-  console.error(`and check the code says ${strong(started.code)}\n`);
+  console.error(`and type this code: ${strong(started.code)}\n`);
   if (options.browser !== false) openBrowser(started.url);
   say(dim("Waiting for you to approve it…"));
   const collected = await collect(memdot, pending, LOGIN_WAIT_SECONDS);
@@ -244,10 +254,12 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
       connected: true,
       agent_id: collected.agentId,
       namespace_id: collected.namespaceId,
+      owner_account: collected.ownerAccount,
       synced,
     },
     text: () => {
-      console.log(`${good("Connected.")} Saved to ${credentialsPath()}`);
+      console.log(`${good("Connected")} to ${collected.ownerAccount ?? "your account"}.`);
+      console.log(dim(`Saved to ${credentialsPath()}`));
       if (synced.length) console.log(dim(`Updated the key in ${synced.join(", ")}`));
       console.log(`\nTry: memdot add "I prefer short answers" -u me --no-infer`);
     },

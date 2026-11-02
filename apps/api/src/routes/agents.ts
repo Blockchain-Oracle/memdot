@@ -1,3 +1,4 @@
+import { verifyOAuthQueryParams } from "@better-auth/oauth-provider";
 import { createRoute, z } from "@hono/zod-openapi";
 import { MAX_SPACES_PER_ACCOUNT } from "@memdot/config";
 import {
@@ -12,6 +13,7 @@ import {
 } from "@memdot/db";
 import { and, desc, eq, inArray, isNull, type SQL, sql } from "drizzle-orm";
 import { db } from "../db.js";
+import { env } from "../env.js";
 import { badRequest, conflict, isUniqueViolation, notFound } from "../lib/errors.js";
 import { loadSpace } from "../lib/ownership.js";
 import {
@@ -81,6 +83,33 @@ async function loadAgent(accountId: string, id: string) {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_EXPIRY_DAYS = 365;
+const OAUTH_QUERY_MAX = 8192;
+
+const OAuthQuery = z.string().min(1).max(OAUTH_QUERY_MAX).openapi({
+  description: "The query the OAuth server signed when it sent the owner to the consent page",
+});
+
+/**
+ * The client an OAuth request is really for. The consent page's address can be typed by anyone, so
+ * nothing is taken from it unless the OAuth server's signature covers it.
+ */
+async function signedParams(oauthQuery: string): Promise<URLSearchParams> {
+  const params = new URLSearchParams(oauthQuery);
+  const ok =
+    params.getAll("client_id").length === 1 &&
+    params.getAll("redirect_uri").length === 1 &&
+    (await verifyOAuthQueryParams(oauthQuery, env.BETTER_AUTH_SECRET));
+  if (!ok) {
+    throw badRequest(
+      "BAD_OAUTH_REQUEST",
+      "This request isn't valid, or it has expired. Start again from the app that asked.",
+    );
+  }
+  return params;
+}
+
+const signedClientId = async (oauthQuery: string) =>
+  (await signedParams(oauthQuery)).get("client_id") as string;
 
 export function agentRoutes() {
   return createRouter()
@@ -157,11 +186,61 @@ export function agentRoutes() {
     .openapi(
       createRoute({
         method: "post",
+        path: "/v1/agents/hosted/request",
+        tags: ["Agents"],
+        summary: "See what an OAuth request is asking",
+        description:
+          "What the consent page shows, read from the query the OAuth server signed rather than from the page's address.",
+        security: authenticated,
+        middleware: [requireScope("agents", "write"), requireAccountWide] as const,
+        request: {
+          body: {
+            content: jsonContent(z.object({ oauthQuery: OAuthQuery })),
+            required: true,
+          },
+        },
+        responses: {
+          200: {
+            description: "The request",
+            content: jsonContent(
+              z
+                .object({
+                  clientId: z.string(),
+                  clientName: z.string().nullable(),
+                  redirectUri: z.string(),
+                })
+                .openapi("HostedRequest"),
+            ),
+          },
+          ...errorResponses,
+        },
+      }),
+      async (c) => {
+        const params = await signedParams(c.req.valid("json").oauthQuery);
+        const clientId = params.get("client_id") as string;
+        const [client] = await db
+          .select({ name: oauthClient.name })
+          .from(oauthClient)
+          .where(eq(oauthClient.clientId, clientId))
+          .limit(1);
+        return c.json(
+          {
+            clientId,
+            clientName: client?.name ?? null,
+            redirectUri: params.get("redirect_uri") as string,
+          },
+          200,
+        );
+      },
+    )
+    .openapi(
+      createRoute({
+        method: "post",
         path: "/v1/agents/hosted",
         tags: ["Agents"],
         summary: "Allow a hosted agent",
         description:
-          "What the consent page sends just before it accepts an OAuth request: which spaces this client may reach and how. Assisted namespaces only, since nothing can be unwrapped for a client that holds no key. Asking again replaces what it had.",
+          "What the consent page sends just before it accepts an OAuth request: which spaces this client may reach and how. It can use every Assisted namespace in those spaces, including ones made later; nothing can be unwrapped for a client that holds no key. Asking again replaces what it had.",
         security: authenticated,
         middleware: [requireScope("agents", "write"), requireAccountWide] as const,
         request: {
@@ -169,7 +248,7 @@ export function agentRoutes() {
             content: jsonContent(
               z
                 .object({
-                  clientId: z.string().min(1).max(512),
+                  oauthQuery: OAuthQuery,
                   role: z.enum(["read_only", "read_write"]).default("read_write"),
                   spaceIds: z.array(z.uuid()).min(1).max(MAX_SPACES_PER_ACCOUNT),
                   namespaces: z
@@ -197,12 +276,13 @@ export function agentRoutes() {
         assertFreshSession(principalOf(c));
         const accountId = accountOf(c);
         const body = c.req.valid("json");
+        const clientId = await signedClientId(body.oauthQuery);
         for (const spaceId of body.spaceIds) await loadSpace(c, spaceId);
 
         const [client] = await db
           .select({ name: oauthClient.name })
           .from(oauthClient)
-          .where(eq(oauthClient.clientId, body.clientId))
+          .where(eq(oauthClient.clientId, clientId))
           .limit(1);
         if (!client) throw notFound("OAuth client");
 
@@ -241,7 +321,7 @@ export function agentRoutes() {
             .where(
               and(
                 eq(agents.accountId, accountId),
-                eq(agents.oauthClientId, body.clientId),
+                eq(agents.oauthClientId, clientId),
                 isNull(agents.revokedAt),
               ),
             )
@@ -250,7 +330,7 @@ export function agentRoutes() {
             ? await tx.update(agents).set(values).where(eq(agents.id, existing.id)).returning()
             : await tx
                 .insert(agents)
-                .values({ ...values, accountId, oauthClientId: body.clientId })
+                .values({ ...values, accountId, oauthClientId: clientId })
                 .returning();
           return saved;
         });
@@ -318,7 +398,11 @@ export function agentRoutes() {
       async (c) => {
         const agent = await loadAgent(accountOf(c), c.req.valid("param").id);
         const result = await db.transaction(async (tx) => {
-          await tx.update(agents).set({ revokedAt: new Date() }).where(eq(agents.id, agent.id));
+          // Its copy of namespace names has no use now, and shouldn't outlive it.
+          await tx
+            .update(agents)
+            .set({ revokedAt: new Date(), namespaces: null })
+            .where(eq(agents.id, agent.id));
           const keys = await tx
             .delete(apikey)
             .where(sql`${apikey.metadata}::jsonb ->> 'agentId' = ${agent.id}`)

@@ -1,13 +1,16 @@
 "use client";
 
+import type { ConnectRequest } from "@memdot/sdk";
 import { BrandLoader } from "@memdot/ui/components/brand";
 import { Button } from "@memdot/ui/components/button";
+import { Input } from "@memdot/ui/components/input";
+import { Label } from "@memdot/ui/components/label";
 import { Spinner } from "@memdot/ui/components/spinner";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2Icon } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import {
   type AccessChoice,
@@ -34,6 +37,8 @@ export default function ConnectPage() {
     </AuthFrame>
   );
 }
+
+const CODE_MAX = 16;
 
 const CLOSED: Record<string, { title: string; description: string }> = {
   denied: { title: "Refused", description: "This request was refused. Nothing was connected." },
@@ -71,34 +76,18 @@ function Connect() {
 function ConnectForm({ fresh }: { fresh: boolean }) {
   const memdot = useMemDot();
   const queryClient = useQueryClient();
-  const params = useSearchParams();
-  const id = params.get("request");
+  const id = useSearchParams().get("request");
   const spaces = useSpaces();
   const namespaces = useNamespaces();
+  const [request, setRequest] = useState<ConnectRequest | null>(null);
   const [choice, setChoice] = useState<AccessChoice>(initialChoice);
   const [stage, setStage] = useState<"idle" | "wrapping" | "done" | "denied">("idle");
-
-  const request = useQuery({
-    queryKey: ["connect", id],
-    queryFn: () => memdot.agents.connectRequest(id as string),
-    enabled: Boolean(id),
-    retry: false,
-  });
 
   if (!id) {
     return (
       <ConsentHeader
         title="Nothing to connect"
         description="Run memdot login in your terminal, and it brings you back here."
-      />
-    );
-  }
-  if (request.isPending) return <BrandLoader className="mx-auto" />;
-  if (request.isError || !request.data) {
-    return (
-      <ConsentHeader
-        title="Couldn't find that request"
-        description={describeError(request.error).title}
       />
     );
   }
@@ -123,10 +112,11 @@ function ConnectForm({ fresh }: { fresh: boolean }) {
     return <ConsentHeader title="Refused" description="Nothing was connected." />;
   }
 
-  const closed = request.data.status !== "pending" ? CLOSED[request.data.status] : null;
+  if (!request) return <CodeEntry id={id} fresh={fresh} onClaimed={setRequest} />;
+
+  const closed = request.status !== "pending" ? CLOSED[request.status] : null;
   if (closed) return <ConsentHeader {...closed} />;
 
-  const label = request.data.label;
   const approve = async () => {
     setStage("wrapping");
     try {
@@ -141,7 +131,7 @@ function ConnectForm({ fresh }: { fresh: boolean }) {
           })
         : null;
       const namespaceId = made?.id ?? choice.namespaceId;
-      await memdot.agents.approveConnect(request.data, {
+      await memdot.agents.approveConnect(request, {
         spaceIds: choice.spaceIds,
         role: choice.role,
         ...(namespaceId ? { namespaceId } : {}),
@@ -158,25 +148,16 @@ function ConnectForm({ fresh }: { fresh: boolean }) {
   return (
     <div className="flex flex-col gap-6">
       <ConsentHeader
-        title={`Connect ${label}`}
-        description="It asked from a terminal. It only gets what you choose here."
+        title="Connect this device"
+        description="It only gets what you choose here, and it holds its own key on that machine."
       />
       <ConsentFacts
         rows={[
-          {
-            label: "Code",
-            value: <span className="font-mono text-ui tracking-wider">{request.data.code}</span>,
-          },
-          { label: "Runs on", value: label },
-          { label: "Holds", value: "Its own key, on that machine" },
+          { label: "Calls itself", value: request.label },
+          ...(request.requestedFrom ? [{ label: "Asked from", value: request.requestedFrom }] : []),
         ]}
       />
-      <p className="-mt-3 text-center text-ui-sm text-text-3">
-        Check this code matches your terminal. If you didn't run memdot login, refuse.
-      </p>
-      {!fresh ? (
-        <ConfirmItsYou />
-      ) : spaces.isPending || namespaces.isPending ? (
+      {spaces.isPending || namespaces.isPending ? (
         <BrandLoader className="mx-auto" />
       ) : (
         <>
@@ -204,6 +185,68 @@ function ConnectForm({ fresh }: { fresh: boolean }) {
             </Button>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The code has to come from the terminal: a link alone reaches nothing, so nobody can be sent one
+ * and talked into a single click. It's asked for here rather than checked by eye.
+ */
+function CodeEntry({
+  id,
+  fresh,
+  onClaimed,
+}: {
+  id: string;
+  fresh: boolean;
+  onClaimed: (request: ConnectRequest) => void;
+}) {
+  const memdot = useMemDot();
+  const fieldId = useId();
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex flex-col gap-6">
+      <ConsentHeader
+        title="Connect a device"
+        description="Only go on if you just ran memdot login yourself. If someone sent you here, close this page."
+      />
+      {fresh ? (
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setBusy(true);
+            try {
+              onClaimed(await memdot.agents.claimConnect(id, code));
+            } catch (error) {
+              toast.error(describeError(error).title);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <Label htmlFor={fieldId}>The code your terminal shows</Label>
+          <Input
+            id={fieldId}
+            value={code}
+            maxLength={CODE_MAX}
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="XXXX-XXXX"
+            className="font-mono tracking-wider uppercase"
+            onChange={(event) => setCode(event.target.value)}
+          />
+          <Button type="submit" disabled={code.trim().length === 0 || busy} className="self-end">
+            {busy && <Spinner />}
+            Continue
+          </Button>
+        </form>
+      ) : (
+        <ConfirmItsYou />
       )}
     </div>
   );

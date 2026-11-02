@@ -1,4 +1,14 @@
-import { copyFile, mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { serveLocal } from "@memdot/mcp/stdio";
@@ -17,14 +27,19 @@ const FILES: Record<string, () => string> = {
   cursor: () => join(homedir(), ".cursor/mcp.json"),
 };
 const CLIENTS = ["claude-code", ...Object.keys(FILES)];
+const PRIVATE_FILE = 0o600;
 
 /** Adds our server and leaves the rest alone. The old file stays next to it, in case. */
 async function addToSettings(path: string, server: unknown): Promise<void> {
   let settings: { mcpServers?: Record<string, unknown> } = {};
+  // Settings can hold other servers' tokens, so a new copy is never more readable than the old one.
+  let mode = PRIVATE_FILE;
   try {
     const raw = await readFile(path, "utf8");
     settings = JSON.parse(raw) as typeof settings;
+    mode = (await stat(path)).mode & 0o777;
     await copyFile(path, `${path}.bak`);
+    await chmod(`${path}.bak`, mode);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       throw new CliError(
@@ -37,9 +52,18 @@ async function addToSettings(path: string, server: unknown): Promise<void> {
   }
   settings.mcpServers = { ...settings.mcpServers, memdot: server };
   const temporary = `${path}.${process.pid}.tmp`;
-  await writeFile(temporary, `${JSON.stringify(settings, null, 2)}\n`);
-  await rename(temporary, path);
+  try {
+    await writeFile(temporary, `${JSON.stringify(settings, null, 2)}\n`, { mode });
+    await rename(temporary, path);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    throw error;
+  }
 }
+
+/** Safe to paste: an install path can have spaces, and the address came from settings. */
+const shellQuote = (value: string) =>
+  /^[\w@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
 
 export function mcpCommands(program: Command): void {
   const mcp = program
@@ -68,8 +92,8 @@ export function mcpCommands(program: Command): void {
 
       if (options.client === "claude-code") {
         const line = options.hosted
-          ? `claude mcp add --transport http memdot ${apiUrl}/mcp`
-          : `claude mcp add memdot -- ${process.execPath} ${script} mcp`;
+          ? `claude mcp add --transport http memdot ${shellQuote(`${apiUrl}/mcp`)}`
+          : `claude mcp add memdot -- ${shellQuote(process.execPath)} ${shellQuote(script)} mcp`;
         emit({ data: { client: options.client, run: line }, text: () => console.log(line) });
         return;
       }
