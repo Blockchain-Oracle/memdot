@@ -119,7 +119,8 @@ def build_server(
     from mcp.server.fastmcp import FastMCP
     from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
-    server = FastMCP("memdot", instructions=INSTRUCTIONS)
+    # Its default logs every HTTP request; a client shows the server's stderr to the person.
+    server = FastMCP("memdot", instructions=INSTRUCTIONS, log_level="WARNING")
     read = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
     write = ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False)
     destructive = ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=False)

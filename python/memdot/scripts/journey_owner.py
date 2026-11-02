@@ -12,11 +12,14 @@ import json
 import os
 import secrets
 import sys
+import time
 
 from memdot import AsyncMemDot, MemDot, MemDotError, Wallet
 
 API = os.environ.get("MEMDOT_API_URL", "http://localhost:8787")
 ORIGIN = os.environ.get("MEMDOT_ORIGIN", "http://localhost:3100")
+CHAIN_TRIES = 40
+CHAIN_WAIT_SECONDS = 3
 failures: list[str] = []
 
 
@@ -34,6 +37,16 @@ def refused(code: str, call) -> bool:
     except MemDotError as error:
         return error.code == code
     return False
+
+
+def wait_for_chain(memdot: MemDot, space_id: str) -> None:
+    """Restoring reads from the chain alone, so what was just written has to be there first."""
+    for _ in range(CHAIN_TRIES):
+        page = memdot.files.list(space_id=space_id, kind="segment", limit=50)
+        if all(item.status == "stored" for item in page.items):
+            return
+        time.sleep(CHAIN_WAIT_SECONDS)
+    raise TimeoutError("segments never finalized")
 
 
 def main() -> None:
@@ -133,6 +146,7 @@ def main() -> None:
         imported["imported"] == 1 and imported["duplicates"] == 1,
         imported,
     )
+    wait_for_chain(memdot, space.id)
     restored = memdot.memories.restore(private.id)
     check("rebuilds Private from the chain alone", restored["restored"] == 2, restored)
     after = memdot.memories.search("tea", namespace_id=private.id, mode="keyword")

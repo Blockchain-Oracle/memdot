@@ -42,6 +42,7 @@ from ..engine import (
 from ..engine.filters import parse_instant
 from ..errors import ConflictError, MemDotError, NotFoundError
 from . import llm
+from .chain import NodeError
 from .context import Context
 from .files import SEGMENT_PACK_BYTES, require_sponsored, store_object
 from .simple import Jobs
@@ -106,7 +107,15 @@ class PrivateNamespace:
             cid = segment.get("cid")
             if not cid or cid in self._opened:
                 continue
-            sealed = chain.bitswap_get(cid) if chain else self._ctx.transport.blob(cid)
+            try:
+                sealed = chain.bitswap_get(cid) if chain else self._ctx.transport.blob(cid)
+            except NodeError as error:
+                raise ConflictError(
+                    409,
+                    "NOT_ON_CHAIN_YET",
+                    "A recent write hasn't reached the chain yet, so this can't be rebuilt from "
+                    "the chain alone. Try again in a minute.",
+                ) from error
             try:
                 packed = crypto.open_segment(sealed, identities)
             except WrongKeyError as error:
