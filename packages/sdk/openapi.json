@@ -3703,7 +3703,7 @@
                 "properties": {
                   "record": {
                     "type": "string",
-                    "maxLength": 4096,
+                    "maxLength": 16384,
                     "pattern": "^0x[0-9a-fA-F]+$",
                     "description": "The owner-signed registry record saying this account has left"
                   }
