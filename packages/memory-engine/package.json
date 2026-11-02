@@ -1,0 +1,43 @@
+{
+  "name": "@memdot/memory-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MemDot's memory engine: extraction, ranking, filters and the local index. Runs on the server for Assisted namespaces and on the device for Private ones.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./llm": {
+      "types": "./dist/llm.d.mts",
+      "import": "./dist/llm.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts src/llm.ts --dts",
+    "dev": "tsdown src/index.ts src/llm.ts --dts --watch --no-clean",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.94",
+    "@ai-sdk/google": "^4.0.109",
+    "@ai-sdk/openai": "^4.0.106",
+    "@ai-sdk/openai-compatible": "^3.0.82",
+    "@memdot/config": "workspace:*",
+    "@noble/hashes": "^2.4.0",
+    "ai": "^7.0.159",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}

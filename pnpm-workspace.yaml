@@ -20,3 +20,7 @@ catalog:
 
 allowBuilds:
   esbuild: true
+  # The local embedding model's runtime ships its binaries in the package; no install scripts needed.
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false
