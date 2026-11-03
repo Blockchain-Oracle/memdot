@@ -519,6 +519,173 @@ export function portable(): Files {
   };
 }
 
+// ── Hosts that load a plugin in-process ────────────────────────────────────────────────────────
+
+const packageJson = (name: string, main: string, extra: Record<string, unknown> = {}) =>
+  pretty({
+    name: `@memdot/${name}`,
+    version: VERSION,
+    description: DESCRIPTION,
+    license: LICENSE,
+    type: "module",
+    main,
+    exports: { ".": { import: main } },
+    repository: REPOSITORY,
+    keywords: KEYWORDS,
+    ...extra,
+  });
+
+const TOOL_NOTE =
+  "Tools: `memdot_search`, `memdot_remember`, `memdot_list`, `memdot_get`, `memdot_forget`, `memdot_status`.";
+const LIFECYCLE_NOTE =
+  "The first prompt of a session searches this repository's memories and adds what it finds. Tool calls are noted locally, with secrets removed. Every 10 turns, at compaction and at the end of a session, the conversation is saved in the background.";
+const SKILLS_FOR = (hostName: string) => ({
+  hostName,
+  prefix: "memdot-",
+  keepFields: [],
+  argumentsLine: "",
+});
+
+export function opencode(): Files {
+  return {
+    "package.json": packageJson("opencode-plugin", "./core/opencode.mjs"),
+    ...renderSkills(SKILLS_FOR("OpenCode")),
+    "README.md": readme(
+      "OpenCode",
+      `From a clone of the repository, add it to \`opencode.json\`, global or per project:
+
+\`\`\`json
+{ "plugin": ["file:///absolute/path/to/integrations/opencode-plugin/core/opencode.mjs"] }
+\`\`\``,
+      [
+        LIFECYCLE_NOTE,
+        TOOL_NOTE,
+        "The full MemDot MCP server, and the skills as `/memdot-search` and so on.",
+      ],
+    ),
+  };
+}
+
+export function pi(): Files {
+  return {
+    "package.json": packageJson("pi-agent-plugin", "./core/pi.mjs", {
+      keywords: [...KEYWORDS, "pi-package"],
+      pi: { extensions: ["./core/pi.mjs"], skills: ["./skills"] },
+    }),
+    ...renderSkills(SKILLS_FOR("Pi")),
+    "README.md": readme(
+      "Pi",
+      `From a clone of the repository:
+
+\`\`\`bash
+pi install ./integrations/pi-agent-plugin
+\`\`\``,
+      [LIFECYCLE_NOTE, TOOL_NOTE, "The skills, as `/skill:memdot-search` and so on."],
+    ),
+  };
+}
+
+export function openclaw(): Files {
+  const toolNames = [
+    "memdot_search",
+    "memdot_remember",
+    "memdot_list",
+    "memdot_get",
+    "memdot_forget",
+    "memdot_status",
+  ];
+  return {
+    "package.json": packageJson("openclaw-plugin", "./core/openclaw.mjs", {
+      openclaw: {
+        extensions: ["./core/openclaw.mjs"],
+        compat: { pluginApi: ">=2026.4.24", minGatewayVersion: "2026.4.24" },
+      },
+    }),
+    "openclaw.plugin.json": pretty({
+      id: NAME,
+      name: DISPLAY_NAME,
+      description: DESCRIPTION,
+      version: VERSION,
+      skills: ["skills"],
+      contracts: { tools: toolNames },
+      activation: { onStartup: true },
+      configSchema: { type: "object", additionalProperties: false, properties: {} },
+    }),
+    ...renderSkills(SKILLS_FOR("OpenClaw")),
+    "README.md": readme(
+      "OpenClaw",
+      `From a clone of the repository:
+
+\`\`\`bash
+openclaw plugins install ./integrations/openclaw-plugin
+\`\`\`
+
+OpenClaw won't show a third-party plugin the conversation until you allow it. Add this to its config, or recall and saving stay off while the tools still work:
+
+\`\`\`json
+{ "plugins": { "entries": { "memdot": { "hooks": { "allowConversationAccess": true } } } } }
+\`\`\``,
+      [
+        LIFECYCLE_NOTE,
+        TOOL_NOTE,
+        "The skills.",
+        "It doesn't take OpenClaw's exclusive memory slot, so it runs next to whatever memory you already use.",
+      ],
+    ),
+  };
+}
+
+export function deepseek(): Files {
+  return {
+    "package.json": packageJson("deepseek-plugin", "./core/deepseek.mjs"),
+    "README.md": readme(
+      "DeepSeek Harness",
+      `From a clone of the repository, pack it and add it to a profile:
+
+\`\`\`bash
+cd integrations/deepseek-plugin && npm pack
+dsh plugin --profile default add ./memdot-deepseek-plugin-${VERSION}.tgz
+\`\`\`
+
+Then turn it on in that profile's \`cordis.patch.yml\`:
+
+\`\`\`yaml
+- insert:
+    - id: memdot
+      name: "@memdot/deepseek-plugin"
+\`\`\``,
+      [
+        "The first request of a session searches this repository's memories and adds what it finds. Every 10 turns the conversation is saved in the background.",
+        TOOL_NOTE,
+        "No skills: the harness has no way to register them.",
+      ],
+    ),
+  };
+}
+
+export function hermes(): Files {
+  return {
+    "plugin.yaml": `name: ${NAME}\nversion: "${VERSION}"\ndescription: "${DESCRIPTION}"\n`,
+    "__init__.py": readFileSync(join(CORE, "hermes", "__init__.py"), "utf8"),
+    "README.md": readme(
+      "Hermes Agent",
+      `From a clone of the repository:
+
+\`\`\`bash
+cp -r integrations/hermes-plugin ~/.hermes/plugins/memdot
+hermes plugins enable memdot
+\`\`\`
+
+Then choose it with \`hermes memory setup memdot\`. Hermes runs one memory provider at a time.`,
+      [
+        "A Hermes memory provider. Recall happens before the first request of a session, and turns are saved in the background.",
+        "Tools: `memdot_search`, `memdot_remember`, `memdot_forget`, `memdot_status`.",
+        "It calls the same bundled core as every other plugin, by command, so it needs node on the PATH.",
+      ],
+    ),
+  };
+}
+
 // ── Root marketplace manifests ─────────────────────────────────────────────────────────────────
 
 export function marketplaces(): Files {

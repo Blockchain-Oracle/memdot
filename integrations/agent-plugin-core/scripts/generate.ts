@@ -18,9 +18,14 @@ import {
   claudeCode,
   codex,
   cursor,
+  deepseek,
   type Files,
+  hermes,
   kimi,
   marketplaces,
+  openclaw,
+  opencode,
+  pi,
   portable,
   ROOT,
 } from "./hosts.js";
@@ -37,6 +42,11 @@ const PLUGINS: Record<string, { files: () => Files; bundles?: string[] }> = {
   "kimi-plugin": { files: kimi },
   "antigravity-plugin": { files: antigravity },
   "memdot-agent-plugin": { files: portable },
+  "opencode-plugin": { files: opencode, bundles: ["opencode.mjs"] },
+  "pi-agent-plugin": { files: pi, bundles: ["pi.mjs"] },
+  "openclaw-plugin": { files: openclaw, bundles: ["openclaw.mjs"] },
+  "deepseek-plugin": { files: deepseek, bundles: ["deepseek.mjs"] },
+  "hermes-plugin": { files: hermes },
 };
 
 function writeAll(root: string, files: Files): void {

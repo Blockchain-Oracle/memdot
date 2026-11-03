@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { copyFile, readdir, readFile, rename, rm, stat, utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { ensureCli, nodeBinary, runCli } from "./cli.js";
@@ -112,7 +113,7 @@ export async function installLauncher(script: string): Promise<void> {
   ]);
   if (theirs?.equals(mine)) return;
   await ensureDir(join(launcher, ".."));
-  const temporary = `${launcher}.${process.pid}.tmp`;
+  const temporary = `${launcher}.${randomUUID()}.tmp`;
   await copyFile(script, temporary);
   await rename(temporary, launcher);
 }

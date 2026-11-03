@@ -1,34 +1,32 @@
 import { spawn } from "node:child_process";
-import { readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { ensureCli, findCli, nodeBinary, runCli } from "./cli.js";
-import { MAX_MESSAGE_CHARS, PLUGIN_VERSION } from "./constants.js";
+import { realpathSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { ensureCli, nodeBinary, runCli } from "./cli.js";
+import { PLUGIN_VERSION } from "./constants.js";
+import {
+  forgetIds,
+  forgetRepo,
+  pause,
+  rememberText,
+  resume,
+  searchText,
+  statusReport,
+} from "./control.js";
 import { HOST_ADAPTERS } from "./hosts/index.js";
 import {
   deliverPending,
   installLauncher,
   maintain,
   prepareFlush,
-  searchMemories,
   startWorker,
 } from "./lifecycle.js";
-import { ensureDir, FILE_MODE, logError, paths } from "./paths.js";
-import { formatMemories } from "./prompts.js";
-import { bounded } from "./redact.js";
-import { identifyRepo } from "./repo.js";
-import {
-  cliEnvironment,
-  connected,
-  SEARCH_SCOPES,
-  type SearchScope,
-  settings,
-} from "./settings.js";
-import { isPaused } from "./store.js";
+import { logError, paths } from "./paths.js";
+import { cliEnvironment } from "./settings.js";
 
 /** Anything this slow in a hook is stuck, and a stuck hook must not hold the host up. */
 const HOOK_DEADLINE_MS = 30_000;
-const PLUGIN_HOST_FOR_CONTROL = "skill";
+/** What the activity log calls a skill running a command. */
+const CONTROL_HOST = "skill";
 const script = () => realpathSync(process.argv[1] as string);
 
 async function readStdin(): Promise<string> {
@@ -108,159 +106,37 @@ function parseFlags(args: string[]): Flags {
 
 const textFrom = async (values: string[]) => values.join(" ").trim() || (await readStdin()).trim();
 const fail = (message: string): never => {
-  console.error(message);
-  process.exit(1);
+  throw new Error(message);
 };
-
-async function currentRepo() {
-  return identifyRepo(process.cwd());
-}
 
 async function commandSearch(args: string[]): Promise<void> {
   const { values, flags } = parseFlags(args);
   const query = await textFrom(values);
   if (!query) fail("Say what to search for.");
-  const options = settings();
-  const named = flags.scope as SearchScope | undefined;
-  if (named && !SEARCH_SCOPES.includes(named))
-    fail(`--scope is one of ${SEARCH_SCOPES.join(", ")}.`);
-  const { memories, error } = await searchMemories(PLUGIN_HOST_FOR_CONTROL, query, {
-    scope: named ?? options.searchScope,
-    repo: await currentRepo(),
-    topK: Number(flags["top-k"]) || options.topK,
-  });
-  if (error) fail(error);
-  const text = formatMemories(memories, { heading: "", limit: options.maxContextChars });
-  console.log(text || "Nothing found.");
-  if (memories.length) console.log(`\nIds: ${memories.map((memory) => memory.id).join(" ")}`);
-}
-
-async function commandRemember(args: string[]): Promise<void> {
-  const { values } = parseFlags(args);
-  const fact = bounded(await textFrom(values), MAX_MESSAGE_CHARS);
-  if (!fact) fail("Say what to remember.");
-  const repo = await currentRepo();
-  const result = await runCli(
-    PLUGIN_HOST_FOR_CONTROL,
-    [
-      "add",
-      "--no-infer",
-      "-u",
-      settings().userId,
-      "--agent-id",
-      repo.id,
-      "-m",
-      JSON.stringify({ source: "plugin_remember", repo: repo.name }),
-    ],
-    { input: fact },
-  );
-  if (!result.ok) fail(result.error?.message ?? "Couldn't save it.");
-  const added = (result.data as { results?: { id: string; memory: string }[] }).results ?? [];
   console.log(
-    added.length
-      ? `Remembered: ${added.map((memory) => `${memory.memory} (${memory.id})`).join("; ")}`
-      : "That's already remembered.",
+    await searchText(CONTROL_HOST, query, {
+      scope: flags.scope as string | undefined,
+      topK: Number(flags["top-k"]) || undefined,
+      cwd: process.cwd(),
+    }),
   );
 }
 
 async function commandForget(args: string[]): Promise<void> {
   const { values, flags } = parseFlags(args);
+  const confirmed = flags.yes === true;
   if (flags.repo) {
-    const repo = await currentRepo();
-    if (flags.yes !== true) {
-      const preview = await runCli(PLUGIN_HOST_FOR_CONTROL, [
-        "delete",
-        "--all",
-        "--dry-run",
-        "--agent-id",
-        repo.id,
-      ]);
-      if (!preview.ok) fail(preview.error?.message ?? "Couldn't count them.");
-      const { would_delete: count } = preview.data as { would_delete: number };
-      console.log(
-        `This would forget ${count} memories saved for ${repo.name}. Nothing changed. To go ahead, run this again with --yes.`,
-      );
-      return;
-    }
-    const result = await runCli(PLUGIN_HOST_FOR_CONTROL, [
-      "delete",
-      "--all",
-      "--force",
-      "--agent-id",
-      repo.id,
-    ]);
-    if (!result.ok) fail(result.error?.message ?? "Couldn't forget them.");
-    console.log(`Forgotten everything saved for ${repo.name}.`);
+    console.log(await forgetRepo(CONTROL_HOST, process.cwd(), confirmed));
     return;
   }
   if (values.length === 0) fail("Give the ids to forget, or --repo for this whole repository.");
-  if (flags.yes !== true)
-    fail("Forgetting can't be undone. Confirm with the user, then pass --yes.");
-  for (const id of values) {
-    const result = await runCli(PLUGIN_HOST_FOR_CONTROL, ["delete", id, "--force"]);
-    console.log(result.ok ? `Forgotten: ${id}` : `Couldn't forget ${id}: ${result.error?.message}`);
-  }
-}
-
-async function commandPause(): Promise<void> {
-  const { paused, plugin } = paths();
-  await ensureDir(plugin);
-  writeFileSync(paused, "", { mode: FILE_MODE });
-  console.log(
-    "MemDot stopped saving and recalling on its own. Tools you call directly still work.",
-  );
-}
-
-function commandResume(): void {
-  rmSync(paths().paused, { force: true });
-  console.log("MemDot is saving and recalling again. Nothing from the pause was saved.");
+  if (!confirmed) fail("Forgetting can't be undone. Confirm with the user, then pass --yes.");
+  console.log(await forgetIds(CONTROL_HOST, values));
 }
 
 async function commandStatus(args: string[]): Promise<void> {
-  const { flags } = parseFlags(args);
-  const { pending: pendingDir, failed: failedDir, errors } = paths();
-  const list = (dir: string) => {
-    try {
-      return readdirSync(dir).filter((name) => name.endsWith(".json"));
-    } catch {
-      return [];
-    }
-  };
-  const waiting = await Promise.all(
-    list(pendingDir).map(async (name) =>
-      JSON.parse(await readFile(join(pendingDir, name), "utf8").catch(() => "{}")),
-    ),
-  );
-  const repo = await currentRepo();
-  const options = settings();
-  const cli = findCli();
-  const who = connected() && cli ? await runCli(PLUGIN_HOST_FOR_CONTROL, ["whoami"]) : null;
-  const connection = await readFile(paths().connection, "utf8")
-    .then((raw) => JSON.parse(raw))
-    .catch(() => null);
-  const lastError = await readFile(errors, "utf8")
-    .then((raw) => raw.trim().split("\n").at(-1) ?? null)
-    .catch(() => null);
-  const status = {
-    version: PLUGIN_VERSION,
-    connected: connected(),
-    key_works: who ? who.ok : null,
-    key_problem: who && !who.ok ? (who.error?.hint ?? who.error?.message ?? null) : null,
-    agent: who?.ok ? ((who.data as { agent?: { label?: string } }).agent?.label ?? null) : null,
-    namespace: connection?.namespaceId ?? null,
-    mode: connection?.mode ?? null,
-    paused: await isPaused(),
-    auto_save: options.autoSave,
-    repo: repo.name,
-    repo_scope: repo.id,
-    user: options.userId,
-    waiting_to_save: waiting.length,
-    waiting_reason: waiting.find((packet) => packet.lastError)?.lastError ?? null,
-    could_not_save: list(failedDir).length,
-    cli: cli ?? "not installed yet",
-    last_error: lastError,
-  };
-  if (flags.json) {
+  const status = await statusReport(CONTROL_HOST, process.cwd());
+  if (parseFlags(args).flags.json) {
     console.log(JSON.stringify(status, null, 2));
     return;
   }
@@ -273,20 +149,15 @@ async function commandLogin(args: string[]): Promise<void> {
   const { flags } = parseFlags(args);
   const host = typeof flags.client === "string" ? flags.client : "coding agent";
   const result = flags.continue
-    ? await runCli(PLUGIN_HOST_FOR_CONTROL, ["login", "--continue", "--wait", "100"], {
+    ? await runCli(CONTROL_HOST, ["login", "--continue", "--wait", "100"], {
         timeoutMs: 110_000,
       })
-    : await runCli(PLUGIN_HOST_FOR_CONTROL, [
-        "login",
-        "--no-wait",
-        "--label",
-        `MemDot plugin for ${host}`,
-      ]);
+    : await runCli(CONTROL_HOST, ["login", "--no-wait", "--label", `MemDot plugin for ${host}`]);
   if (!result.ok) fail(result.error?.message ?? "Couldn't start the login.");
   const data = result.data as { connected?: boolean; url?: string; code?: string };
   if (data.connected) {
     await rm(paths().connection, { force: true });
-    await maintain(PLUGIN_HOST_FOR_CONTROL).catch((error) => logError("login", error));
+    await maintain(CONTROL_HOST).catch((error) => logError("login", error));
     console.log(
       "Connected. Restart this session, or reload plugins, to bring the MemDot tools up.",
     );
@@ -318,17 +189,17 @@ async function main(): Promise<void> {
       await commandSearch(rest);
       return;
     case "remember":
-      await commandRemember(rest);
+      console.log(await rememberText(CONTROL_HOST, await textFrom(rest), process.cwd()));
       return;
     case "forget":
       await commandForget(rest);
       return;
     case "pause":
-      await commandPause();
+      console.log(await pause());
       return;
     case "resume":
-      commandResume();
-      startWorker({ host: PLUGIN_HOST_FOR_CONTROL, script: script() }, "maintain");
+      console.log(resume());
+      startWorker({ host: CONTROL_HOST, script: script() }, "maintain");
       return;
     case "status":
       await commandStatus(rest);
@@ -347,8 +218,7 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch(async (error) => {
-  await logError("main", error);
+main().catch((error) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 });

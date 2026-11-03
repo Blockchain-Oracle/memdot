@@ -297,10 +297,18 @@ const antigravity: HostAdapter = {
   },
 };
 
+// ── A plugin that isn't in JavaScript, calling these same hooks by command ─────────────────────
+
+const plain: HostAdapter = {
+  handle: claudeCode.handle,
+  render: (_event, { context }) => context ?? "",
+};
+
 export const HOST_ADAPTERS: Record<string, HostAdapter> = {
   "claude-code": claudeCode,
   codex,
   cursor,
   kimi,
   antigravity,
+  hermes: plain,
 };

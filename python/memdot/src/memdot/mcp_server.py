@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 from . import credentials as creds
 from ._constants import __version__
@@ -59,8 +59,18 @@ _Filters = Annotated[
         description='Narrow by user_id, agent_id, run_id, created_at, categories, keywords or metadata, with AND, OR and NOT. Example: {"AND":[{"user_id":"priya"},{"created_at":{"gte":"2026-01-01"}}]}'
     ),
 ]
+
+
+def _must_be_true(value: bool) -> bool:
+    if value is not True:
+        raise ValueError("Set this to true to confirm.")
+    return value
+
+
+# A boolean that has to be true, not a literal: some models reject a schema whose enum isn't text.
 _Confirm = Annotated[
-    Literal[True],
+    bool,
+    AfterValidator(_must_be_true),
     Field(description="Set to true only after the person has said yes: this can't be undone."),
 ]
 _UserId = Annotated[str | None, Field(max_length=256, description="Who this is about")]

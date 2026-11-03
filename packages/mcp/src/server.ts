@@ -108,8 +108,10 @@ const Filters = z
     'Narrow by user_id, agent_id, run_id, created_at, categories, keywords or metadata, with AND, OR and NOT. Example: {"AND":[{"user_id":"priya"},{"created_at":{"gte":"2026-01-01"}}]}',
   );
 const MemoryId = z.string().uuid().describe("The memory's id");
+// A boolean that has to be true, not a literal: some models reject a schema whose enum isn't text.
 const Confirm = z
-  .literal(true)
+  .boolean()
+  .refine((value) => value, "Set this to true to confirm.")
   .describe("Set to true only after the person has said yes: this can't be undone.");
 
 /**

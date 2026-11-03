@@ -1,0 +1,21 @@
+{
+  "name": "@memdot/opencode-plugin",
+  "version": "0.1.0",
+  "description": "Long-term memory for coding agents: encrypted on your device, stored on Portaldot V3, and yours to move or revoke.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./core/opencode.mjs",
+  "exports": {
+    ".": {
+      "import": "./core/opencode.mjs"
+    }
+  },
+  "repository": "https://github.com/Blockchain-Oracle/memdot",
+  "keywords": [
+    "memory",
+    "coding-agents",
+    "encrypted",
+    "portaldot",
+    "mcp"
+  ]
+}

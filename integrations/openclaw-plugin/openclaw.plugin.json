@@ -1,0 +1,27 @@
+{
+  "id": "memdot",
+  "name": "MemDot",
+  "description": "Long-term memory for coding agents: encrypted on your device, stored on Portaldot V3, and yours to move or revoke.",
+  "version": "0.1.0",
+  "skills": [
+    "skills"
+  ],
+  "contracts": {
+    "tools": [
+      "memdot_search",
+      "memdot_remember",
+      "memdot_list",
+      "memdot_get",
+      "memdot_forget",
+      "memdot_status"
+    ]
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
