@@ -39,10 +39,12 @@ Working live on V3 today:
 - Export everything as a decrypted zip and re-import it into a new account, and account deletion that stops every renewal.
 - Agents connect themselves: `memdot login` makes a key pair on the machine, the owner chooses spaces in the browser, and the browser wraps those keys to it. A local MCP server decrypts with that key; a hosted one signs in with OAuth and reaches Assisted namespaces only. Revoking stops either on its next call.
 - A dashboard on desktop and phone, in light and dark. A CLI with an agent JSON mode. TypeScript and Python SDKs on the same encryption formats, tested against each other, with Python integrations for LangGraph, CrewAI, Strands and the OpenAI Agents SDK. A REST API with OpenAPI, API keys and rate limits.
+- Agent plugins for ten coding agents and harnesses, plus a portable package, generated from one core and installable from this repository. They recall at the start of work, note what happened with secrets removed, and save in the background. A real session answered from an earlier one on Codex, Kimi Code, OpenCode, Pi and OpenClaw.
 - Deployed: API, worker, web and Postgres on our own server, with health checks and daily database backups.
 
 ## Outstanding items
 
+- A signed-in Claude Code session through the plugin (it installs and its hooks run), and Cursor, which needs a sign-in.
 - Walking real extensions and Touch ID on the live site. Wallet sign-in, MetaMask sign-in and wallet-paid stores have run in the dashboard on a local build against live V3 with test wallets; passkey and recovery-code flows have run end to end
 - TypeScript framework adapters and automation nodes
 - Docs site and landing page

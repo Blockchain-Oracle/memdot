@@ -2801,6 +2801,7 @@ function evidenceFrom({ tool, input, response, error, failed, subagent }) {
 // src/packet.ts
 const PACKET_ID_CHARS = 32;
 const PREVIEW_CHARS = 500;
+const NOTE_LINE_CHARS = 400;
 const textOf = (event) => {
 	if (event.kind === "prompt" || event.kind === "assistant") return event.text;
 	if (event.kind === "stop") return event.text ?? "";
@@ -2876,14 +2877,15 @@ function messagesOf(events, root) {
 }
 /** Without a model nothing can be extracted, so a short note of the session is kept instead. */
 function noteOf(messages, repoName) {
-	const asked = messages.find((message) => message.role === "user")?.content ?? "";
-	const ended = messages.findLast((message) => message.role === "assistant")?.content ?? "";
-	const room = Math.floor(MAX_NOTE_CHARS / 2);
-	return [
-		`Session in ${repoName}.`,
-		`Asked: ${asked.slice(0, room)}`,
-		`Ended with: ${ended.slice(0, room)}`
-	].join("\n").trim();
+	const lines = [];
+	let room = MAX_NOTE_CHARS;
+	for (const message of [...messages].reverse()) {
+		const line = `${message.role === "user" ? "Asked" : "Answered"}: ${message.content.slice(0, NOTE_LINE_CHARS)}`;
+		if (line.length > room) break;
+		lines.unshift(line);
+		room -= line.length;
+	}
+	return [`Session in ${repoName}.`, ...lines].join("\n").trim();
 }
 /** A packet for these events, or nothing when they hold too little to be worth saving. */
 function buildPacket(taken, state, where) {

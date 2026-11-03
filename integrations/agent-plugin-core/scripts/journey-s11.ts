@@ -39,8 +39,9 @@ const environment = (extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv => ({
   HOME: home,
   MEMDOT_CREDENTIALS_DIR: join(home, "memdot"),
   MEMDOT_API_URL: baseUrl,
-  // The bundled CLI, before it's on the site. Everything else is what a host would run.
-  MEMDOT_CLI: CLI,
+  // A deployed service gets the real thing: the pinned release, fetched and checked by hash. A local
+  // stack gets the build next to it, which may be ahead of that.
+  ...(live ? {} : { MEMDOT_CLI: CLI }),
   CLAUDE_PLUGIN_ROOT: PLUGIN,
   ...extra,
 });

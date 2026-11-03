@@ -1,0 +1,16 @@
+{
+  "stage": "S11",
+  "at": "2026-11-03T08:35:56.425Z",
+  "app": "https://app.84.46.247.92.sslip.io",
+  "api": "https://api.84.46.247.92.sslip.io",
+  "spaceId": "070dbd73-b7db-46d8-9683-f54cdda736fd",
+  "namespaces": {
+    "private": "9881db2e-386d-41a3-b3d0-7ca59b62f6ef",
+    "assisted": "b5312053-d4bd-463d-a577-ea7c5d2f4489"
+  },
+  "checkpoint": {
+    "cid": "bafk2bzacebzg4iaxlqytjkziymsnf55kke75l4hsigirlbyybh2ugoqdwekr2",
+    "txHash": "0xd0ff8e0db9d2345723465ae3797daa344d0d8444bed7ccd49699e3d86439d4ff",
+    "block": 303700
+  }
+}
