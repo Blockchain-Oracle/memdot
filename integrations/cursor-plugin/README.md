@@ -6,7 +6,11 @@ Generated from `integrations/agent-plugin-core`. Edit it there.
 
 ## Install
 
-Cursor installs plugins from its Customize page: import `https://github.com/Blockchain-Oracle/memdot` as a team marketplace, or copy this folder to `~/.cursor/plugins/local/memdot` and reload the window. To try it for one run:
+```bash
+agent plugin marketplace add https://github.com/Blockchain-Oracle/memdot
+```
+
+Then install MemDot from Cursor's Customize page. To try it for one run instead, from a clone:
 
 ```bash
 agent --plugin-dir integrations/cursor-plugin

@@ -630,8 +630,7 @@ for (const { host, start, prompt, session, promptInput, read, startsWithContext 
   });
   hook(box.env, "claude-code", "stop", {
     ...base,
-    last_assistant_message:
-      "Deployed through Coolify, with the staging environment first, because the production one has to stay up. That is how this should be done from now on, every time.",
+    last_assistant_message: `Deployed through Coolify, with the staging environment first, because the production one has to stay up. ${"That is how this should be done from now on, every time. ".repeat(6)}`,
   });
 
   const [dir] = sessionsOf(box.home);

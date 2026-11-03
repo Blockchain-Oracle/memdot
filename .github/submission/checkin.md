@@ -44,7 +44,7 @@ Working live on V3 today:
 ## Outstanding items
 
 - Walking real extensions and Touch ID on the live site. Wallet sign-in, MetaMask sign-in and wallet-paid stores have run in the dashboard on a local build against live V3 with test wallets; passkey and recovery-code flows have run end to end
-- Agent plugins, TypeScript framework adapters and automation nodes
+- TypeScript framework adapters and automation nodes
 - Docs site and landing page
 - The final domain, memdot.xyz, to replace the temporary address
 - Rebuilding spaces and objects from registry records (stored items and renewals already rebuild from chain events)

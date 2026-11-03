@@ -83,7 +83,9 @@ class MemDotProvider(MemoryProvider):
 
     def initialize(self, session_id: str, **kwargs: Any) -> None:
         self._session = session_id or self._session
-        self._cwd = kwargs.get("cwd") or self._cwd
+        # Hermes names the folder when a session has adopted one. Otherwise it's where it was launched,
+        # which isn't always the process's own folder.
+        self._cwd = kwargs.get("cwd") or os.environ.get("TERMINAL_CWD") or os.environ.get("PWD") or self._cwd
         self._hook("session-start", {"source": "startup"})
 
     def system_prompt_block(self) -> str:

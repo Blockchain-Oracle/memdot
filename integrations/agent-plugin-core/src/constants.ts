@@ -22,8 +22,8 @@ export const MAX_CONTEXT_CHARS = 10_000;
  */
 export const DEFAULT_CHECKPOINT_EXCHANGES = 10;
 export const CHECKPOINT_CHARS = 40_000;
-/** Too little to hold a fact: not worth a model call or a chain write. */
-export const MIN_PACKET_CHARS = 200;
+/** A quick question and its answer: not worth a model call or a chain write. */
+export const MIN_PACKET_CHARS = 400;
 
 export const MAX_COMMAND_CHARS = 2_000;
 export const MAX_RESULT_CHARS = 2_500;

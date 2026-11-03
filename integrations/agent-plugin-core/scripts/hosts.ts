@@ -366,7 +366,11 @@ export function cursor(): Files {
     }),
     "README.md": readme(
       "Cursor",
-      `Cursor installs plugins from its Customize page: import \`${REPOSITORY}\` as a team marketplace, or copy this folder to \`~/.cursor/plugins/local/memdot\` and reload the window. To try it for one run:
+      `\`\`\`bash
+agent plugin marketplace add ${REPOSITORY}
+\`\`\`
+
+Then install MemDot from Cursor's Customize page. To try it for one run instead, from a clone:
 
 \`\`\`bash
 agent --plugin-dir integrations/cursor-plugin

@@ -9,7 +9,7 @@ export const CHECKPOINT_INSTRUCTIONS = `This conversation is a coding session in
 - Problems that were hit, what caused them, and the fix.
 - The user's own preferences that apply in any repository: tools, languages, style, how they like to work. File these under user_preferences, in the third person.
 
-A finished change is one memory: what it does now, where it lives, and what must stay true. Use the assistant's final message for how things ended up. A subagent's report is supporting evidence, not a decision. A proposal counts only once it's accepted or done. Leave out test results, release notes, temporary state, and anything about this session itself. Write about the repository or the user, never about "the assistant" or "this conversation". If nothing qualifies, save nothing.`;
+A finished change is one memory: what it does now, where it lives, and what must stay true. Use the assistant's final message for how things ended up. A subagent's report is supporting evidence, not a decision. A proposal counts only once it's accepted or done. Notes recalled from earlier sessions may be repeated here, and repeating one doesn't make it new. Leave out test results, release notes, temporary state, and anything about this session itself. Write about the repository or the user, never about "the assistant" or "this conversation". If nothing qualifies, save nothing.`;
 
 export const CHECKPOINT_CATEGORIES = [
   { name: "project_knowledge", description: "What the project is and how its parts work" },

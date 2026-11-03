@@ -200,6 +200,8 @@ check("the key is readable only by you", (credentials.mode & 0o777) === 0o600);
 
 // ── Both modes ──────────────────────────────────────────────────────────────────────────────────
 
+const savedMemory: Partial<Record<"assisted" | "private", string>> = {};
+
 /** Saves with a real model in Assisted. In Private: the owner's model, then none, which keeps a note. */
 async function journey(mode: "assisted" | "private", namespace: string) {
   const env = { MEMDOT_NAMESPACE: namespace };
@@ -291,6 +293,7 @@ async function journey(mode: "assisted" | "private", namespace: string) {
     );
   });
   const saved = (JSON.parse(listed).data.results ?? JSON.parse(listed).data ?? []) as {
+    id: string;
     memory: string;
     agent_id?: string;
     run_id?: string;
@@ -303,6 +306,7 @@ async function journey(mode: "assisted" | "private", namespace: string) {
     mine.every((memory) => memory.agent_id?.startsWith("repo-acme-shop")),
     mine[0],
   );
+  savedMemory[mode] = mine[0]?.id;
   check(
     "saying where it came from",
     mine.every((memory) => memory.metadata?.source === "claude-code_plugin"),
@@ -456,7 +460,7 @@ await hook(
   {
     ...revokedSession,
     prompt:
-      "This work happens after the agent was revoked, but it still matters to the team, and it should not simply vanish from this machine.",
+      "This work happens after the agent was revoked, but it still matters to the team, and it should not simply vanish from this machine. We settled on keeping the queue in the worker, so that retries stay in one place.",
   },
   env,
 );
@@ -465,7 +469,7 @@ await hook(
   {
     ...revokedSession,
     last_assistant_message:
-      "It stays on this machine until the owner connects the agent again, rather than vanishing, because a revoked key says nothing about whether the work mattered.",
+      "It stays on this machine until the owner connects the agent again, rather than vanishing, because a revoked key says nothing about whether the work mattered. The queue now lives in the worker, and the API only enqueues.",
   },
   env,
 );
@@ -479,12 +483,40 @@ check("a save that can't go is kept, not lost", waiting.waiting_to_save > 0, wai
 check("and says why", Boolean(waiting.waiting_reason), waiting);
 
 if (live && failures === 0) {
-  const at = new Date().toISOString();
-  await writeFile(
-    join(ROOT, `docs/evidence/s11-plugin-${at.slice(0, 10)}.json`),
-    `${JSON.stringify({ stage: "S11", at, app: origin, api: baseUrl, spaceId, namespaces: { private: privateNamespace, assisted: assistedNamespace } }, null, 2)}\n`,
-  );
-  console.log("Evidence written to docs/evidence.");
+  // A checkpoint is searchable at once and reaches the chain a little later.
+  let cid: string | null = null;
+  const deadline = Date.now() + SAVE_WAIT_MS;
+  while (!cid && Date.now() < deadline) {
+    const memory = await owner.memories.get(savedMemory.assisted as string);
+    cid = memory.segment?.cid ?? null;
+    if (!cid) await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+  }
+  const proof = cid ? await owner.proof.cid(cid) : null;
+  check("the checkpoint reached the chain", Boolean(proof?.firstStore?.txHash), { cid });
+  if (failures === 0) {
+    const at = new Date().toISOString();
+    await writeFile(
+      join(ROOT, `docs/evidence/s11-plugin-${at.slice(0, 10)}.json`),
+      `${JSON.stringify(
+        {
+          stage: "S11",
+          at,
+          app: origin,
+          api: baseUrl,
+          spaceId,
+          namespaces: { private: privateNamespace, assisted: assistedNamespace },
+          checkpoint: {
+            cid,
+            txHash: proof?.firstStore?.txHash,
+            block: proof?.firstStore?.block,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    console.log("Evidence written to docs/evidence.");
+  }
 }
 
 await rm(home, { recursive: true, force: true });
