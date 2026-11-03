@@ -17,4 +17,6 @@ FACT
 MEMDOT_END
 ```
 
+If the text has a line reading MEMDOT_END, use a different end marker that it doesn't contain.
+
 It's saved under this repository and encrypted before it leaves this machine if the namespace is Private. Report the line it prints, and never claim a save that didn't print. It may say it's already remembered, which is fine.

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { ensureCli, nodeBinary, runCli } from "./cli.js";
-import { PLUGIN_VERSION } from "./constants.js";
+import { PLUGIN_VERSION, WORKER_DEADLINE_MS } from "./constants.js";
 import {
   forgetIds,
   forgetRepo,
@@ -23,6 +23,7 @@ import {
 } from "./lifecycle.js";
 import { logError, paths } from "./paths.js";
 import { cliEnvironment } from "./settings.js";
+import { isPaused } from "./store.js";
 
 /** Anything this slow in a hook is stuck, and a stuck hook must not hold the host up. */
 const HOOK_DEADLINE_MS = 30_000;
@@ -53,7 +54,12 @@ async function runHook(host: string, event: string): Promise<void> {
       // Nothing usable came in: it's handled as an event with no details.
     }
     const output = await adapter.handle(
-      { host, script: script(), deliversOnTool: adapter.deliversOnTool ?? false },
+      {
+        host,
+        script: script(),
+        deliversOnTool: adapter.deliversOnTool ?? false,
+        quietStart: adapter.quietStart ?? false,
+      },
       event,
       input,
     );
@@ -179,9 +185,11 @@ async function main(): Promise<void> {
       return;
     case "worker": {
       const [host, job, ...more] = rest;
+      setTimeout(() => process.exit(1), WORKER_DEADLINE_MS).unref();
       if (job === "maintain") await maintain(host as string);
-      if (job === "flush") {
+      if (job === "flush" && !(await isPaused())) {
         await prepareFlush(more[0] as string, more.includes("--force"));
+        await ensureCli();
         await deliverPending(host as string);
       }
       return;

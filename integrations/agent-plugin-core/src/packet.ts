@@ -27,6 +27,9 @@ export interface Packet {
   repoName: string;
   userId: string;
   sessionId: string;
+  /** Where this was written for. It goes there or nowhere: a default can change while it waits. */
+  namespaceId: string | null;
+  loginId: string | null;
   metadata: Record<string, string>;
   messages: ChatMessage[];
   /** For a namespace with no model: stored as written. */
@@ -149,7 +152,7 @@ export function noteOf(messages: ChatMessage[], repoName: string): string {
 export function buildPacket(
   taken: ReadEvent[],
   state: SessionState,
-  userId: string,
+  where: { userId: string; namespaceId: string | null; loginId: string | null },
 ): Packet | null {
   const events = taken.map((entry) => entry.event);
   const messages = messagesOf(events, state.repo.root);
@@ -166,7 +169,7 @@ export function buildPacket(
     host: state.host,
     repoId: state.repo.id,
     repoName: state.repo.name,
-    userId,
+    ...where,
     sessionId: state.sessionId,
     metadata: {
       source: `${state.host}_plugin`,

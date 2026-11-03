@@ -114,6 +114,11 @@ def register(root: click.Group) -> None:
         metavar="json",
         help="categories to file under, as a JSON array of {name, description}",
     )
+    @click.option(
+        "--idempotency-key",
+        metavar="key",
+        help="sent again with the same key, it isn't saved twice",
+    )
     @click.option("--wait-chain", is_flag=True, help="wait until it's finalized on Portaldot V3")
     @click.option("--no-wait", is_flag=True, help="return at once with an event to follow")
     @click.pass_context
@@ -146,6 +151,7 @@ def register(root: click.Group) -> None:
                 parse_json(options["categories"], "--categories") if options["categories"] else None
             ),
             wait=False if options["no_wait"] else ("chain" if options["wait_chain"] else "indexed"),
+            idempotency_key=options["idempotency_key"],
             **scope,
             **kwargs,
         )

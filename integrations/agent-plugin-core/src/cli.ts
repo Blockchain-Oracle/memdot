@@ -1,13 +1,14 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
-import { basename, delimiter, dirname, join } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, relative } from "node:path";
 import { promisify } from "node:util";
+import { CLI_RELEASE } from "./cli-release.js";
 import {
-  CLI_TARBALL_URL,
   CLI_TIMEOUT_MS,
   DOWNLOAD_TIMEOUT_MS,
-  MIN_CLI_VERSION,
+  MAX_CLI_DOWNLOAD_BYTES,
   PLUGIN_VERSION,
 } from "./constants.js";
 import { ensureDir, paths } from "./paths.js";
@@ -17,6 +18,7 @@ import { withLock } from "./store.js";
 const run = promisify(execFile);
 const INSTALL_LOCK = "install.lock";
 const MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
+const KILL_GRACE_MS = 2_000;
 
 /**
  * A real node. Some hosts run plugin code in their own runtime, where `process.execPath` is the
@@ -54,8 +56,15 @@ function packageVersion(packageDir: string): string | null {
 
 const usable = (packageDir: string) => {
   const version = packageVersion(packageDir);
-  return version !== null && versionAtLeast(version, MIN_CLI_VERSION);
+  return version !== null && versionAtLeast(version, CLI_RELEASE.version);
 };
+
+/** A `memdot` a repository put on the PATH isn't one to hand a key to. */
+function insideProject(dir: string): boolean {
+  if (!isAbsolute(dir)) return true;
+  const within = relative(process.cwd(), dir);
+  return !within.startsWith("..") && !isAbsolute(within);
+}
 
 /** The Node CLI on this machine: our own copy, or one you installed. `memdot` could be Python's. */
 export function findCli(): string | null {
@@ -65,7 +74,7 @@ export function findCli(): string | null {
   if (existsSync(own) && usable(paths().cli)) return own;
   for (const dir of (process.env.PATH ?? "").split(delimiter)) {
     const candidate = join(dir, "memdot");
-    if (!dir || !existsSync(candidate)) continue;
+    if (!dir || !existsSync(candidate) || insideProject(dir)) continue;
     try {
       const real = realpathSync(candidate);
       if (real.endsWith(".mjs") && usable(dirname(dirname(real)))) return real;
@@ -81,18 +90,31 @@ async function downloadCli(): Promise<void> {
   await ensureDir(cliTemp);
   const staging = await mkdtemp(join(cliTemp, "staging-"));
   try {
-    const url = process.env.MEMDOT_CLI_URL?.trim() || CLI_TARBALL_URL;
+    const url = process.env.MEMDOT_CLI_URL?.trim() || CLI_RELEASE.url;
+    // This is about to run with the API key in its environment, so it has to be exactly the
+    // release this plugin was built against. Pointing at your own build is a choice you can make.
+    const wanted = process.env.MEMDOT_CLI_URL?.trim()
+      ? process.env.MEMDOT_CLI_SHA256?.trim()
+      : CLI_RELEASE.sha256;
     const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
     if (!response.ok) throw new Error(`Couldn't download the CLI: ${response.status} from ${url}`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length > MAX_CLI_DOWNLOAD_BYTES) throw new Error(`The CLI at ${url} is too large.`);
+    const got = createHash("sha256").update(bytes).digest("hex");
+    if (wanted && got !== wanted) {
+      throw new Error(`The CLI at ${url} isn't the expected release, so it wasn't installed.`);
+    }
     const archive = join(cliTemp, `${basename(staging)}.tgz`);
-    await writeFile(archive, new Uint8Array(await response.arrayBuffer()), { mode: 0o600 });
+    await writeFile(archive, bytes, { mode: 0o600 });
     try {
       await run("tar", ["-xzf", archive, "-C", staging, "--strip-components=1"]);
     } finally {
       await rm(archive, { force: true });
     }
     if (!existsSync(join(staging, "dist", "index.mjs")) || !usable(staging)) {
-      throw new Error(`The CLI at ${url} is older than this plugin needs (${MIN_CLI_VERSION}).`);
+      throw new Error(
+        `The CLI at ${url} is older than this plugin needs (${CLI_RELEASE.version}).`,
+      );
     }
     const old = `${cli}.old-${process.pid}`;
     if (existsSync(cli)) await rename(cli, old);
@@ -144,15 +166,30 @@ export async function runCli(
     };
   }
   return new Promise((resolve) => {
+    // A grandchild can hold the pipe open past the kill, and some hosts run this inside their own
+    // long process with nothing else to stop it, so this doesn't wait for the streams to close.
+    const giveUp = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve({
+        exit: 1,
+        ok: false,
+        data: null,
+        error: { code: "TIMEOUT", message: "The CLI took too long." },
+        timedOut: true,
+      });
+    }, timeoutMs + KILL_GRACE_MS);
+    giveUp.unref();
     const child = execFile(
       nodeBinary(),
       [cli, "--agent", ...args],
       {
         env: cliEnvironment(host, PLUGIN_VERSION),
         timeout: timeoutMs,
+        killSignal: "SIGKILL",
         maxBuffer: MAX_OUTPUT_BYTES,
       },
       (failure, stdout) => {
+        clearTimeout(giveUp);
         const timedOut = Boolean(failure && (failure as { killed?: boolean }).killed);
         const exit = failure ? Number((failure as { code?: unknown }).code) || 1 : 0;
         let envelope: { status?: string; data?: unknown; error?: CliResult["error"] } = {};

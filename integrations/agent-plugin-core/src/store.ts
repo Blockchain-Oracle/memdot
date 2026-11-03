@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
-import { appendFile, mkdir, open, readFile, rm, stat } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { appendFile, mkdir, open, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { STALE_LOCK_MS } from "./constants.js";
+import { LOCK_HEARTBEAT_MS, STALE_LOCK_MS } from "./constants.js";
 import { DIR_MODE, ensureDir, FILE_MODE, paths, writePrivate } from "./paths.js";
 import { identifyRepo, type RepoIdentity } from "./repo.js";
 
@@ -39,9 +39,9 @@ export interface SessionState {
   repo: RepoIdentity;
   createdAt: string;
   updatedAt: string;
-  /** Bytes of the event log already turned into a packet. */
-  offset: number;
   prompts: number;
+  /** Recall has run for this session, so it won't again. A failed search doesn't count. */
+  recallDone: boolean;
   recalled: { ids: string[]; block: string } | null;
   /** Found memories this host can only take later, with a tool result. */
   undelivered: string | null;
@@ -56,6 +56,20 @@ export const sessionDir = (host: string, sessionId: string) =>
 
 const stateFile = (dir: string) => join(dir, "state.json");
 const eventsFile = (dir: string) => join(dir, "events.jsonl");
+const offsetFile = (dir: string) => join(dir, "offset");
+
+/**
+ * Bytes of the event log already turned into a packet. It has its own file, written only while
+ * holding the flush lock: state is rewritten by every hook, which could put an old value back.
+ */
+export const readOffset = (dir: string) =>
+  readFile(offsetFile(dir), "utf8").then(
+    (raw) => Number(raw) || 0,
+    () => 0,
+  );
+
+export const writeOffset = (dir: string, offset: number) =>
+  writePrivate(offsetFile(dir), String(offset));
 
 export async function readState(dir: string): Promise<SessionState | null> {
   try {
@@ -88,8 +102,8 @@ export async function openSession(
     repo: await identifyRepo(cwd),
     createdAt: now,
     updatedAt: now,
-    offset: 0,
     prompts: 0,
+    recallDone: false,
     recalled: null,
     undelivered: null,
     connectNoticeGiven: false,
@@ -147,17 +161,37 @@ export const logSize = (dir: string) =>
     () => 0,
   );
 
-/** Runs `work` if nobody else is, by making a folder: that's atomic everywhere. */
+/** When a session last did anything. A long turn only appends, so the log says more than state. */
+export const lastActive = async (dir: string): Promise<number> => {
+  const times = await Promise.all(
+    [eventsFile(dir), stateFile(dir), dir].map((path) =>
+      stat(path).then(
+        (found) => found.mtimeMs,
+        () => 0,
+      ),
+    ),
+  );
+  return Math.max(...times);
+};
+
+/**
+ * Runs `work` if nobody else is, by making a folder: that's atomic everywhere. The holder keeps it
+ * fresh while it works, so only a crashed holder's lock ever looks stale, and it only ever removes
+ * its own.
+ */
 export async function withLock<T>(
   path: string,
   work: () => Promise<T>,
   { waitMs = 0 }: { waitMs?: number } = {},
 ): Promise<T | undefined> {
   const deadline = Date.now() + waitMs;
+  const owner = randomUUID();
+  const ownerFile = join(path, "owner");
   for (;;) {
     try {
       await ensureDir(join(path, ".."));
       await mkdir(path, { mode: DIR_MODE });
+      await writeFile(ownerFile, owner);
       break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
@@ -165,7 +199,6 @@ export async function withLock<T>(
         (found) => Date.now() - found.mtimeMs,
         () => 0,
       );
-      // Whoever held this crashed.
       if (held > STALE_LOCK_MS) {
         await rm(path, { recursive: true, force: true });
         continue;
@@ -174,10 +207,17 @@ export async function withLock<T>(
       await new Promise((resolve) => setTimeout(resolve, LOCK_WAIT_MS));
     }
   }
+  const heartbeat = setInterval(() => {
+    const now = new Date();
+    utimes(path, now, now).catch(() => undefined);
+  }, LOCK_HEARTBEAT_MS);
+  heartbeat.unref();
   try {
     return await work();
   } finally {
-    await rm(path, { recursive: true, force: true });
+    clearInterval(heartbeat);
+    const holder = await readFile(ownerFile, "utf8").catch(() => null);
+    if (holder === owner) await rm(path, { recursive: true, force: true });
   }
 }
 

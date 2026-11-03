@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { appendFile, chmod, mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { MAX_ERROR_LOG_BYTES } from "./constants.js";
+import { redact } from "./redact.js";
 
 export const DIR_MODE = 0o700;
 export const FILE_MODE = 0o600;
@@ -26,6 +28,7 @@ export const paths = () => {
     pending: join(plugin, "pending"),
     failed: join(plugin, "failed"),
     paused: join(plugin, "paused"),
+    options: join(plugin, "options.json"),
     errors: join(plugin, "errors.log"),
     connection: join(plugin, "connection.json"),
     maintained: join(plugin, "maintained"),
@@ -40,7 +43,8 @@ export async function ensureDir(path: string): Promise<void> {
 /** Replaces a file in one step, readable only by you. */
 export async function writePrivate(path: string, content: string): Promise<void> {
   await ensureDir(dirname(path));
-  const temporary = join(dirname(path), `.${basename(path)}.${process.pid}.tmp`);
+  // Some hosts run this inside one long process, so a process id wouldn't make the name unique.
+  const temporary = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`);
   try {
     await writeFile(temporary, content, { mode: FILE_MODE });
     await chmod(temporary, FILE_MODE);
@@ -54,7 +58,7 @@ export async function writePrivate(path: string, content: string): Promise<void>
 /** Hooks must never get in the host's way, so what goes wrong is kept here for `status`. */
 export async function logError(where: string, error: unknown): Promise<void> {
   const { errors } = paths();
-  const message = error instanceof Error ? error.message : String(error);
+  const message = redact(error instanceof Error ? error.message : String(error));
   try {
     await ensureDir(dirname(errors));
     const size = await stat(errors).then(

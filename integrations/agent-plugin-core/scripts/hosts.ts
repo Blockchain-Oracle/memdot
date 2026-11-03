@@ -109,7 +109,7 @@ const CLAUDE_ROOT = hostVar("CLAUDE_PLUGIN_ROOT");
 const claudeCommand = (root: string, host: string, event: string) =>
   `node "${root}/core/memdot-plugin.mjs" hook ${host} ${event}`;
 
-function claudeStyleHooks(root: string, host: string, isClaude: boolean) {
+function claudeStyleHooks(root: string, host: string) {
   const command = (event: string, timeout: number, extra: Record<string, unknown> = {}) => ({
     type: "command",
     command: claudeCommand(root, host, event),
@@ -117,18 +117,14 @@ function claudeStyleHooks(root: string, host: string, isClaude: boolean) {
     ...extra,
   });
   const background = { async: true };
-  const sidekickOnly = isClaude ? { matcher: "^memdot:sidekick$" } : {};
+  const sidekickOnly = { matcher: "^memdot:sidekick$" };
   return {
     SessionStart: [
       { matcher: "startup|resume|clear|compact", hooks: [command("session-start", 5)] },
     ],
     UserPromptSubmit: [{ hooks: [command("prompt", 15)] }],
     PostToolUse: [{ matcher: ".*", hooks: [command("tool", 5, background)] }],
-    ...(isClaude
-      ? {
-          PostToolUseFailure: [{ matcher: ".*", hooks: [command("tool-failure", 5, background)] }],
-        }
-      : {}),
+    PostToolUseFailure: [{ matcher: ".*", hooks: [command("tool-failure", 5, background)] }],
     SubagentStart: [{ ...sidekickOnly, hooks: [command("subagent-start", 5)] }],
     SubagentStop: [{ ...sidekickOnly, hooks: [command("subagent-stop", 5)] }],
     Stop: [{ hooks: [command("stop", 5)] }],
@@ -224,7 +220,7 @@ export function claudeCode(): Files {
     "hooks/hooks.json": pretty({
       description:
         "Recall memories at the start of work, record what happened, and save checkpoints in the background.",
-      hooks: claudeStyleHooks(CLAUDE_ROOT, "claude-code", true),
+      hooks: claudeStyleHooks(CLAUDE_ROOT, "claude-code"),
     }),
     "agents/sidekick.md": sidekick({
       model: "sonnet",
@@ -268,7 +264,6 @@ export function codex(): Files {
       author: AUTHOR,
       extensions: {
         "com.openai": {
-          hooks: "./hooks/hooks.json",
           interface: {
             displayName: DISPLAY_NAME,
             shortDescription: "Encrypted long-term memory on Portaldot V3",
@@ -289,10 +284,6 @@ export function codex(): Files {
           args: [`${root}/core/memdot-plugin.mjs`, "mcp", "codex"],
         },
       },
-    }),
-    "hooks/hooks.json": pretty({
-      description: "Recall memories, record what happened, and save checkpoints in the background.",
-      hooks: claudeStyleHooks(root, "codex", false),
     }),
     ...renderSkills({
       hostName: "Codex",
@@ -558,10 +549,10 @@ const TOOL_NOTE =
   "Tools: `memdot_search`, `memdot_remember`, `memdot_list`, `memdot_get`, `memdot_forget`, `memdot_status`.";
 const LIFECYCLE_NOTE =
   "The first prompt of a session searches this repository's memories and adds what it finds. Tool calls are noted locally, with secrets removed. Every 10 turns, at compaction and at the end of a session, the conversation is saved in the background.";
-const SKILLS_FOR = (hostName: string) => ({
+const SKILLS_FOR = (hostName: string, keepFields: string[] = []) => ({
   hostName,
   prefix: "memdot-",
-  keepFields: [],
+  keepFields,
   argumentsLine: "",
 });
 
@@ -591,7 +582,7 @@ export function pi(): Files {
       keywords: [...KEYWORDS, "pi-package"],
       pi: { extensions: ["./core/pi.mjs"], skills: ["./skills"] },
     }),
-    ...renderSkills(SKILLS_FOR("Pi")),
+    ...renderSkills(SKILLS_FOR("Pi", ["disable-model-invocation"])),
     "README.md": readme(
       "Pi",
       `From a clone of the repository:
@@ -630,7 +621,7 @@ export function openclaw(): Files {
       activation: { onStartup: true },
       configSchema: { type: "object", additionalProperties: false, properties: {} },
     }),
-    ...renderSkills(SKILLS_FOR("OpenClaw")),
+    ...renderSkills(SKILLS_FOR("OpenClaw", ["disable-model-invocation"])),
     "README.md": readme(
       "OpenClaw",
       `From a clone of the repository:

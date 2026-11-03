@@ -17,7 +17,7 @@ const READ_TOOLS = new Set(["Read", "view_file", "read"]);
 const LOOKUP_FIELDS = ["pattern", "path", "query", "url"];
 const CHANGED_FIELDS = ["content", "new_string", "new_source", "edits", "patch", "newString"];
 const PATH_FIELDS = ["file_path", "notebook_path", "filePath", "path", "TargetFile", "target_file"];
-const RESULT_FIELDS = ["stdout", "stderr", "output", "content", "error"];
+const RESULT_FIELDS = ["stderr", "stdout", "output", "content", "error"];
 
 const TEST_COMMAND =
   /(?:^|\s)(?:pytest|py\.test|jest|vitest|go\s+test|cargo\s+test|npm\s+(?:run\s+)?test|pnpm\s+(?:run\s+)?test|yarn\s+test|mvn\s+test|gradle\s+test|make\s+test|forge\s+test)(?:\s|$)/i;
@@ -38,12 +38,18 @@ const asRecord = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
-/** Only the useful parts of a result: a tool can return a whole file. */
-function previewOf(response: unknown): string {
-  if (typeof response === "string") return bounded(response, MAX_RESULT_CHARS);
+/** The text of a result, without its wrapping: a tool can return a whole file. */
+function resultText(response: unknown): string {
+  if (typeof response === "string") return response;
+  if (Array.isArray(response)) {
+    return response.map(resultText).filter(Boolean).join("\n");
+  }
   const record = asRecord(response);
-  const kept = RESULT_FIELDS.filter((field) => record[field]).map((field) => record[field]);
-  return bounded(kept.length ? kept : response, MAX_RESULT_CHARS);
+  const kept = RESULT_FIELDS.filter((field) => record[field]).map((field) =>
+    resultText(record[field]),
+  );
+  if (kept.length) return kept.join("\n");
+  return typeof record.text === "string" ? record.text : "";
 }
 
 /**
@@ -83,7 +89,9 @@ export function evidenceFrom({
       : BUILD_COMMAND.test(command)
         ? "build"
         : "shell";
-    evidence.preview = previewOf(failed && error ? error : response);
+    // What a command printed is only worth keeping when it failed. Otherwise it could be anything,
+    // including the file someone just read.
+    if (failed) evidence.preview = bounded(resultText(error ?? response), MAX_RESULT_CHARS);
   } else {
     const detail = Object.fromEntries(
       LOOKUP_FIELDS.filter((field) => args[field]).map((field) => [

@@ -96,6 +96,7 @@ export function memoryCommands(program: Command): void {
       "--categories <json>",
       "categories to file under, as a JSON array of {name, description}",
     )
+    .option("--idempotency-key <key>", "sent again with the same key, it isn't saved twice")
     .option("--wait-chain", "wait until it's finalized on Portaldot V3")
     .option("--no-wait", "return at once with an event to follow")
     .action(async (text: string | undefined, options, command: Command) => {
@@ -122,6 +123,7 @@ export function memoryCommands(program: Command): void {
         ...(options.categories
           ? { categories: parseJson(options.categories, "--categories") }
           : {}),
+        ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
         wait: options.wait === false ? false : options.waitChain ? "chain" : "indexed",
       });
       emit({

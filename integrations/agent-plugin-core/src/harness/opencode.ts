@@ -9,7 +9,9 @@ function zodFor(parameter: ToolParameter): z.ZodType {
     ? z.enum(parameter.enum as [string, ...string[]])
     : parameter.type === "integer"
       ? z.number().int()
-      : z.string();
+      : parameter.type === "boolean"
+        ? z.boolean()
+        : z.string();
   const described = base.describe(parameter.description);
   return parameter.required ? described : described.optional();
 }
@@ -68,35 +70,38 @@ export const MemDotPlugin = async ({ directory, worktree, client }: OpenCodeInpu
       ]),
     ),
 
-    config: async (config: {
-      mcp?: Record<string, unknown>;
-      command?: Record<string, unknown>;
-    }) => {
-      config.mcp = {
-        memdot: { type: "local", command: ["node", runtime.script, "mcp", HOST], enabled: true },
-        ...config.mcp,
-      };
-      const commands = Object.fromEntries(
-        readSkills(runtime.skillsDir).map((skill) => [
-          skill.name,
-          { description: skill.description, template: skill.body },
-        ]),
-      );
-      config.command = { ...commands, ...config.command };
-    },
+    config: runtime.guard(
+      "config",
+      async (config: { mcp?: Record<string, unknown>; command?: Record<string, unknown> }) => {
+        config.mcp = {
+          memdot: { type: "local", command: ["node", runtime.script, "mcp", HOST], enabled: true },
+          ...config.mcp,
+        };
+        const commands = Object.fromEntries(
+          readSkills(runtime.skillsDir).map((skill) => [
+            skill.name,
+            { description: skill.description, template: skill.body },
+          ]),
+        );
+        config.command = { ...commands, ...config.command };
+      },
+    ),
 
-    "chat.message": async (
-      input: { sessionID: string },
-      output: { parts: { type?: string; text?: string }[] },
-    ) => {
-      await begin(input.sessionID);
-      const prompt = output.parts
-        .filter((part) => part.type === "text")
-        .map((part) => part.text ?? "")
-        .join("\n");
-      const { context } = await runtime.prompt({ sessionId: input.sessionID, cwd, prompt });
-      if (context) recalled.set(input.sessionID, context);
-    },
+    "chat.message": runtime.guard(
+      "message",
+      async (
+        input: { sessionID: string },
+        output: { parts: { type?: string; text?: string }[] },
+      ) => {
+        await begin(input.sessionID);
+        const prompt = output.parts
+          .filter((part) => part.type === "text")
+          .map((part) => part.text ?? "")
+          .join("\n");
+        const { context } = await runtime.prompt({ sessionId: input.sessionID, cwd, prompt });
+        if (context) recalled.set(input.sessionID, context);
+      },
+    ),
 
     "experimental.chat.system.transform": async (
       input: { sessionID?: string },
@@ -106,33 +111,39 @@ export const MemDotPlugin = async ({ directory, worktree, client }: OpenCodeInpu
       if (context) output.system.push(context);
     },
 
-    "tool.execute.after": async (
-      input: { tool: string; sessionID: string; args?: unknown },
-      output: { output?: unknown; metadata?: unknown },
-    ) => {
-      await runtime.tool({
-        sessionId: input.sessionID,
-        cwd,
-        tool: input.tool,
-        input: input.args,
-        response: output.output,
-        failed: null,
-      });
-    },
+    "tool.execute.after": runtime.guard(
+      "tool",
+      async (
+        input: { tool: string; sessionID: string; args?: unknown },
+        output: { output?: unknown; metadata?: unknown },
+      ) => {
+        await runtime.tool({
+          sessionId: input.sessionID,
+          cwd,
+          tool: input.tool,
+          input: input.args,
+          response: output.output,
+          failed: null,
+        });
+      },
+    ),
 
     "experimental.session.compacting": async (input: { sessionID: string }) => {
       await runtime.flush({ sessionId: input.sessionID, cwd });
     },
 
-    event: async ({ event }: { event: { type: string; properties?: Record<string, unknown> } }) => {
-      const info = event.properties?.info as { id?: string } | undefined;
-      const sessionId = (event.properties?.sessionID as string | undefined) ?? info?.id;
-      if (!sessionId) return;
-      if (event.type === "session.created") await begin(sessionId);
-      if (event.type === "session.idle") {
-        await runtime.stop({ sessionId, cwd, message: await lastAnswer(sessionId) });
-      }
-      if (event.type === "session.deleted") await runtime.flush({ sessionId, cwd });
-    },
+    event: runtime.guard(
+      "event",
+      async ({ event }: { event: { type: string; properties?: Record<string, unknown> } }) => {
+        const info = event.properties?.info as { id?: string } | undefined;
+        const sessionId = (event.properties?.sessionID as string | undefined) ?? info?.id;
+        if (!sessionId) return;
+        if (event.type === "session.created") await begin(sessionId);
+        if (event.type === "session.idle") {
+          await runtime.stop({ sessionId, cwd, message: await lastAnswer(sessionId) });
+        }
+        if (event.type === "session.deleted") await runtime.flush({ sessionId, cwd });
+      },
+    ),
   };
 };

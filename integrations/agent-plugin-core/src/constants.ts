@@ -1,9 +1,5 @@
-import { DEFAULT_APP_URL } from "@memdot/config";
-
 export const PLUGIN_VERSION = "0.1.0";
-/** The CLI this plugin expects: it has to take --categories and carry no dependencies. */
-export const MIN_CLI_VERSION = "0.1.1";
-export const CLI_TARBALL_URL = `${DEFAULT_APP_URL}/cli/memdot-cli.tgz`;
+export const MAX_CLI_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 
 /** A first prompt shorter than this has nothing to search on. */
 export const MIN_QUERY_CHARS = 20;
@@ -46,18 +42,26 @@ export const DAY_MS = 24 * HOUR_MS;
 export const MAINTAIN_EVERY_MS = 10 * MINUTE_MS;
 /** A session untouched this long has crashed or been left: what it holds gets saved. */
 export const ABANDONED_AFTER_MS = 30 * MINUTE_MS;
-export const STALE_LOCK_MS = 10 * MINUTE_MS;
+export const STALE_LOCK_MS = 5 * MINUTE_MS;
 /** Failures that aren't this packet's fault wait, instead of using up its attempts. */
 export const RETRY_NETWORK_MS = 10 * MINUTE_MS;
 export const RETRY_AUTH_MS = HOUR_MS;
 export const RETRY_LIMITED_MS = 6 * HOUR_MS;
 export const RETRY_FAILED_MS = 30 * MINUTE_MS;
+export const RETRY_OTHER_LOGIN_MS = HOUR_MS;
 export const MAX_PACKET_ATTEMPTS = 5;
 export const PACKET_TTL_MS = 7 * DAY_MS;
-export const SESSION_TTL_MS = 14 * DAY_MS;
+/** What a saved session leaves on this machine is removed this long after it goes quiet. */
+export const SESSION_TTL_MS = DAY_MS;
+export const FAILED_TTL_MS = 14 * DAY_MS;
+/** Nothing in the background should outlast this, however it got stuck. */
+export const WORKER_DEADLINE_MS = 30 * MINUTE_MS;
+export const LOCK_HEARTBEAT_MS = MINUTE_MS;
 export const MAX_ERROR_LOG_BYTES = 256 * 1024;
 
 /** Exit codes from the CLI. */
+export const EXIT_USAGE = 2;
 export const EXIT_AUTH = 3;
+export const EXIT_NOT_FOUND = 4;
 export const EXIT_LIMITED = 6;
 export const EXIT_NETWORK = 7;

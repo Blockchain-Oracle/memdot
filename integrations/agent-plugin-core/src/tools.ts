@@ -2,7 +2,7 @@ import { forgetIds, getText, listText, rememberText, searchText, statusReport } 
 import { SEARCH_SCOPES } from "./settings.js";
 
 export interface ToolParameter {
-  type: "string" | "integer" | "array";
+  type: "string" | "integer" | "boolean";
   description: string;
   required?: boolean;
   enum?: readonly string[];
@@ -71,8 +71,19 @@ export const TOOLS: ToolSpec[] = [
     name: "memdot_forget",
     description:
       "Permanently forget one memory. This can't be undone, so only use it after the user has clearly said to.",
-    parameters: { id: { type: "string", description: "The memory's id.", required: true } },
-    run: (host, args) => forgetIds(host, [args.id as string]),
+    parameters: {
+      id: { type: "string", description: "The memory's id.", required: true },
+      confirm: {
+        type: "boolean",
+        description: "Set to true only after the person has said yes: this can't be undone.",
+        required: true,
+      },
+    },
+    run: async (host, args) => {
+      if (args.confirm !== true)
+        throw new Error("Confirm with the person first, then set confirm.");
+      return forgetIds(host, [args.id as string]);
+    },
   },
   {
     name: "memdot_status",

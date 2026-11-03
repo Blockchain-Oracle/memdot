@@ -1,6 +1,7 @@
 ---
 name: memdot-resume
 description: Turn MemDot's saving and recall back on after a pause.
+disable-model-invocation: true
 ---
 
 # Resume MemDot

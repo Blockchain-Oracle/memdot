@@ -8,20 +8,30 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
 
 try:
-    from agent.memory_provider import MemoryProvider
+    from agent.memory_provider import MemoryProvider, spawn_context_thread
 except ImportError:  # Outside Hermes, so the file can still be imported and checked.
+    import threading
+
     MemoryProvider = object  # type: ignore[assignment,misc]
+
+    def spawn_context_thread(target: Any, name: str = "") -> Any:
+        thread = threading.Thread(target=target, name=name, daemon=True)
+        thread.start()
+        return thread
 
 _CORE = Path(__file__).parent / "core" / "memdot-plugin.mjs"
 _HOST = "hermes"
 _HOOK_TIMEOUT_SECONDS = 15
 _TOOL_TIMEOUT_SECONDS = 60
+# Only an id: from a model, anything starting with a dash could become a flag on the way down.
+_MEMORY_ID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
 _SCOPE = {
     "type": "string",
@@ -57,8 +67,14 @@ _TOOLS = [
         "description": "Permanently forget one memory. This can't be undone, so only use it after the user has clearly said to.",
         "parameters": {
             "type": "object",
-            "properties": {"id": {"type": "string", "description": "The memory's id."}},
-            "required": ["id"],
+            "properties": {
+                "id": {"type": "string", "description": "The memory's id."},
+                "confirm": {
+                    "type": "boolean",
+                    "description": "Set to true only after the person has said yes: this can't be undone.",
+                },
+            },
+            "required": ["id", "confirm"],
         },
     },
     {
@@ -95,7 +111,11 @@ class MemDotProvider(MemoryProvider):
         return self._hook("prompt", {"prompt": query})
 
     def sync_turn(self, user: str, assistant: str, *, session_id: str = "", messages: Any = None) -> None:
-        self._hook("stop", {"last_assistant_message": assistant})
+        # Hermes asks that this never holds up the agent.
+        fields = {"last_assistant_message": assistant}
+        if session_id:
+            fields["session_id"] = session_id
+        spawn_context_thread(lambda: self._hook("stop", fields), name="memdot-sync")
 
     def on_pre_compress(self, messages: Any) -> str:
         self._hook("compact", {})
@@ -119,6 +139,10 @@ class MemDotProvider(MemoryProvider):
             if tool_name == "memdot_remember":
                 return self._run(["remember"], str(args["text"]))
             if tool_name == "memdot_forget":
+                if args.get("confirm") is not True:
+                    return json.dumps({"error": "Confirm with the person first, then set confirm."})
+                if not _MEMORY_ID.match(str(args.get("id", ""))):
+                    return json.dumps({"error": "That isn't a memory id, so nothing was forgotten."})
                 return self._run(["forget", str(args["id"]), "--yes"])
             if tool_name == "memdot_status":
                 return self._run(["status", "--json"])

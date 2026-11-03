@@ -31,9 +31,13 @@ async function safely<T>(where: string, work: () => Promise<T>, fallback: T): Pr
  * The same lifecycle the hook hosts run, for hosts that load a plugin in-process. The bundle sits
  * next to the launcher, so background work can start from it.
  */
-export function createRuntime(host: string, moduleUrl: string) {
+export function createRuntime(
+  host: string,
+  moduleUrl: string,
+  options: { quietStart?: boolean } = {},
+) {
   const core = dirname(fileURLToPath(moduleUrl));
-  const context: PluginContext = { host, script: join(core, "memdot-plugin.mjs") };
+  const context: PluginContext = { host, script: join(core, "memdot-plugin.mjs"), ...options };
   const none: HookOutput = {};
   return {
     host,
@@ -53,6 +57,11 @@ export function createRuntime(host: string, moduleUrl: string) {
     flush: (input: SessionInput & { message?: string }) =>
       safely(`${host} flush`, () => onFlush(context, input), undefined),
     installLauncher: () => installLauncher(context.script),
+    /** One of the host's own callbacks: whatever goes wrong in it stays in it. */
+    guard<A extends unknown[], R>(where: string, handler: (...args: A) => Promise<R>) {
+      return (...args: A): Promise<R | undefined> =>
+        safely(`${host} ${where}`, () => handler(...args), undefined);
+    },
   };
 }
 

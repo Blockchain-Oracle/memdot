@@ -98,14 +98,15 @@ async function waitForSaves(label: string): Promise<boolean> {
     const sessions = await readdir(join(pluginState, "sessions")).catch(() => [] as string[]);
     let flushed = true;
     for (const session of sessions) {
-      const state = JSON.parse(
-        await readFile(join(pluginState, "sessions", session, "state.json"), "utf8"),
+      const offset = await readFile(join(pluginState, "sessions", session, "offset"), "utf8").then(
+        Number,
+        () => 0,
       );
       const size = await stat(join(pluginState, "sessions", session, "events.jsonl")).then(
         (s) => s.size,
         () => 0,
       );
-      if (size > state.offset) flushed = false;
+      if (size > offset) flushed = false;
     }
     if (sent && idle && flushed) return true;
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
@@ -312,6 +313,29 @@ async function journey(mode: "assisted" | "private", namespace: string) {
     mine.every((memory) => memory.metadata?.source === "claude-code_plugin"),
     mine[0],
   );
+
+  if (mode === "assisted") {
+    const key = `journey-${stamp}`;
+    const sendTwice = () =>
+      new Promise<{ data?: { event_id?: string } }>((resolve) => {
+        const child = execFile(
+          "node",
+          [CLI, "--agent", "add", "--no-infer", "--idempotency-key", key, "-u", "journey"],
+          { env: environment(env) },
+          (_error, stdout) => resolve(JSON.parse(stdout)),
+        );
+        child.stdin?.end(
+          `Sent twice on purpose, as a client that never heard back would ${stamp}.`,
+        );
+      });
+    const first = await sendTwice();
+    const again = await sendTwice();
+    check(
+      "a save sent twice is one save",
+      Boolean(first.data?.event_id) && first.data?.event_id === again.data?.event_id,
+      { first, again },
+    );
+  }
 
   heading(`The next session, in ${mode}`);
   const next = { session_id: `next-${mode}-${stamp}`, cwd: repo };

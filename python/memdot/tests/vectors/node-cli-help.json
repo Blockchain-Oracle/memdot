@@ -132,6 +132,10 @@
           "description": "categories to file under, as a JSON array of {name, description}"
         },
         {
+          "flags": "--idempotency-key <key>",
+          "description": "sent again with the same key, it isn't saved twice"
+        },
+        {
           "flags": "--wait-chain",
           "description": "wait until it's finalized on Portaldot V3"
         },

@@ -41,43 +41,57 @@ export default function memdot(pi: PiApi): void {
     });
   }
 
-  pi.on("session_start", async (event: { reason?: string }, ctx) => {
-    const { context } = await runtime.start({
-      ...session(ctx),
-      source: event.reason === "resume" ? "resume" : "startup",
-    });
-    recalled = context;
-  });
+  pi.on(
+    "session_start",
+    runtime.guard("start", async (event: { reason?: string }, ctx: PiContext) => {
+      const { context } = await runtime.start({
+        ...session(ctx),
+        source: event.reason === "resume" ? "resume" : "startup",
+      });
+      recalled = context;
+    }),
+  );
 
-  pi.on("before_agent_start", async (event: { prompt?: string; systemPrompt: string }, ctx) => {
-    const { context } = await runtime.prompt({ ...session(ctx), prompt: event.prompt ?? "" });
-    if (context) recalled = context;
-    return recalled ? { systemPrompt: `${event.systemPrompt}\n\n${recalled}` } : undefined;
-  });
+  pi.on(
+    "before_agent_start",
+    runtime.guard(
+      "prompt",
+      async (event: { prompt?: string; systemPrompt: string }, ctx: PiContext) => {
+        const { context } = await runtime.prompt({ ...session(ctx), prompt: event.prompt ?? "" });
+        if (context) recalled = context;
+        return recalled ? { systemPrompt: `${event.systemPrompt}\n\n${recalled}` } : undefined;
+      },
+    ),
+  );
 
   pi.on(
     "tool_result",
-    async (
-      event: { toolName: string; input: unknown; content?: unknown; isError?: boolean },
-      ctx,
-    ) => {
-      await runtime.tool({
-        ...session(ctx),
-        tool: event.toolName,
-        input: event.input,
-        response: event.content,
-        failed: event.isError ?? null,
-      });
-    },
+    runtime.guard(
+      "tool",
+      async (
+        event: { toolName: string; input: unknown; content?: unknown; isError?: boolean },
+        ctx: PiContext,
+      ) => {
+        await runtime.tool({
+          ...session(ctx),
+          tool: event.toolName,
+          input: event.input,
+          response: event.content,
+          failed: event.isError ?? null,
+        });
+      },
+    ),
   );
 
-  pi.on("agent_end", async (event: { messages?: unknown[] }, ctx) => {
-    await runtime.stop({ ...session(ctx), message: lastAssistantText(event.messages ?? []) });
-  });
-  pi.on("session_before_compact", async (_event, ctx) => {
+  pi.on(
+    "agent_end",
+    runtime.guard("end", async (event: { messages?: unknown[] }, ctx: PiContext) => {
+      await runtime.stop({ ...session(ctx), message: lastAssistantText(event.messages ?? []) });
+    }),
+  );
+  const flush = runtime.guard("flush", async (_event: unknown, ctx: PiContext) => {
     await runtime.flush(session(ctx));
   });
-  pi.on("session_shutdown", async (_event, ctx) => {
-    await runtime.flush(session(ctx));
-  });
+  pi.on("session_before_compact", flush);
+  pi.on("session_shutdown", flush);
 }

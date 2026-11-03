@@ -1,15 +1,19 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { copyFile, readdir, readFile, rename, rm, stat, utimes } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { ensureCli, nodeBinary, runCli } from "./cli.js";
 import {
   ABANDONED_AFTER_MS,
   EXIT_AUTH,
   EXIT_LIMITED,
   EXIT_NETWORK,
+  EXIT_NOT_FOUND,
+  EXIT_USAGE,
+  FAILED_TTL_MS,
   FLUSH_TIMEOUT_MS,
   MAINTAIN_EVERY_MS,
+  MAX_FIELD_CHARS,
   MAX_MESSAGE_CHARS,
   MAX_PACKET_ATTEMPTS,
   MAX_QUERY_CHARS,
@@ -21,6 +25,7 @@ import {
   RETRY_FAILED_MS,
   RETRY_LIMITED_MS,
   RETRY_NETWORK_MS,
+  RETRY_OTHER_LOGIN_MS,
   SESSION_TTL_MS,
   WARM_TIMEOUT_MS,
 } from "./constants.js";
@@ -36,16 +41,20 @@ import {
 } from "./prompts.js";
 import { bounded } from "./redact.js";
 import type { RepoIdentity } from "./repo.js";
-import { connected, type SearchScope, settings } from "./settings.js";
+import { connected, keepHostOptions, type SearchScope, settings, writeTarget } from "./settings.js";
 import {
   appendEvent,
   isPaused,
+  lastActive,
   logSize,
   openSession,
   readEvents,
+  readOffset,
   readState,
+  type SessionState,
   sessionDir,
   withLock,
+  writeOffset,
   writeState,
 } from "./store.js";
 
@@ -55,6 +64,8 @@ export interface PluginContext {
   script: string;
   /** This host can't take context with a prompt, only with a later tool result. */
   deliversOnTool?: boolean;
+  /** This host can't show anything at session start, so a notice waits for the first prompt. */
+  quietStart?: boolean;
 }
 
 /** What goes back to the host. Each host says it differently; see hosts/. */
@@ -167,25 +178,43 @@ async function refreshConnection(host: string): Promise<void> {
   );
 }
 
-async function pendingPackets(): Promise<string[]> {
-  try {
-    return (await readdir(paths().pending)).filter((name) => name.endsWith(".json")).sort();
-  } catch {
-    return [];
+/** What's waiting, oldest first. A packet that can't be read right now just waits its turn. */
+async function pendingPackets(): Promise<{ file: string; packet: Packet }[]> {
+  const dir = paths().pending;
+  const names = await readdir(dir).catch(() => [] as string[]);
+  const found: { file: string; packet: Packet }[] = [];
+  for (const name of names.filter((entry) => entry.endsWith(".json"))) {
+    const file = join(dir, name);
+    let raw: string;
+    try {
+      raw = await readFile(file, "utf8");
+    } catch {
+      continue;
+    }
+    try {
+      found.push({ file, packet: JSON.parse(raw) as Packet });
+    } catch {
+      // Packets are replaced in one step, so a damaged one can never be finished later.
+      await rm(file, { force: true });
+    }
   }
-}
-
-async function readPacket(file: string): Promise<Packet | null> {
-  try {
-    return JSON.parse(await readFile(file, "utf8")) as Packet;
-  } catch {
-    return null;
-  }
+  return found.sort((a, b) => a.packet.createdAt.localeCompare(b.packet.createdAt));
 }
 
 async function sendPacket(host: string, packet: Packet) {
-  const scope = ["-u", packet.userId, "--agent-id", packet.repoId, "--run-id", packet.sessionId];
-  const metadata = ["-m", JSON.stringify(packet.metadata)];
+  const target = [
+    ...(packet.namespaceId ? ["-n", packet.namespaceId] : []),
+    "-u",
+    packet.userId,
+    "--agent-id",
+    packet.repoId,
+    "--run-id",
+    packet.sessionId,
+    "-m",
+    JSON.stringify(packet.metadata),
+    "--idempotency-key",
+    packet.id,
+  ];
   const conversation = join(paths().pending, `${packet.id}.messages`);
   await writePrivate(conversation, JSON.stringify(packet.messages));
   try {
@@ -195,8 +224,7 @@ async function sendPacket(host: string, packet: Packet) {
         "add",
         "-f",
         conversation,
-        ...scope,
-        ...metadata,
+        ...target,
         "--prompt",
         CHECKPOINT_INSTRUCTIONS,
         "--categories",
@@ -206,7 +234,7 @@ async function sendPacket(host: string, packet: Packet) {
     );
     // A Private namespace with no model set: there's nothing to extract with, so keep a note.
     if (sent.error?.code === "MODEL_REQUIRED") {
-      return runCli(host, ["add", "--no-infer", ...scope, ...metadata], {
+      return runCli(host, ["add", "--no-infer", ...target], {
         input: packet.note,
         timeoutMs: FLUSH_TIMEOUT_MS,
       });
@@ -217,95 +245,110 @@ async function sendPacket(host: string, packet: Packet) {
   }
 }
 
+/** How long to wait, for failures that say nothing about the packet itself. */
 function retryDelay(exit: number): number | null {
+  if (exit === EXIT_USAGE || exit === EXIT_NOT_FOUND) return null;
   if (exit === EXIT_NETWORK) return RETRY_NETWORK_MS;
   if (exit === EXIT_AUTH) return RETRY_AUTH_MS;
   if (exit === EXIT_LIMITED) return RETRY_LIMITED_MS;
-  return null;
+  return RETRY_FAILED_MS;
 }
 
-/** Sends what's waiting, oldest first. What can't go now stays on disk with the reason. */
+const hold = (file: string, packet: Packet, waitMs: number, reason: string) =>
+  writePrivate(
+    file,
+    JSON.stringify({
+      ...packet,
+      notBefore: Date.now() + waitMs,
+      lastError: bounded(reason, MAX_FIELD_CHARS),
+    } satisfies Packet),
+  );
+
+/** Sends what's waiting. What can't go now stays on disk with the reason. */
 export async function deliverPending(host: string): Promise<void> {
   await withLock(paths().deliverLock, async () => {
     const attempted = new Set<string>();
     for (;;) {
-      const names = (await pendingPackets()).filter((name) => !attempted.has(name));
-      if (names.length === 0) return;
-      for (const name of names) {
-        attempted.add(name);
-        const file = join(paths().pending, name);
-        const packet = await readPacket(file);
-        if (!packet) {
-          await rm(file, { force: true });
-          continue;
-        }
+      const waiting = (await pendingPackets()).filter(({ file }) => !attempted.has(file));
+      if (waiting.length === 0) return;
+      const { loginId } = writeTarget();
+      for (const { file, packet } of waiting) {
+        attempted.add(file);
         const expired = Date.now() - Date.parse(packet.createdAt) > PACKET_TTL_MS;
         if (expired || packet.attempts >= MAX_PACKET_ATTEMPTS) {
           await ensureDir(paths().failed);
-          await rename(file, join(paths().failed, name));
+          await rename(file, join(paths().failed, basename(file)));
           continue;
         }
         if (packet.notBefore > Date.now()) continue;
+        // A conversation goes to the account it came from, whoever is logged in by now.
+        if (packet.loginId !== loginId) {
+          await hold(file, packet, RETRY_OTHER_LOGIN_MS, "Saved under a different login.");
+          continue;
+        }
         const sent = await sendPacket(packet.host || host, packet);
         if (sent.ok) {
           await rm(file, { force: true });
           continue;
         }
+        const reason = sent.error?.message ?? "It failed.";
         const wait = retryDelay(sent.exit);
-        await writePrivate(
+        await hold(
           file,
-          JSON.stringify({
-            ...packet,
-            // Only a failure of this packet counts against it: a network or a limit isn't one.
-            attempts: wait === null ? packet.attempts + 1 : packet.attempts,
-            notBefore: Date.now() + (wait ?? RETRY_FAILED_MS),
-            lastError: sent.error?.message ?? "It failed.",
-          } satisfies Packet),
+          // Only a failure of this packet counts against it: an outage or a limit isn't one.
+          wait === null ? { ...packet, attempts: packet.attempts + 1 } : packet,
+          wait ?? RETRY_FAILED_MS,
+          reason,
         );
       }
     }
   });
 }
 
-/** Turns what a session has logged into a packet. The log's position moves in the same step. */
+/** Turns what a session has logged into a packet. The log's position moves only once that's safe. */
 export async function prepareFlush(dir: string, force: boolean): Promise<void> {
   await withLock(join(dir, "flush.lock"), async () => {
     const state = await readState(dir);
     if (!state) return;
-    const events = await readEvents(dir, state.offset);
+    const offset = await readOffset(dir);
+    const events = await readEvents(dir, offset);
     const { checkpointExchanges, userId } = settings();
     const count = selectCheckpoint(events, { force, exchanges: checkpointExchanges });
     if (count === 0) return;
     const taken = events.slice(0, count);
-    const packet = buildPacket(taken, state, userId);
+    const packet = buildPacket(taken, state, { userId, ...writeTarget() });
     if (packet) {
       await writePrivate(join(paths().pending, `${packet.id}.json`), JSON.stringify(packet));
     }
-    await writeState(dir, { ...state, offset: taken.at(-1)?.end ?? state.offset });
+    await writeOffset(dir, taken.at(-1)?.end ?? offset);
   });
 }
 
-/** A session that crashed never got to flush. Old ones go once there's nothing left in them. */
+/** A session that crashed never got to flush. What's left of an old one goes once it's saved. */
 async function sweepSessions(): Promise<void> {
-  const { sessions } = paths();
+  const { sessions, failed: failedDir } = paths();
   const names = await readdir(sessions).catch(() => [] as string[]);
   for (const name of names) {
     const dir = join(sessions, name);
+    const idle = Date.now() - (await lastActive(dir));
     const state = await readState(dir);
-    if (!state) continue;
-    const idle = Date.now() - Date.parse(state.updatedAt);
-    const unsaved = (await logSize(dir)) > state.offset;
+    if (!state) {
+      if (idle > SESSION_TTL_MS) await rm(dir, { recursive: true, force: true });
+      continue;
+    }
+    const unsaved = (await logSize(dir)) > (await readOffset(dir));
     if (unsaved && idle > ABANDONED_AFTER_MS) await prepareFlush(dir, true);
-    if (idle > SESSION_TTL_MS) await rm(dir, { recursive: true, force: true });
+    const stillUnsaved = (await logSize(dir)) > (await readOffset(dir));
+    if (!stillUnsaved && idle > SESSION_TTL_MS) await rm(dir, { recursive: true, force: true });
   }
-  const failed = await readdir(paths().failed).catch(() => [] as string[]);
+  const failed = await readdir(failedDir).catch(() => [] as string[]);
   for (const name of failed) {
-    const file = join(paths().failed, name);
+    const file = join(failedDir, name);
     const age = await stat(file).then(
       (found) => Date.now() - found.mtimeMs,
       () => 0,
     );
-    if (age > SESSION_TTL_MS) await rm(file, { force: true });
+    if (age > FAILED_TTL_MS) await rm(file, { force: true });
   }
 }
 
@@ -314,6 +357,7 @@ export async function maintain(host: string): Promise<void> {
   await ensureCli();
   if (!connected() || (await isPaused())) return;
   await refreshConnection(host);
+  if (!settings().autoSave) return;
   await sweepSessions();
   await deliverPending(host);
 }
@@ -337,19 +381,25 @@ export interface SessionInput {
   cwd: string;
 }
 
+/** Tell someone once that nothing is happening, at the first moment their host can show it. */
+async function connectNotice(dir: string, state: SessionState): Promise<HookOutput> {
+  if (state.connectNoticeGiven) return {};
+  await writeState(dir, { ...state, connectNoticeGiven: true });
+  return { context: NOT_CONNECTED };
+}
+
 export async function onSessionStart(
   context: PluginContext,
-  input: SessionInput & { source?: string; canAddContext?: boolean },
+  input: SessionInput & { source?: string },
 ): Promise<HookOutput> {
   await installLauncher(context.script).catch((error) => logError("launcher", error));
+  await keepHostOptions().catch((error) => logError("options", error));
   if (await maintenanceDue()) startWorker(context, "maintain");
   if (await isPaused()) return {};
   const { dir, state } = await openSession(context.host, input.sessionId, input.cwd);
   if (!connected()) {
     // Where a host can't take it here, the first prompt says it instead.
-    if (state.connectNoticeGiven || input.canAddContext === false) return {};
-    await writeState(dir, { ...state, connectNoticeGiven: true });
-    return { context: NOT_CONNECTED };
+    return context.quietStart ? {} : connectNotice(dir, state);
   }
   // Compaction just dropped what was recalled earlier, so it comes back.
   if (input.source === "compact" && state.recalled?.block) return { context: state.recalled.block };
@@ -362,34 +412,35 @@ export async function onPrompt(
 ): Promise<HookOutput> {
   if (await isPaused()) return {};
   const { dir, state } = await openSession(context.host, input.sessionId, input.cwd);
-  if (!connected()) {
-    if (state.connectNoticeGiven) return {};
-    await writeState(dir, { ...state, connectNoticeGiven: true });
-    return { context: NOT_CONNECTED };
-  }
-  const prompt = bounded(input.prompt, MAX_MESSAGE_CHARS);
-  await appendEvent(dir, { kind: "prompt", at: new Date().toISOString(), text: prompt });
-  const first = state.prompts === 0;
-  await writeState(dir, { ...state, prompts: state.prompts + 1 });
-  if (!first || prompt.length < MIN_QUERY_CHARS || !(await recallReady())) return {};
-
+  if (!connected()) return connectNotice(dir, state);
   const options = settings();
+  const prompt = bounded(input.prompt, MAX_MESSAGE_CHARS);
+  if (options.autoSave) {
+    await appendEvent(dir, { kind: "prompt", at: new Date().toISOString(), text: prompt });
+  }
+  await writeState(dir, { ...state, prompts: state.prompts + 1 });
+  // A short first prompt or a failed search doesn't use up the session's one recall.
+  if (state.recallDone || prompt.length < MIN_QUERY_CHARS || !(await recallReady())) return {};
+
   const { memories, error } = await searchMemories(context.host, prompt, {
     scope: options.searchScope,
     repo: state.repo,
     topK: RECALL_TOP_K,
     timeoutMs: RECALL_TIMEOUT_MS,
   });
-  if (error) await logError("recall", error);
+  if (error) {
+    await logError("recall", error);
+    return {};
+  }
   const block = formatMemories(memories, { limit: options.maxContextChars });
-  if (!block) return {};
   const latest = (await readState(dir)) ?? state;
   await writeState(dir, {
     ...latest,
-    recalled: { ids: memories.map((memory) => memory.id), block },
-    undelivered: context.deliversOnTool ? block : null,
+    recallDone: true,
+    recalled: block ? { ids: memories.map((memory) => memory.id), block } : null,
+    undelivered: block && context.deliversOnTool ? block : null,
   });
-  return context.deliversOnTool ? {} : { context: block };
+  return block && !context.deliversOnTool ? { context: block } : {};
 }
 
 /** The hot path, on every tool call: one line appended and nothing else. */
@@ -399,7 +450,9 @@ export async function onTool(
 ): Promise<HookOutput> {
   if ((await isPaused()) || !connected()) return {};
   const dir = sessionDir(context.host, input.sessionId);
-  await appendEvent(dir, { kind: "tool", at: new Date().toISOString(), ...evidenceFrom(input) });
+  if (settings().autoSave) {
+    await appendEvent(dir, { kind: "tool", at: new Date().toISOString(), ...evidenceFrom(input) });
+  }
   if (!context.deliversOnTool) return {};
   const state = await readState(dir);
   if (!state?.undelivered) return {};
@@ -411,7 +464,7 @@ export async function onAssistant(
   context: PluginContext,
   input: SessionInput & { message: string },
 ): Promise<void> {
-  if ((await isPaused()) || !connected() || !input.message) return;
+  if ((await isPaused()) || !connected() || !input.message || !settings().autoSave) return;
   const { dir } = await openSession(context.host, input.sessionId, input.cwd);
   await appendEvent(dir, {
     kind: "assistant",
@@ -424,7 +477,8 @@ export async function onStop(
   context: PluginContext,
   input: SessionInput & { message?: string },
 ): Promise<void> {
-  if ((await isPaused()) || !connected()) return;
+  const options = settings();
+  if ((await isPaused()) || !connected() || !options.autoSave) return;
   const { dir, state } = await openSession(context.host, input.sessionId, input.cwd);
   await appendEvent(dir, {
     kind: "stop",
@@ -432,9 +486,7 @@ export async function onStop(
     ...(input.message ? { text: bounded(input.message, MAX_MESSAGE_CHARS) } : {}),
   });
   await writeState(dir, state);
-  const options = settings();
-  if (!options.autoSave) return;
-  const events = await readEvents(dir, state.offset);
+  const events = await readEvents(dir, await readOffset(dir));
   if (selectCheckpoint(events, { force: false, exchanges: options.checkpointExchanges }) > 0) {
     startWorker(context, "flush", dir);
   }
@@ -445,10 +497,10 @@ export async function onFlush(
   context: PluginContext,
   input: SessionInput & { message?: string },
 ): Promise<void> {
-  if ((await isPaused()) || !connected()) return;
+  if ((await isPaused()) || !connected() || !settings().autoSave) return;
   const { dir } = await openSession(context.host, input.sessionId, input.cwd);
   if (input.message) await onAssistant(context, { ...input, message: input.message });
-  if (settings().autoSave) startWorker(context, "flush", dir, "--force");
+  startWorker(context, "flush", dir, "--force");
 }
 
 export async function onSubagentStart(
@@ -457,11 +509,13 @@ export async function onSubagentStart(
 ): Promise<HookOutput> {
   if ((await isPaused()) || !connected()) return {};
   const { dir, state } = await openSession(context.host, input.sessionId, input.cwd);
-  await appendEvent(dir, {
-    kind: "subagent",
-    at: new Date().toISOString(),
-    agentType: bounded(input.agentType, 200),
-  });
+  if (settings().autoSave) {
+    await appendEvent(dir, {
+      kind: "subagent",
+      at: new Date().toISOString(),
+      agentType: bounded(input.agentType, MAX_FIELD_CHARS),
+    });
+  }
   return state.recalled?.block ? { context: state.recalled.block } : {};
 }
 

@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { userInfo } from "node:os";
 import {
   DEFAULT_CHECKPOINT_EXCHANGES,
@@ -7,7 +9,7 @@ import {
   MAX_CONTEXT_CHARS,
   MIN_CONTEXT_CHARS,
 } from "./constants.js";
-import { paths } from "./paths.js";
+import { paths, writePrivate } from "./paths.js";
 
 export const SEARCH_SCOPES = ["repo", "mine", "all"] as const;
 export type SearchScope = (typeof SEARCH_SCOPES)[number];
@@ -15,18 +17,58 @@ export type SearchScope = (typeof SEARCH_SCOPES)[number];
 /** A host that couldn't fill a placeholder may pass it through as written. */
 const unfilled = (value: string) => /^\$\{.*\}$/.test(value);
 
-/** A plugin option, wherever this host puts them. */
-function option(name: string): string | undefined {
+const OPTION_NAMES = [
+  "api_key",
+  "api_url",
+  "namespace",
+  "user_id",
+  "top_k",
+  "max_context_chars",
+  "search_scope",
+  "checkpoint_exchanges",
+  "auto_save",
+];
+
+function hostOption(name: string): string | undefined {
   const upper = name.toUpperCase();
-  for (const key of [
-    `MEMDOT_${upper}`,
-    `PLUGIN_OPTION_${upper}`,
-    `CLAUDE_PLUGIN_OPTION_${upper}`,
-  ]) {
+  for (const key of [`PLUGIN_OPTION_${upper}`, `CLAUDE_PLUGIN_OPTION_${upper}`]) {
     const value = process.env[key]?.trim();
     if (value && !unfilled(value)) return value;
   }
   return undefined;
+}
+
+function savedOptions(): Record<string, string> {
+  try {
+    return JSON.parse(readFileSync(paths().options, "utf8")) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+/** A plugin option: from this process's environment, or what the last session start kept. */
+function option(name: string): string | undefined {
+  const own = process.env[`MEMDOT_${name.toUpperCase()}`]?.trim();
+  if (own && !unfilled(own)) return own;
+  return hostOption(name) ?? savedOptions()[name];
+}
+
+/**
+ * Some hosts give plugin options to hooks only, and skills run outside them. So a session start
+ * keeps them for the skills, in a file as private as the credentials next to it.
+ */
+export async function keepHostOptions(): Promise<void> {
+  const found = Object.fromEntries(
+    OPTION_NAMES.flatMap((name) => {
+      const value = hostOption(name);
+      return value ? [[name, value]] : [];
+    }),
+  );
+  if (Object.keys(found).length > 0) {
+    await writePrivate(paths().options, JSON.stringify(found));
+  } else {
+    await rm(paths().options, { force: true });
+  }
 }
 
 const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high);
@@ -83,6 +125,16 @@ export function settings(): Settings {
     ),
     autoSave: !/^(0|false|no|off)$/i.test(option("auto_save") ?? ""),
     userId: option("user_id") ?? savedCredentials()?.defaults?.user_id ?? accountName(),
+  };
+}
+
+/** Where a write goes right now, so that one written earlier can tell if that has changed. */
+export function writeTarget(): { namespaceId: string | null; loginId: string | null } {
+  const saved = savedCredentials();
+  const key = option("api_key") ?? saved?.api_key;
+  return {
+    namespaceId: option("namespace") ?? saved?.namespace_id ?? null,
+    loginId: key ? createHash("sha256").update(key).digest("hex").slice(0, 16) : null,
   };
 }
 

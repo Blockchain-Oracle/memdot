@@ -102,6 +102,11 @@ export interface AddOptions extends MemoryScope {
   prompt?: string;
   categories?: PromptCategory[];
   immutable?: boolean;
+  /**
+   * Makes a retry safe in Assisted: the same key gets the same write. Private needs none, since
+   * what's stored is deduplicated by its content on this device.
+   */
+  idempotencyKey?: string;
   /** The file this was read from. Deleting the file deletes these memories. */
   source?: { objectId?: string; label?: string };
   /** Self-signed spaces: the wallet that signs the store (Private namespaces). */
@@ -536,6 +541,9 @@ export class MemoriesApi {
 
     const accepted = await unwrap(
       this.ctx.transport.api.POST("/v1/memories", {
+        ...(options.idempotencyKey
+          ? { headers: this.ctx.transport.idempotencyHeader(options.idempotencyKey) }
+          : {}),
         body: {
           messages: normalizeMessages(messages),
           infer: options.infer ?? true,

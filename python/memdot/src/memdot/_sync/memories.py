@@ -378,6 +378,7 @@ class Memories:
         immutable: bool = False,
         source: dict[str, str] | None = None,
         wait: str | bool = "indexed",
+        idempotency_key: str | None = None,
     ) -> AddResult:
         """Remembers a string or chat messages. At least one of the three ids is required.
 
@@ -452,7 +453,12 @@ class Memories:
                 )
                 if value
             }
-        accepted = self._ctx.transport.json("POST", "/v1/memories", body)
+        accepted = self._ctx.transport.json(
+            "POST",
+            "/v1/memories",
+            body,
+            headers={"idempotency-key": idempotency_key} if idempotency_key else None,
+        )
         if wait is False:
             return AddResult(
                 event_id=accepted["event_id"],

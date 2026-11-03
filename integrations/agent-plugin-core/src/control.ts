@@ -1,13 +1,14 @@
-import { readdirSync, rmSync, writeFileSync } from "node:fs";
-import { copyFile, readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { constants, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFile, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { findCli, runCli } from "./cli.js";
 import { MAX_MESSAGE_CHARS, PLUGIN_VERSION } from "./constants.js";
 import { scopeFilter, searchMemories } from "./lifecycle.js";
 import { ensureDir, FILE_MODE, paths } from "./paths.js";
-import { formatMemories, type RecalledMemory } from "./prompts.js";
-import { bounded } from "./redact.js";
+import { formatMemories, LOOKUP_HEADING, memoryLine, type RecalledMemory } from "./prompts.js";
+import { bounded, redactValue } from "./redact.js";
 import { identifyRepo } from "./repo.js";
 import { connected, SEARCH_SCOPES, type SearchScope, settings } from "./settings.js";
 import { isPaused } from "./store.js";
@@ -30,7 +31,10 @@ export async function searchText(
     topK: topK ?? options.topK,
   });
   if (error) throw new Error(error);
-  const text = formatMemories(memories, { heading: "", limit: options.maxContextChars });
+  const text = formatMemories(memories, {
+    heading: LOOKUP_HEADING,
+    limit: options.maxContextChars,
+  });
   if (!text) return NOTHING_FOUND;
   return `${text}\n\nIds: ${memories.map((memory) => memory.id).join(" ")}`;
 }
@@ -54,10 +58,12 @@ export async function rememberText(host: string, text: string, cwd: string): Pro
     { input: fact },
   );
   if (!result.ok) throw new Error(result.error?.message ?? "Couldn't save it.");
-  const added = (result.data as { results?: { id: string; memory: string }[] }).results ?? [];
-  return added.length
-    ? `Remembered: ${added.map((memory) => `${memory.memory} (${memory.id})`).join("; ")}`
-    : "That's already remembered.";
+  const data = result.data as { event_id?: string; results?: { id: string; memory: string }[] };
+  const added = data.results ?? [];
+  if (added.length) {
+    return `Remembered: ${added.map((memory) => `${memory.memory} (${memory.id})`).join("; ")}`;
+  }
+  return data.event_id ? "Queued. It can be searched for shortly." : "That's already remembered.";
 }
 
 export async function listText(
@@ -81,18 +87,26 @@ export async function listText(
   const data = result.data as { results?: RecalledMemory[] } | RecalledMemory[];
   const memories = Array.isArray(data) ? data : (data.results ?? []);
   if (memories.length === 0) return NOTHING_FOUND;
-  return memories.map((memory) => `${memory.id}: ${memory.memory}`).join("\n");
+  const lines = memories.map((memory) => `${memory.id}: ${memoryLine(memory.memory)}`);
+  return [LOOKUP_HEADING, ...lines].join("\n");
 }
 
 export async function getText(host: string, id: string): Promise<string> {
   const result = await runCli(host, ["get", id]);
   if (!result.ok) throw new Error(result.error?.message ?? "Couldn't find it.");
-  return JSON.stringify(result.data, null, 2);
+  return `${LOOKUP_HEADING}\n${JSON.stringify(redactValue(result.data), null, 2)}`;
 }
+
+/** Only an id: from a model, anything starting with a dash could become a flag on the way down. */
+const MEMORY_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function forgetIds(host: string, ids: string[]): Promise<string> {
   const lines: string[] = [];
   for (const id of ids) {
+    if (!MEMORY_ID.test(id)) {
+      lines.push(`That isn't a memory id, so nothing was forgotten: ${bounded(id, 80)}`);
+      continue;
+    }
     const result = await runCli(host, ["delete", id, "--force"]);
     lines.push(result.ok ? `Forgotten: ${id}` : `Couldn't forget ${id}: ${result.error?.message}`);
   }
@@ -152,19 +166,29 @@ export async function setupCodex(): Promise<string> {
   const home = process.env.CODEX_HOME?.trim() || join(homedir(), ".codex");
   const file = join(home, "hooks.json");
   let config: { hooks?: Record<string, CodexHookGroup[]> } = {};
+  let existing: string | null = null;
   try {
-    config = JSON.parse(await readFile(file, "utf8"));
-    await copyFile(file, `${file}.bak`);
+    existing = await readFile(file, "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new Error(`Couldn't read ${file}: ${(error as Error).message}`);
+    }
+  }
+  if (existing !== null) {
+    try {
+      config = JSON.parse(existing);
+    } catch {
       throw new Error(`${file} isn't valid JSON, so it was left alone.`);
     }
   }
+  const ours = (command: string | undefined) => command?.includes("memdot-plugin.mjs") === true;
   const hooks = { ...config.hooks };
-  const runsOurs = (group: CodexHookGroup) =>
-    group.hooks?.some((hook) => hook.command?.includes("memdot-plugin.mjs")) === true;
   for (const [event, action, matcher] of CODEX_EVENTS) {
-    const others = (hooks[event] ?? []).filter((group) => !runsOurs(group));
+    // Only our own hook goes: anything else sharing its group stays.
+    const others = (hooks[event] ?? []).flatMap((group) => {
+      const kept = (group.hooks ?? []).filter((hook) => !ours(hook.command));
+      return kept.length ? [{ ...group, hooks: kept }] : [];
+    });
     hooks[event] = [
       ...others,
       {
@@ -183,7 +207,12 @@ export async function setupCodex(): Promise<string> {
     ];
   }
   await ensureDir(home);
-  writeFileSync(file, `${JSON.stringify({ ...config, hooks }, null, 2)}\n`);
+  // The first backup is the one worth having: a later run would only copy its own edit.
+  if (existing !== null)
+    await copyFile(file, `${file}.bak`, constants.COPYFILE_EXCL).catch(() => undefined);
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  await writeFile(temporary, `${JSON.stringify({ ...config, hooks }, null, 2)}\n`);
+  await rename(temporary, file);
   return `Added MemDot's hooks to ${file}. Open /hooks in Codex once and trust them: it skips any hook you haven't reviewed.`;
 }
 

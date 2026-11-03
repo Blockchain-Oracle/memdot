@@ -19,7 +19,6 @@
   },
   "extensions": {
     "com.openai": {
-      "hooks": "./hooks/hooks.json",
       "interface": {
         "displayName": "MemDot",
         "shortDescription": "Encrypted long-term memory on Portaldot V3",

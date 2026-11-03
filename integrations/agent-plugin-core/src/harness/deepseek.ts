@@ -8,8 +8,7 @@ interface Assembly {
 }
 interface HarnessSession {
   id?: string;
-  cwd?: string;
-  deriveMessages?: () => { role?: string; content?: unknown }[];
+  deriveMessages?: () => { role?: string; content?: unknown; source?: { kind?: string } }[];
 }
 interface HarnessContext {
   tools: { register(tool: unknown): () => void };
@@ -21,11 +20,12 @@ export const name = "memdot";
 export const inject = ["tools", "systemPrompt"];
 
 export function apply(ctx: HarnessContext): void {
-  const runtime = createRuntime(HOST, import.meta.url);
+  const runtime = createRuntime(HOST, import.meta.url, { quietStart: true });
   const cwd = process.cwd();
   /** The prompt is assembled per request, so what was recalled has to go in every time. */
   const recalled = new Map<string, string>();
   const started = new Set<string>();
+  const lastPrompt = new Map<string, string>();
   const idOf = (session: HarnessSession | undefined) => session?.id ?? "deepseek-session";
 
   for (const spec of TOOLS) {
@@ -41,6 +41,24 @@ export function apply(ctx: HarnessContext): void {
     });
   }
 
+  /** Each request is the one place every new prompt passes through, so they're noted here. */
+  const notePrompt = runtime.guard("prompt", async (session: HarnessSession | undefined) => {
+    const sessionId = idOf(session);
+    const messages = session?.deriveMessages?.() ?? [];
+    const latest = [...messages]
+      .reverse()
+      .find((message) => message.role === "user" && message.source?.kind !== "system");
+    const prompt = latest ? messageText(latest) : "";
+    if (!prompt || lastPrompt.get(sessionId) === prompt) return;
+    lastPrompt.set(sessionId, prompt);
+    if (!started.has(sessionId)) {
+      started.add(sessionId);
+      await runtime.start({ sessionId, cwd });
+    }
+    const found = await runtime.prompt({ sessionId, cwd, prompt });
+    if (found.context) recalled.set(sessionId, found.context);
+  });
+
   ctx.on(
     "system-prompt/assemble",
     async (
@@ -48,18 +66,11 @@ export function apply(ctx: HarnessContext): void {
       context: { agent?: { session?: HarnessSession } },
       next: () => Promise<Assembly>,
     ) => {
+      // A failure in the harness's own assembly is the harness's to report. Only ours is contained.
       const assembly = await next();
       const session = context.agent?.session;
-      const messages = session?.deriveMessages?.() ?? [];
-      const prompt = [...messages].reverse().find((message) => message.role === "user");
-      const sessionId = idOf(session);
-      if (prompt && !started.has(sessionId)) {
-        started.add(sessionId);
-        await runtime.start({ sessionId, cwd });
-        const found = await runtime.prompt({ sessionId, cwd, prompt: messageText(prompt) });
-        if (found.context) recalled.set(sessionId, found.context);
-      }
-      const text = recalled.get(sessionId);
+      await notePrompt(session);
+      const text = recalled.get(idOf(session));
       return text
         ? { ...assembly, contexts: [...assembly.contexts, { name: "memdot:recall", text }] }
         : assembly;
@@ -68,16 +79,19 @@ export function apply(ctx: HarnessContext): void {
 
   ctx.on(
     "session/event",
-    async (
-      session: HarnessSession,
-      event: { type: string; data?: { message?: unknown; reason?: { kind?: string } } },
-    ) => {
-      const sessionId = idOf(session);
-      if (event.type === "assistant/message") {
-        await runtime.assistant({ sessionId, cwd, message: messageText(event.data?.message) });
-      } else if (event.type === "turn/end" && event.data?.reason?.kind === "completed") {
-        await runtime.stop({ sessionId, cwd });
-      }
-    },
+    runtime.guard(
+      "event",
+      async (
+        session: HarnessSession,
+        event: { type: string; data?: { message?: unknown; reason?: { kind?: string } } },
+      ) => {
+        const sessionId = idOf(session);
+        if (event.type === "assistant/message") {
+          await runtime.assistant({ sessionId, cwd, message: messageText(event.data?.message) });
+        } else if (event.type === "turn/end" && event.data?.reason?.kind === "completed") {
+          await runtime.stop({ sessionId, cwd });
+        }
+      },
+    ),
   );
 }

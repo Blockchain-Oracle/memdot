@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { IDEMPOTENCY_HEADER } from "@memdot/config";
 import { folders, jobs, memories, memoryHistory, memoryInbox, objects } from "@memdot/db";
 import { enqueueMemory, JOB_KIND } from "@memdot/jobs";
 import { normalizeMessages } from "@memdot/memory-engine";
@@ -274,7 +275,10 @@ export function memoryRoutes(services: Services) {
           "Assisted namespaces only: the server reads this text to extract memories, keeps it encrypted, and never stores it in the clear. Accepted at once; follow the event until it's indexed (searchable) and finalized (on chain). At least one of user_id, agent_id or run_id is required.",
         security: authenticated,
         middleware: [requireScope("memories", "write")] as const,
-        request: { body: { content: jsonContent(AddRequest), required: true } },
+        request: {
+          headers: z.object({ [IDEMPOTENCY_HEADER]: z.string().max(128).optional() }),
+          body: { content: jsonContent(AddRequest), required: true },
+        },
         responses: {
           202: { description: "Accepted", content: jsonContent(AddAccepted) },
           ...errorResponses,
@@ -288,9 +292,28 @@ export function memoryRoutes(services: Services) {
         if (body.memory_type && !body.agent_id) {
           throw conflict("AGENT_REQUIRED", "A procedural memory needs agent_id.");
         }
+        const accountId = accountOf(c);
+        const idempotencyKey = c.req.valid("header")[IDEMPOTENCY_HEADER] ?? null;
+        // The same write sent again, by a client that never heard back: same event, no new work.
+        const earlier = async () => {
+          if (!idempotencyKey) return null;
+          const [row] = await db
+            .select({ id: jobs.id, payload: jobs.payload })
+            .from(jobs)
+            .where(and(eq(jobs.accountId, accountId), eq(jobs.idempotencyKey, idempotencyKey)))
+            .limit(1);
+          return row
+            ? {
+                event_id: row.id,
+                status: "PENDING" as const,
+                namespace_id: (row.payload as { folderId: string }).folderId,
+              }
+            : null;
+        };
+        const replay = await earlier();
+        if (replay) return c.json(replay, 202);
         const namespace = await resolveAssisted(c, body.namespace_id);
         if (body.infer) await spendSharedModel(c);
-        const accountId = accountOf(c);
         const messages = normalizeMessages(body.messages as never);
         const attachments = messages.reduce(
           (sum, message) =>
@@ -330,20 +353,28 @@ export function memoryRoutes(services: Services) {
             : { kind: "conversation", ...(actorOf(c) ? { label: actorOf(c) as string } : {}) },
           actor: actorOf(c) ?? undefined,
         });
-        const job = await db.transaction(async (tx) => {
-          const [row] = await tx
-            .insert(jobs)
-            .values({
-              accountId,
-              kind: JOB_KIND.memoryAdd,
-              payload: { folderId: namespace.id },
-            })
-            .returning();
-          if (!row) throw new Error("job insert returned no row");
-          await tx.insert(memoryInbox).values({ jobId: row.id, folderId: namespace.id, sealed });
-          await enqueueMemory(services.boss, tx, { op: "add", jobId: row.id });
-          return row;
-        });
+        let job: { id: string };
+        try {
+          job = await db.transaction(async (tx) => {
+            const [row] = await tx
+              .insert(jobs)
+              .values({
+                accountId,
+                kind: JOB_KIND.memoryAdd,
+                payload: { folderId: namespace.id },
+                idempotencyKey,
+              })
+              .returning();
+            if (!row) throw new Error("job insert returned no row");
+            await tx.insert(memoryInbox).values({ jobId: row.id, folderId: namespace.id, sealed });
+            await enqueueMemory(services.boss, tx, { op: "add", jobId: row.id });
+            return row;
+          });
+        } catch (error) {
+          const raced = isUniqueViolation(error, "jobs_idempotency_idx") ? await earlier() : null;
+          if (raced) return c.json(raced, 202);
+          throw error;
+        }
         return c.json(
           { event_id: job.id, status: "PENDING" as const, namespace_id: namespace.id },
           202,

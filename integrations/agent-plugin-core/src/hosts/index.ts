@@ -24,6 +24,7 @@ interface HostAdapter {
   /** What to print for it: every host reads context back differently. */
   render(event: string, output: HookOutput): string;
   deliversOnTool?: boolean;
+  quietStart?: boolean;
 }
 
 const json = (value: unknown) => JSON.stringify(value);
@@ -228,6 +229,7 @@ function partsText(value: unknown): string {
 }
 
 const kimi: HostAdapter = {
+  quietStart: true,
   handle: async (context, event, input) => {
     const session = {
       sessionId: str(input.session_id) || UNKNOWN_SESSION,
@@ -235,7 +237,7 @@ const kimi: HostAdapter = {
     };
     switch (event) {
       case "SessionStart":
-        await onSessionStart(context, { ...session, canAddContext: false });
+        await onSessionStart(context, session);
         return {};
       case "UserPromptSubmit":
         return onPrompt(context, { ...session, prompt: partsText(input.prompt) });
@@ -355,6 +357,7 @@ const antigravity: HostAdapter = {
 // ── A plugin that isn't in JavaScript, calling these same hooks by command ─────────────────────
 
 const plain: HostAdapter = {
+  quietStart: true,
   handle: claudeCode.handle,
   render: (_event, { context }) => context ?? "",
 };
