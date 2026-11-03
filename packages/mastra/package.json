@@ -1,0 +1,40 @@
+{
+  "name": "@memdot/mastra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Long-term memory for Mastra agents: encrypted, on Portaldot V3.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --dts",
+    "dev": "tsdown src/index.ts --dts --watch --no-clean",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@memdot/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "@mastra/core": "^1",
+    "zod": "^3.25 || ^4"
+  },
+  "devDependencies": {
+    "@mastra/core": "^1.81.0",
+    "@memdot/config": "workspace:*",
+    "@types/node": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

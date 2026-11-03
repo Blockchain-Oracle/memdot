@@ -1,0 +1,43 @@
+{
+  "name": "@memdot/ai-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Long-term memory for the AI SDK: encrypted, on Portaldot V3, for any model.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts --dts",
+    "dev": "tsdown src/index.ts --dts --watch --no-clean",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.82",
+    "@memdot/config": "workspace:*",
+    "@memdot/sdk": "workspace:*"
+  },
+  "peerDependencies": {
+    "@ai-sdk/provider": "^4",
+    "ai": "^7",
+    "zod": "^3.25.76 || ^4.1.8"
+  },
+  "devDependencies": {
+    "@ai-sdk/provider": "^4.0.35",
+    "@types/node": "catalog:",
+    "ai": "^7.0.159",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

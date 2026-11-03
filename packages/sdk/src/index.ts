@@ -13,6 +13,14 @@ export {
 } from "./account.js";
 export { ActivityApi, type ChainTransaction, type RequestLogEntry } from "./activity.js";
 export {
+  AgentMemory,
+  type AgentMemoryOptions,
+  type MemoryBinding,
+  recallContext,
+  scopeFilter,
+  withRecall,
+} from "./agent-memory.js";
+export {
   type Agent,
   AgentsApi,
   API_KEY_FORMAT,

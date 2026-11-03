@@ -1,0 +1,351 @@
+import {
+  BaseStore,
+  type Item,
+  type ListNamespacesOperation,
+  type MatchCondition,
+  type Operation,
+  type OperationResults,
+  type PutOperation,
+  type SearchItem,
+  type SearchOperation,
+} from "@langchain/langgraph-checkpoint";
+import {
+  AgentMemory,
+  type AgentMemoryOptions,
+  type MemDot,
+  type Memory,
+  type MemoryBinding,
+  type ScoredMemory,
+} from "@memdot/sdk";
+import { type CredentialFlags, connectFromMachine } from "@memdot/sdk/credentials";
+import { createMiddleware, tool } from "langchain";
+import { z } from "zod";
+
+const CLIENT = "langchain";
+const STORE_NAMESPACE = "store_namespace";
+const STORE_KEY = "store_key";
+const STORE_VALUE = "store_value";
+const SEPARATOR = "/";
+const TEXT_FIELDS = ["text", "content", "memory"];
+const PAGE = 100;
+/** Search asks for more than it returns, since a namespace prefix and a filter are applied here. */
+const SEARCH_OVERFETCH = 4;
+const MAX_FETCH = 100;
+const MEMORIES_HELD = 32;
+
+type Connect = MemDot | (() => Promise<MemDot>);
+
+/** A client from the environment or `memdot login`, made the first time something needs it. */
+export function memdotFromMachine(flags: CredentialFlags = {}): () => Promise<MemDot> {
+  let client: Promise<MemDot> | null = null;
+  return () => {
+    client ??= connectFromMachine(CLIENT, flags).then(({ memdot }) => memdot);
+    return client;
+  };
+}
+
+function textOf(value: Record<string, unknown>): string {
+  for (const field of TEXT_FIELDS) {
+    const text = value[field];
+    if (typeof text === "string" && text.trim()) return text;
+  }
+  return JSON.stringify(value);
+}
+
+function matchesCondition(namespace: string[], condition: MatchCondition): boolean {
+  const { path, matchType } = condition;
+  if (path.length > namespace.length) return false;
+  const window =
+    matchType === "prefix" ? namespace.slice(0, path.length) : namespace.slice(-path.length);
+  return path.every((want, i) => want === "*" || want === window[i]);
+}
+
+/**
+ * Long-term memory for LangGraph: `createAgent({ store })` or `compile({ store })`.
+ *
+ * A store is key-addressed and MemDot gives memories their own ids, so the namespace and key travel
+ * in the memory's metadata, in the same shape as the Python store: the two read each other's items.
+ * Memories are stored as written, never through a model. MemDot embeds on its own side or this
+ * machine's, so an `index` setting is accepted and ignored.
+ */
+export class MemDotStore extends BaseStore {
+  private client: Promise<MemDot> | null = null;
+
+  constructor(
+    private readonly connect: Connect = memdotFromMachine(),
+    private readonly options: { namespaceId?: string } = {},
+  ) {
+    super();
+  }
+
+  private get memdot(): Promise<MemDot> {
+    this.client ??=
+      typeof this.connect === "function" ? this.connect() : Promise.resolve(this.connect);
+    return this.client;
+  }
+
+  private get where(): { namespaceId?: string } {
+    return this.options.namespaceId ? { namespaceId: this.options.namespaceId } : {};
+  }
+
+  /** `["memories", "alex"]` is about alex, so forgetting alex forgets these too. */
+  private userOf(namespace: string[]): string {
+    return (namespace[1] ?? namespace[0]) as string;
+  }
+
+  private async find(namespace: string[], key: string): Promise<Memory | null> {
+    const { results } = await (await this.memdot).memories.list({
+      ...this.where,
+      pageSize: 1,
+      filters: {
+        AND: [
+          { [`metadata.${STORE_NAMESPACE}`]: namespace.join(SEPARATOR) },
+          { [`metadata.${STORE_KEY}`]: key },
+        ],
+      },
+    });
+    return results[0] ?? null;
+  }
+
+  private fields(memory: Memory) {
+    const metadata = memory.metadata ?? {};
+    const namespace = metadata[STORE_NAMESPACE];
+    const key = metadata[STORE_KEY];
+    if (typeof namespace !== "string" || typeof key !== "string") return null;
+    const value = metadata[STORE_VALUE];
+    return {
+      namespace: namespace.split(SEPARATOR),
+      key,
+      value:
+        value && typeof value === "object"
+          ? (value as Record<string, unknown>)
+          : { text: memory.memory },
+    };
+  }
+
+  private item(memory: Memory): Item | null {
+    const fields = this.fields(memory);
+    return fields
+      ? {
+          ...fields,
+          createdAt: new Date(memory.createdAt),
+          updatedAt: new Date(memory.updatedAt),
+        }
+      : null;
+  }
+
+  private async putOne(op: PutOperation): Promise<void> {
+    const memdot = await this.memdot;
+    const current = await this.find(op.namespace, op.key);
+    if (op.value === null) {
+      if (current) await memdot.memories.delete(current.id);
+      return;
+    }
+    const metadata = {
+      [STORE_NAMESPACE]: op.namespace.join(SEPARATOR),
+      [STORE_KEY]: op.key,
+      [STORE_VALUE]: op.value,
+    };
+    const text = textOf(op.value);
+    if (current) {
+      await memdot.memories.update(current.id, { text, metadata });
+      return;
+    }
+    await memdot.memories.add(text, {
+      userId: this.userOf(op.namespace),
+      ...this.where,
+      metadata,
+      infer: false,
+    });
+  }
+
+  private async searchOne(op: SearchOperation): Promise<SearchItem[]> {
+    const memdot = await this.memdot;
+    const limit = op.limit ?? 10;
+    const offset = op.offset ?? 0;
+    const wanted = limit + offset;
+    const filters = {
+      [`metadata.${STORE_NAMESPACE}`]: { contains: op.namespacePrefix.join(SEPARATOR) },
+    };
+    const fetch = Math.min(MAX_FETCH, wanted * SEARCH_OVERFETCH);
+    const found: (Memory | ScoredMemory)[] = op.query
+      ? await memdot.memories.search(op.query, {
+          ...this.where,
+          filters,
+          topK: fetch,
+          threshold: 0,
+        })
+      : (await memdot.memories.list({ ...this.where, filters, pageSize: fetch })).results;
+    const items: SearchItem[] = [];
+    for (const memory of found) {
+      const item = this.item(memory);
+      if (!item) continue;
+      if (op.namespacePrefix.some((part, i) => item.namespace[i] !== part)) continue;
+      if (op.filter && Object.entries(op.filter).some(([k, v]) => item.value[k] !== v)) continue;
+      items.push("score" in memory ? { ...item, score: memory.score } : item);
+    }
+    return items.slice(offset, wanted);
+  }
+
+  private async listNamespacesOne(op: ListNamespacesOperation): Promise<string[][]> {
+    const memdot = await this.memdot;
+    const seen = new Map<string, string[]>();
+    let cursor: string | undefined;
+    do {
+      const page = await memdot.memories.list({
+        ...this.where,
+        pageSize: PAGE,
+        ...(cursor ? { cursor } : {}),
+      });
+      for (const memory of page.results) {
+        const fields = this.fields(memory);
+        if (fields) seen.set(fields.namespace.join(SEPARATOR), fields.namespace);
+      }
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    let namespaces = [...seen.values()];
+    for (const condition of op.matchConditions ?? []) {
+      namespaces = namespaces.filter((namespace) => matchesCondition(namespace, condition));
+    }
+    if (op.maxDepth !== undefined) {
+      const depth = op.maxDepth;
+      const cut = new Map(
+        namespaces.map((n) => [n.slice(0, depth).join(SEPARATOR), n.slice(0, depth)]),
+      );
+      namespaces = [...cut.values()];
+    }
+    namespaces.sort((a, b) => a.join(SEPARATOR).localeCompare(b.join(SEPARATOR)));
+    return namespaces.slice(op.offset ?? 0, (op.offset ?? 0) + (op.limit ?? namespaces.length));
+  }
+
+  async batch<Op extends readonly Operation[]>(operations: Op): Promise<OperationResults<Op>> {
+    const results: unknown[] = [];
+    for (const op of operations) {
+      if ("namespacePrefix" in op) results.push(await this.searchOne(op));
+      else if ("matchConditions" in op || "maxDepth" in op) {
+        results.push(await this.listNamespacesOne(op as ListNamespacesOperation));
+      } else if ("value" in op) results.push(await this.putOne(op));
+      else if ("key" in op) {
+        const memory = await this.find(op.namespace, op.key);
+        results.push(memory ? this.item(memory) : null);
+      } else {
+        throw new Error("Unknown store operation.");
+      }
+    }
+    return results as OperationResults<Op>;
+  }
+}
+
+/** What's said in a message, whichever way the model or caller shaped it. */
+function messageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .flatMap((part: { type?: string; text?: string }) =>
+      part?.type === "text" && part.text ? [part.text] : [],
+    )
+    .join("\n");
+}
+
+interface LooseMessage {
+  content: unknown;
+  tool_calls?: unknown[];
+  getType?: () => string;
+  type?: string;
+}
+
+const typeOf = (message: LooseMessage) => message.getType?.() ?? message.type;
+const lastOf = (messages: LooseMessage[], type: string) =>
+  messages.findLast((message) => typeOf(message) === type);
+
+export interface MemDotMiddlewareOptions extends AgentMemoryOptions {
+  /** Default: the environment or `memdot login`. */
+  client?: Connect;
+}
+
+/**
+ * Recalls before the model and saves when the agent finishes. Who it's for comes from these options,
+ * or per call: `agent.invoke(input, { context: { userId: "alex" } })`.
+ */
+export function memdotMiddleware(options: MemDotMiddlewareOptions = {}) {
+  const { client = memdotFromMachine(), ...settings } = options;
+  const held = new Map<string, AgentMemory>();
+
+  const memoryFor = (context: unknown): AgentMemory => {
+    const asked = (context ?? {}) as MemoryBinding;
+    const scope = {
+      userId: settings.userId ?? asked.userId,
+      agentId: settings.agentId ?? asked.agentId,
+      runId: settings.runId ?? asked.runId,
+      namespaceId: settings.namespaceId ?? asked.namespaceId,
+    };
+    const key = JSON.stringify(scope);
+    let memory = held.get(key);
+    if (!memory) {
+      const defined = Object.fromEntries(Object.entries(scope).filter(([, value]) => value));
+      memory = new AgentMemory(client, { ...settings, ...defined });
+      held.set(key, memory);
+      if (held.size > MEMORIES_HELD) held.delete(held.keys().next().value as string);
+    }
+    return memory;
+  };
+
+  return createMiddleware({
+    name: "MemDotMemory",
+    wrapModelCall: async (request, handler) => {
+      const human = lastOf(request.messages as LooseMessage[], "human");
+      const recalled = await memoryFor(request.runtime?.context).recall(
+        human ? messageText(human.content) : "",
+      );
+      return handler(
+        recalled ? { ...request, systemMessage: request.systemMessage.concat(recalled) } : request,
+      );
+    },
+    afterAgent: async (state, runtime) => {
+      const messages = state.messages as LooseMessage[];
+      const human = lastOf(messages, "human");
+      const answer = lastOf(messages, "ai");
+      if (human && answer && !answer.tool_calls?.length) {
+        await memoryFor(runtime?.context).saveExchange(
+          messageText(human.content),
+          messageText(answer.content),
+        );
+      }
+      return;
+    },
+  });
+}
+
+/** `remember` and `recall`, for an agent that decides for itself when to use them. */
+export function memdotTools(options: MemoryBinding & { client?: Connect }) {
+  const { client = memdotFromMachine(), ...scope } = options;
+  const memory = new AgentMemory(client, scope);
+  const remember = tool(
+    async ({ text }) => {
+      const added = await memory.remember(text);
+      if (added.note) return added.note;
+      return added.results.length ? "Remembered." : "That's already remembered.";
+    },
+    {
+      name: "remember",
+      description: "Save a durable fact: a preference, a decision, a name. Not a secret.",
+      schema: z.object({ text: z.string().describe("The fact, as one short sentence") }),
+    },
+  );
+  const recall = tool(
+    async ({ query, top_k }) => {
+      const hits = await memory.search(query, top_k ? { topK: top_k } : {});
+      return hits.map((hit) => `- ${hit.memory}`).join("\n") || "Nothing remembered about that.";
+    },
+    {
+      name: "recall",
+      description:
+        "Find what's been remembered, before answering anything that might depend on it.",
+      schema: z.object({
+        query: z.string().describe("What to look for, in plain words"),
+        top_k: z.number().int().min(1).max(50).optional().describe("How many results"),
+      }),
+    },
+  );
+  return [remember, recall] as [typeof remember, typeof recall];
+}

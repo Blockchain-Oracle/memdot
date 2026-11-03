@@ -343,6 +343,8 @@ export class FilesApi {
     if (!detail.spaceId || detail.keyEpoch === null) {
       throw new MemDotError(400, "NOT_A_FILE", "That object is not a file in a space.");
     }
+    // A connected agent's keys load on demand, and this may be the first thing it does.
+    await this.ctx.ensureKeys(detail.spaceId, detail.keyEpoch);
     const identities = this.ctx.vault.ownedIdentities(detail.spaceId, detail.keyEpoch).slice(0, 1);
     return readObject(this.ctx, detail, identities, (segmentId) => this.detail(segmentId));
   }

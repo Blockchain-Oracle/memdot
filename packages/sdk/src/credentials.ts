@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { DEFAULT_API_URL } from "@memdot/config";
+import { MemDotError } from "./errors.js";
 import { localEmbedder } from "./local-embedder.js";
 import { MemDot } from "./memdot.js";
 
@@ -207,6 +208,23 @@ async function embeddingRuntime() {
  * agent; with `MEMDOT_RECOVERY_CODE` it acts as the owner, for scripts that need to. The code is
  * only ever read from the environment, never stored.
  */
+/** Reaches MemDot the way the CLI does: flags, then environment, then what `memdot login` saved. */
+export async function connectFromMachine(
+  client: string,
+  flags: CredentialFlags & { identity?: string | undefined } = {},
+): Promise<{ memdot: MemDot; resolved: ResolvedCredentials }> {
+  const found = resolveCredentials(await loadCredentials(), flags);
+  const resolved = flags.identity ? { ...found, identity: flags.identity } : found;
+  if (!resolved.apiKey && !resolved.recoveryCode) {
+    throw new MemDotError(
+      401,
+      "NOT_CONNECTED",
+      "No MemDot credentials found. Set MEMDOT_API_KEY, or connect this machine with: memdot login",
+    );
+  }
+  return { memdot: await clientFor(resolved, client), resolved };
+}
+
 export async function clientFor(resolved: ResolvedCredentials, client: string): Promise<MemDot> {
   const memdot = MemDot.create({
     baseUrl: resolved.apiUrl,
