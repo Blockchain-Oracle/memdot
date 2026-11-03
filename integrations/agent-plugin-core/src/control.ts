@@ -1,5 +1,6 @@
 import { readdirSync, rmSync, writeFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { copyFile, readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { findCli, runCli } from "./cli.js";
 import { MAX_MESSAGE_CHARS, PLUGIN_VERSION } from "./constants.js";
@@ -123,6 +124,67 @@ export async function pause(): Promise<string> {
 export function resume(): string {
   rmSync(paths().paused, { force: true });
   return "MemDot is saving and recalling again. Nothing from the pause was saved.";
+}
+
+const CODEX_EVENTS: [string, string, string?][] = [
+  ["SessionStart", "session-start", "startup|resume|clear|compact"],
+  ["UserPromptSubmit", "prompt"],
+  ["PostToolUse", "tool", ".*"],
+  ["SubagentStart", "subagent-start"],
+  ["SubagentStop", "subagent-stop"],
+  ["Stop", "stop"],
+  ["PreCompact", "compact"],
+  ["SessionEnd", "session-end"],
+];
+const CODEX_HOOK_TIMEOUT_SECONDS = 15;
+const CODEX_SESSION_END_TIMEOUT_SECONDS = 3;
+
+interface CodexHookGroup {
+  matcher?: string;
+  hooks?: { type?: string; command?: string; timeout?: number }[];
+}
+
+/**
+ * Adds MemDot's hooks to Codex's own hook config. Codex's CLI doesn't run hooks that come from a
+ * plugin, only these, so this is a step you ask for. Anything else in the file stays as it was.
+ */
+export async function setupCodex(): Promise<string> {
+  const home = process.env.CODEX_HOME?.trim() || join(homedir(), ".codex");
+  const file = join(home, "hooks.json");
+  let config: { hooks?: Record<string, CodexHookGroup[]> } = {};
+  try {
+    config = JSON.parse(await readFile(file, "utf8"));
+    await copyFile(file, `${file}.bak`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new Error(`${file} isn't valid JSON, so it was left alone.`);
+    }
+  }
+  const hooks = { ...config.hooks };
+  const runsOurs = (group: CodexHookGroup) =>
+    group.hooks?.some((hook) => hook.command?.includes("memdot-plugin.mjs")) === true;
+  for (const [event, action, matcher] of CODEX_EVENTS) {
+    const others = (hooks[event] ?? []).filter((group) => !runsOurs(group));
+    hooks[event] = [
+      ...others,
+      {
+        ...(matcher ? { matcher } : {}),
+        hooks: [
+          {
+            type: "command",
+            command: `node "${paths().launcher}" hook codex ${action}`,
+            timeout:
+              event === "SessionEnd"
+                ? CODEX_SESSION_END_TIMEOUT_SECONDS
+                : CODEX_HOOK_TIMEOUT_SECONDS,
+          },
+        ],
+      },
+    ];
+  }
+  await ensureDir(home);
+  writeFileSync(file, `${JSON.stringify({ ...config, hooks }, null, 2)}\n`);
+  return `Added MemDot's hooks to ${file}. Open /hooks in Codex once and trust them: it skips any hook you haven't reviewed.`;
 }
 
 const packetFiles = (dir: string) => {

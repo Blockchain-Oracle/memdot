@@ -1,10 +1,10 @@
 // Generated from integrations/agent-plugin-core. Edit it there, then run its generate script.
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { appendFile, chmod, copyFile, mkdir, open, readFile, realpath, rename, rm, stat, utimes, writeFile } from "node:fs/promises";
+import { homedir, userInfo } from "node:os";
 import { basename, delimiter, dirname, isAbsolute, join } from "node:path";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { homedir, userInfo } from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 "ee".repeat(12);

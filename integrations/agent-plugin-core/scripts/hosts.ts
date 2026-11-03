@@ -42,6 +42,8 @@ interface SkillStyle {
   keepFields: string[];
   /** A host that fills in what the person typed after the skill's name. */
   argumentsLine: string;
+  /** One more step at the end of logging in, on a host that needs it. */
+  afterLogin?: string;
 }
 
 export function renderSkills(style: SkillStyle): Files {
@@ -61,6 +63,7 @@ export function renderSkills(style: SkillStyle): Files {
     const rendered = `---\n${fields.join("\n")}\n---${body}`
       .replaceAll("{{MEMDOT}}", LAUNCHER)
       .replaceAll("{{HOST_NAME}}", style.hostName)
+      .replaceAll("{{AFTER_LOGIN}}", style.afterLogin ? `\n${style.afterLogin}\n` : "")
       .replaceAll("{{ARGUMENTS}}\n\n", style.argumentsLine ? `${style.argumentsLine}\n\n` : "");
     if (/\{\{|\}\}/.test(rendered)) throw new Error(`Unfilled placeholder in skill ${name}`);
     files[`skills/${style.prefix}${name}/SKILL.md`] = rendered;
@@ -296,6 +299,11 @@ export function codex(): Files {
       prefix: "memdot-",
       keepFields: [],
       argumentsLine: "",
+      afterLogin: `4. Codex's CLI only runs hooks from its own config, so add MemDot's there, and tell them to open \`/hooks\` once and trust them:
+
+   \`\`\`bash
+   ${LAUNCHER} setup codex
+   \`\`\``,
     }),
     "README.md": readme(
       "Codex",
@@ -304,7 +312,13 @@ codex plugin marketplace add Blockchain-Oracle/memdot
 codex plugin add memdot@${MARKETPLACE}
 \`\`\`
 
-Then open \`/hooks\` once in Codex and trust MemDot's hooks. Codex skips any hook you haven't reviewed.`,
+Codex's CLI runs hooks from its own config, not from plugins, so one more step adds them there. Start Codex once so the plugin is in place, then:
+
+\`\`\`bash
+${LAUNCHER} setup codex
+\`\`\`
+
+Then open \`/hooks\` in Codex and trust MemDot's hooks. Codex skips any hook you haven't reviewed.`,
       [
         "The first prompt of a session searches this repository's memories and adds what it finds.",
         "Every tool call is noted locally, with secrets removed and no file contents.",
@@ -397,6 +411,7 @@ export function kimi(): Files {
         rule("PostToolUse"),
         rule("PostToolUseFailure"),
         rule("SubagentStart"),
+        rule("SubagentStop"),
         rule("Stop"),
         rule("PreCompact"),
         rule("SessionEnd"),

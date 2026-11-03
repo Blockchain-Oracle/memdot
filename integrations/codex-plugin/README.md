@@ -11,7 +11,13 @@ codex plugin marketplace add Blockchain-Oracle/memdot
 codex plugin add memdot@memdot-plugins
 ```
 
-Then open `/hooks` once in Codex and trust MemDot's hooks. Codex skips any hook you haven't reviewed.
+Codex's CLI runs hooks from its own config, not from plugins, so one more step adds them there. Start Codex once so the plugin is in place, then:
+
+```bash
+node "$HOME/.memdot/bin/memdot-plugin.mjs" setup codex
+```
+
+Then open `/hooks` in Codex and trust MemDot's hooks. Codex skips any hook you haven't reviewed.
 
 Needs Node 22.12 or later. The first session unpacks the MemDot CLI into `~/.memdot`.
 

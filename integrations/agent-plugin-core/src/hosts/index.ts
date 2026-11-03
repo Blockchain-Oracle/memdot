@@ -1,4 +1,6 @@
-import { closeSync, fstatSync, openSync, readSync } from "node:fs";
+import { closeSync, fstatSync, openSync, readFileSync, readSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   type HookOutput,
   onAssistant,
@@ -161,50 +163,6 @@ const cursor: HostAdapter = {
 
 // ── Kimi: session start can't add context, and a prompt's context is plain text ────────────────
 
-const kimi: HostAdapter = {
-  handle: async (context, event, input) => {
-    const session = {
-      sessionId: str(input.session_id) || UNKNOWN_SESSION,
-      cwd: str(input.cwd) || process.cwd(),
-    };
-    switch (event) {
-      case "SessionStart":
-        await onSessionStart(context, { ...session, canAddContext: false });
-        return {};
-      case "UserPromptSubmit":
-        return onPrompt(context, { ...session, prompt: str(input.prompt) });
-      case "PostToolUse":
-      case "PostToolUseFailure":
-        return onTool(context, {
-          ...session,
-          tool: str(input.tool_name),
-          input: input.tool_input,
-          response: input.tool_output ?? input.tool_response,
-          error: input.error,
-          failed: event === "PostToolUseFailure",
-        });
-      case "Stop":
-        await onStop(context, {
-          ...session,
-          message: str(input.response) || str(input.last_assistant_message),
-        });
-        return {};
-      case "PreCompact":
-      case "SessionEnd":
-        await onFlush(context, session);
-        return {};
-      case "SubagentStart":
-        await onSubagentStart(context, { ...session, agentType: str(input.agent_name) });
-        return {};
-      default:
-        return {};
-    }
-  },
-  render: (event, { context }) => (event === "UserPromptSubmit" && context ? context : ""),
-};
-
-// ── Antigravity: no prompt or answer in the hook itself, only a transcript to read ─────────────
-
 const TRANSCRIPT_TAIL_BYTES = 512 * 1024;
 
 function readTail(path: string): string {
@@ -219,6 +177,103 @@ function readTail(path: string): string {
     closeSync(file);
   }
 }
+
+/** Kimi's Stop hook carries no answer, so it comes from the session's own log. */
+export function kimiLastAnswer(sessionId: string): string {
+  const home = process.env.KIMI_CODE_HOME?.trim() || join(homedir(), ".kimi-code");
+  try {
+    let sessionDir = "";
+    for (const line of readFileSync(join(home, "session_index.jsonl"), "utf8").split("\n")) {
+      if (!line.includes(sessionId)) continue;
+      const row = JSON.parse(line) as Json;
+      if (row.sessionId === sessionId) sessionDir = str(row.sessionDir);
+    }
+    if (!sessionDir) return "";
+    let answer = "";
+    let step = "";
+    let text = "";
+    for (const line of readTail(join(sessionDir, "agents", "main", "wire.jsonl")).split("\n")) {
+      if (!line.includes("context.append_loop_event")) continue;
+      let row: Json;
+      try {
+        row = JSON.parse(line) as Json;
+      } catch {
+        continue;
+      }
+      const event = (row.event ?? {}) as Json;
+      if (event.type === "step.begin") {
+        step = str(event.uuid);
+        text = "";
+      } else if (event.type === "content.part" && event.stepUuid === step) {
+        const part = (event.part ?? {}) as Json;
+        if (part.type === "text") text += str(part.text);
+      } else if (event.type === "step.end" && text && event.finishReason !== "error") {
+        answer = text;
+      }
+    }
+    return answer.trim();
+  } catch {
+    return "";
+  }
+}
+
+/** Kimi sends a prompt as typed parts, not a string. */
+function partsText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((part) => (part && typeof part === "object" ? str((part as Json).text) : ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
+const kimi: HostAdapter = {
+  handle: async (context, event, input) => {
+    const session = {
+      sessionId: str(input.session_id) || UNKNOWN_SESSION,
+      cwd: str(input.cwd) || process.cwd(),
+    };
+    switch (event) {
+      case "SessionStart":
+        await onSessionStart(context, { ...session, canAddContext: false });
+        return {};
+      case "UserPromptSubmit":
+        return onPrompt(context, { ...session, prompt: partsText(input.prompt) });
+      case "PostToolUse":
+      case "PostToolUseFailure":
+        return onTool(context, {
+          ...session,
+          tool: str(input.tool_name),
+          input: input.tool_input,
+          response: input.tool_output ?? input.tool_response,
+          error: input.error,
+          failed: event === "PostToolUseFailure",
+        });
+      case "Stop":
+        await onStop(context, { ...session, message: kimiLastAnswer(session.sessionId) });
+        return {};
+      case "PreCompact":
+      case "SessionEnd":
+        await onFlush(context, session);
+        return {};
+      case "SubagentStart":
+        await onSubagentStart(context, { ...session, agentType: str(input.agent_name) });
+        return {};
+      case "SubagentStop":
+        await onSubagentStop(context, {
+          ...session,
+          agentType: str(input.agent_name),
+          message: str(input.response),
+        });
+        return {};
+      default:
+        return {};
+    }
+  },
+  render: (event, { context }) => (event === "UserPromptSubmit" && context ? context : ""),
+};
+
+// ── Antigravity: no prompt or answer in the hook itself, only a transcript to read ─────────────
 
 /** The latest thing said by each side. The tail can start mid-line, so bad lines are skipped. */
 export function antigravityTurn(path: string): { prompt: string; answer: string } {

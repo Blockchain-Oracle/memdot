@@ -60,6 +60,11 @@
       "timeout": 5
     },
     {
+      "event": "SubagentStop",
+      "command": "node ./core/memdot-plugin.mjs hook kimi SubagentStop",
+      "timeout": 5
+    },
+    {
       "event": "Stop",
       "command": "node ./core/memdot-plugin.mjs hook kimi Stop",
       "timeout": 5

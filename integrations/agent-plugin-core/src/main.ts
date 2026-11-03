@@ -10,6 +10,7 @@ import {
   rememberText,
   resume,
   searchText,
+  setupCodex,
   statusReport,
 } from "./control.js";
 import { HOST_ADAPTERS } from "./hosts/index.js";
@@ -207,12 +208,16 @@ async function main(): Promise<void> {
     case "login":
       await commandLogin(rest);
       return;
+    case "setup":
+      if (rest[0] !== "codex") fail("Only Codex needs this: setup codex");
+      console.log(await setupCodex());
+      return;
     case "version":
       console.log(PLUGIN_VERSION);
       return;
     default:
       console.error(
-        "Usage: memdot-plugin search|remember|forget|status|pause|resume|login|version",
+        "Usage: memdot-plugin search|remember|forget|status|pause|resume|login|setup|version",
       );
       process.exitCode = 2;
   }

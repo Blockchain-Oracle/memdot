@@ -2720,14 +2720,14 @@ function evidenceOf(events, root) {
 /** The conversation, with what happened in the repository added to the last answer. */
 function messagesOf(events, root) {
 	const messages = [];
-	for (const event of events) if (event.kind === "prompt" && event.text) messages.push({
-		role: "user",
-		content: trimMessage(event.text)
-	});
-	else if ((event.kind === "assistant" || event.kind === "stop") && textOf(event)) {
-		const content = trimMessage(textOf(event));
-		if (messages.at(-1)?.content !== content) messages.push({
-			role: "assistant",
+	for (const event of events) {
+		const role = event.kind === "prompt" ? "user" : event.kind === "assistant" || event.kind === "stop" ? "assistant" : null;
+		const text = textOf(event);
+		if (!role || !text) continue;
+		const content = trimMessage(text);
+		const last = messages.at(-1);
+		if (last?.role !== role || last.content !== content) messages.push({
+			role,
 			content
 		});
 	}
@@ -3300,6 +3300,57 @@ function resume() {
 	rmSync(paths().paused, { force: true });
 	return "MemDot is saving and recalling again. Nothing from the pause was saved.";
 }
+const CODEX_EVENTS = [
+	[
+		"SessionStart",
+		"session-start",
+		"startup|resume|clear|compact"
+	],
+	["UserPromptSubmit", "prompt"],
+	[
+		"PostToolUse",
+		"tool",
+		".*"
+	],
+	["SubagentStart", "subagent-start"],
+	["SubagentStop", "subagent-stop"],
+	["Stop", "stop"],
+	["PreCompact", "compact"],
+	["SessionEnd", "session-end"]
+];
+const CODEX_HOOK_TIMEOUT_SECONDS = 15;
+const CODEX_SESSION_END_TIMEOUT_SECONDS = 3;
+/**
+* Adds MemDot's hooks to Codex's own hook config. Codex's CLI doesn't run hooks that come from a
+* plugin, only these, so this is a step you ask for. Anything else in the file stays as it was.
+*/
+async function setupCodex() {
+	const home = process.env.CODEX_HOME?.trim() || join(homedir(), ".codex");
+	const file = join(home, "hooks.json");
+	let config = {};
+	try {
+		config = JSON.parse(await readFile(file, "utf8"));
+		await copyFile(file, `${file}.bak`);
+	} catch (error) {
+		if (error.code !== "ENOENT") throw new Error(`${file} isn't valid JSON, so it was left alone.`);
+	}
+	const hooks = { ...config.hooks };
+	const runsOurs = (group) => group.hooks?.some((hook) => hook.command?.includes("memdot-plugin.mjs")) === true;
+	for (const [event, action, matcher] of CODEX_EVENTS) hooks[event] = [...(hooks[event] ?? []).filter((group) => !runsOurs(group)), {
+		...matcher ? { matcher } : {},
+		hooks: [{
+			type: "command",
+			command: `node "${paths().launcher}" hook codex ${action}`,
+			timeout: event === "SessionEnd" ? CODEX_SESSION_END_TIMEOUT_SECONDS : CODEX_HOOK_TIMEOUT_SECONDS
+		}]
+	}];
+	await ensureDir(home);
+	writeFileSync(file, `${JSON.stringify({
+		...config,
+		hooks
+	}, null, 2)}\n`);
+	return `Added MemDot's hooks to ${file}. Open /hooks in Codex once and trust them: it skips any hook you haven't reviewed.`;
+}
 const packetFiles = (dir) => {
 	try {
 		return readdirSync(dir).filter((name) => name.endsWith(".json"));
@@ -3458,6 +3509,61 @@ const cursor = {
 		return context ? json({ additional_context: context }) : "";
 	}
 };
+const TRANSCRIPT_TAIL_BYTES = 524288;
+function readTail(path) {
+	const file = openSync(path, "r");
+	try {
+		const { size } = fstatSync(file);
+		const length = Math.min(size, TRANSCRIPT_TAIL_BYTES);
+		const buffer = Buffer.alloc(length);
+		readSync(file, buffer, 0, length, size - length);
+		return buffer.toString("utf8");
+	} finally {
+		closeSync(file);
+	}
+}
+/** Kimi's Stop hook carries no answer, so it comes from the session's own log. */
+function kimiLastAnswer(sessionId) {
+	const home = process.env.KIMI_CODE_HOME?.trim() || join(homedir(), ".kimi-code");
+	try {
+		let sessionDir = "";
+		for (const line of readFileSync(join(home, "session_index.jsonl"), "utf8").split("\n")) {
+			if (!line.includes(sessionId)) continue;
+			const row = JSON.parse(line);
+			if (row.sessionId === sessionId) sessionDir = str(row.sessionDir);
+		}
+		if (!sessionDir) return "";
+		let answer = "";
+		let step = "";
+		let text = "";
+		for (const line of readTail(join(sessionDir, "agents", "main", "wire.jsonl")).split("\n")) {
+			if (!line.includes("context.append_loop_event")) continue;
+			let row;
+			try {
+				row = JSON.parse(line);
+			} catch {
+				continue;
+			}
+			const event = row.event ?? {};
+			if (event.type === "step.begin") {
+				step = str(event.uuid);
+				text = "";
+			} else if (event.type === "content.part" && event.stepUuid === step) {
+				const part = event.part ?? {};
+				if (part.type === "text") text += str(part.text);
+			} else if (event.type === "step.end" && text && event.finishReason !== "error") answer = text;
+		}
+		return answer.trim();
+	} catch {
+		return "";
+	}
+}
+/** Kimi sends a prompt as typed parts, not a string. */
+function partsText(value) {
+	if (typeof value === "string") return value;
+	if (!Array.isArray(value)) return "";
+	return value.map((part) => part && typeof part === "object" ? str(part.text) : "").filter(Boolean).join("\n");
+}
 const kimi = {
 	handle: async (context, event, input) => {
 		const session = {
@@ -3473,7 +3579,7 @@ const kimi = {
 				return {};
 			case "UserPromptSubmit": return onPrompt(context, {
 				...session,
-				prompt: str(input.prompt)
+				prompt: partsText(input.prompt)
 			});
 			case "PostToolUse":
 			case "PostToolUseFailure": return onTool(context, {
@@ -3487,7 +3593,7 @@ const kimi = {
 			case "Stop":
 				await onStop(context, {
 					...session,
-					message: str(input.response) || str(input.last_assistant_message)
+					message: kimiLastAnswer(session.sessionId)
 				});
 				return {};
 			case "PreCompact":
@@ -3500,24 +3606,18 @@ const kimi = {
 					agentType: str(input.agent_name)
 				});
 				return {};
+			case "SubagentStop":
+				await onSubagentStop(context, {
+					...session,
+					agentType: str(input.agent_name),
+					message: str(input.response)
+				});
+				return {};
 			default: return {};
 		}
 	},
 	render: (event, { context }) => event === "UserPromptSubmit" && context ? context : ""
 };
-const TRANSCRIPT_TAIL_BYTES = 524288;
-function readTail(path) {
-	const file = openSync(path, "r");
-	try {
-		const { size } = fstatSync(file);
-		const length = Math.min(size, TRANSCRIPT_TAIL_BYTES);
-		const buffer = Buffer.alloc(length);
-		readSync(file, buffer, 0, length, size - length);
-		return buffer.toString("utf8");
-	} finally {
-		closeSync(file);
-	}
-}
 /** The latest thing said by each side. The tail can start mid-line, so bad lines are skipped. */
 function antigravityTurn(path) {
 	const turn = {
@@ -3764,11 +3864,15 @@ async function main() {
 		case "login":
 			await commandLogin(rest);
 			return;
+		case "setup":
+			if (rest[0] !== "codex") fail("Only Codex needs this: setup codex");
+			console.log(await setupCodex());
+			return;
 		case "version":
 			console.log(PLUGIN_VERSION);
 			return;
 		default:
-			console.error("Usage: memdot-plugin search|remember|forget|status|pause|resume|login|version");
+			console.error("Usage: memdot-plugin search|remember|forget|status|pause|resume|login|setup|version");
 			process.exitCode = 2;
 	}
 }

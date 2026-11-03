@@ -562,7 +562,7 @@ const HOSTS: {
     start: "SessionStart",
     prompt: "UserPromptSubmit",
     session: (cwd) => ({ session_id: "s1", cwd }),
-    promptInput: { prompt: PROMPT },
+    promptInput: { prompt: [{ type: "text", text: PROMPT }] },
     read: (out) => out,
     startsWithContext: false,
   },
@@ -805,6 +805,45 @@ for (const { host, start, prompt, session, promptInput, read, startsWithContext 
   check(
     "antigravity: finds the answer too",
     readFileSync(join(dir as string, "events.jsonl"), "utf8").includes("Through Coolify."),
+  );
+  box.dispose();
+}
+
+{
+  // Kimi's Stop hook has no answer in it: it comes from the session's own log.
+  const box = sandbox();
+  box.ready();
+  const sessionDir = join(box.home, "kimi/sessions/x/s1");
+  mkdirSync(join(sessionDir, "agents/main"), { recursive: true });
+  writeFileSync(
+    join(box.home, "kimi/session_index.jsonl"),
+    `${JSON.stringify({ sessionId: "s1", sessionDir })}\n`,
+  );
+  const loop = (event: object) => JSON.stringify({ type: "context.append_loop_event", event });
+  writeFileSync(
+    join(sessionDir, "agents/main/wire.jsonl"),
+    `${[
+      loop({ type: "step.begin", uuid: "a" }),
+      loop({ type: "step.end", uuid: "a", finishReason: "tool_use" }),
+      loop({ type: "step.begin", uuid: "b" }),
+      loop({ type: "content.part", stepUuid: "b", part: { type: "text", text: "It deploys " } }),
+      loop({
+        type: "content.part",
+        stepUuid: "b",
+        part: { type: "text", text: "through Coolify." },
+      }),
+      loop({ type: "step.end", uuid: "b", finishReason: "end_turn" }),
+    ].join("\n")}\n`,
+  );
+  const env = { ...box.env, KIMI_CODE_HOME: join(box.home, "kimi") };
+  const base = { session_id: "s1", cwd: box.repo };
+  hook(env, "kimi", "Stop", { ...base, stop_hook_active: false });
+  const [dir] = sessionsOf(box.home);
+  const log = readFileSync(join(dir as string, "events.jsonl"), "utf8");
+  check(
+    "kimi: finds the answer in its session log",
+    log.includes("It deploys through Coolify."),
+    log,
   );
   box.dispose();
 }

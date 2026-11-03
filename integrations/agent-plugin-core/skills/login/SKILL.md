@@ -23,3 +23,4 @@ The person has to approve this in their browser; you can't do it for them.
    If it says it's still waiting, run it again. Only ask them to start over if they say the code expired.
 
 3. When it says connected, tell them to restart this session or reload plugins, so the MemDot tools come up. Saving and recall start from the next session.
+{{AFTER_LOGIN}}

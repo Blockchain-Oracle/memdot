@@ -104,13 +104,18 @@ function evidenceOf(events: SessionEvent[], root: string): string {
 export function messagesOf(events: SessionEvent[], root: string): ChatMessage[] {
   const messages: ChatMessage[] = [];
   for (const event of events) {
-    if (event.kind === "prompt" && event.text) {
-      messages.push({ role: "user", content: trimMessage(event.text) });
-    } else if ((event.kind === "assistant" || event.kind === "stop") && textOf(event)) {
-      const content = trimMessage(textOf(event));
-      // A host that reports the answer and the turn's end apart can report the same text twice.
-      if (messages.at(-1)?.content !== content) messages.push({ role: "assistant", content });
-    }
+    const role =
+      event.kind === "prompt"
+        ? "user"
+        : event.kind === "assistant" || event.kind === "stop"
+          ? "assistant"
+          : null;
+    const text = textOf(event);
+    if (!role || !text) continue;
+    const content = trimMessage(text);
+    // A host can report the same thing twice: an answer and then the turn's end, say.
+    const last = messages.at(-1);
+    if (last?.role !== role || last.content !== content) messages.push({ role, content });
   }
   // Over the limit, the oldest goes first: what the session ended on matters most.
   let total = messages.reduce((sum, message) => sum + message.content.length, 0);
