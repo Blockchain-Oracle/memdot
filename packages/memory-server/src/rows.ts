@@ -21,7 +21,10 @@ import type { AssistedKeys } from "./keys.js";
 export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 export type MemoryRow = typeof memories.$inferSelect;
 type ObjectRow = typeof objects.$inferSelect;
-type Executor = Pick<Database, "select" | "insert" | "update" | "delete" | "execute">;
+type Executor = Pick<
+  Database,
+  "select" | "selectDistinct" | "insert" | "update" | "delete" | "execute"
+>;
 
 const CHUNK = 500;
 
