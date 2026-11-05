@@ -58,8 +58,11 @@ const fail = (error: unknown) => toast.error(describeError(error).title);
 function useOwnMemory(namespace: Namespace, id: string) {
   const memdot = useMemDot();
   return useQuery({
-    queryKey: ["memories", namespace.id, "one", id],
+    // Apart from the memory lists, so it isn't read again once it's changed or gone: the card keeps
+    // showing what was proposed.
+    queryKey: ["copilot-proposal", namespace.id, id],
     retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
     // A model named this id, so it has to prove it's in the namespace being talked about.
     queryFn: async () => {
       const memory = await memdot.memories.get(id);

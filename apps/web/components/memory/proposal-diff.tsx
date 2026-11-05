@@ -63,7 +63,7 @@ export function ProposalCard({
         <p className="text-ui-sm text-text-3">{reason}</p>
       </div>
       {children}
-      {blocked && <p className="text-ui-sm text-danger-fg">{blocked}</p>}
+      {blocked && state === "open" && <p className="text-ui-sm text-danger-fg">{blocked}</p>}
       {state === "open" ? (
         <div className="flex gap-2">
           <Button size="sm" disabled={busy || Boolean(blocked)} onClick={onApply}>

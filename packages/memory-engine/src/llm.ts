@@ -11,6 +11,7 @@ export {
 } from "./copilot.js";
 export {
   ChatMessageSchema,
+  type DreamMemory,
   type DreamProposal,
   type ExtractedMemory,
   type ExtractInput,
@@ -24,5 +25,6 @@ export {
   rerankTexts,
   summarizeMemories,
   type UserProfile,
+  usableProposals,
 } from "./extract.js";
 export { languageModel, providerEmbedder } from "./models.js";

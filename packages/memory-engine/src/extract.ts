@@ -222,31 +222,38 @@ const DreamProposal = z.object({
 export type DreamProposal = z.infer<typeof DreamProposal>;
 const DreamOutput = z.object({ proposals: z.array(DreamProposal) });
 
+export interface DreamMemory {
+  id: string;
+  text: string;
+  createdAt: string;
+  userId?: string | null | undefined;
+  agentId?: string | null | undefined;
+  runId?: string | null | undefined;
+}
+
+const scopeLabel = ({ userId, agentId, runId }: DreamMemory) =>
+  [
+    userId ? `user ${userId}` : null,
+    agentId ? `agent ${agentId}` : null,
+    runId ? `run ${runId}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
 /**
- * Changes a model suggests to a list of memories. It only reads and proposes: nothing here writes,
- * and a person applies what they agree with. A proposal that names an id it wasn't given, reuses one
- * or doesn't make sense for its kind is dropped rather than trusted.
+ * What a person may be shown. A proposal that names an id it wasn't given, reuses one, doesn't make
+ * sense for its kind, or crosses from one person's memories to another's is dropped rather than
+ * trusted: merging across people would quietly move what's known about one onto the other.
  */
-export async function proposeDream(
-  model: LanguageModel,
-  memories: { id: string; text: string; createdAt: string }[],
-): Promise<DreamProposal[]> {
-  const { output } = await generateText({
-    model,
-    abortSignal: timeout(),
-    instructions: DREAM_SYSTEM,
-    output: Output.object({ schema: DreamOutput }),
-    prompt: memories
-      .map((memory) => `[${memory.id}] ${memory.createdAt}: ${memory.text}`)
-      .join("\n"),
-  });
-  const known = new Set(memories.map((memory) => memory.id));
+export function usableProposals(proposals: DreamProposal[], memories: DreamMemory[]) {
+  const scopes = new Map(memories.map((memory) => [memory.id, scopeLabel(memory)]));
   const used = new Set<string>();
-  return output.proposals.filter((proposal) => {
+  return proposals.filter((proposal) => {
     const named = [...proposal.sources, ...(proposal.kept ? [proposal.kept] : [])];
     const fits =
-      named.every((id) => known.has(id) && !used.has(id)) &&
+      named.every((id) => scopes.has(id) && !used.has(id)) &&
       new Set(named).size === named.length &&
+      new Set(named.map((id) => scopes.get(id))).size === 1 &&
       proposal.sources.length > 0 &&
       (proposal.kind === "supersede"
         ? Boolean(proposal.kept)
@@ -254,6 +261,26 @@ export async function proposeDream(
     if (fits) for (const id of named) used.add(id);
     return fits;
   });
+}
+
+/** Changes a model suggests to a list of memories. It only reads and proposes: nothing here writes. */
+export async function proposeDream(
+  model: LanguageModel,
+  memories: DreamMemory[],
+): Promise<DreamProposal[]> {
+  const { output } = await generateText({
+    model,
+    abortSignal: timeout(),
+    instructions: DREAM_SYSTEM,
+    output: Output.object({ schema: DreamOutput }),
+    prompt: memories
+      .map((memory) => {
+        const scope = scopeLabel(memory);
+        return `[${memory.id}] ${memory.createdAt}${scope ? ` (${scope})` : ""}: ${memory.text}`;
+      })
+      .join("\n"),
+  });
+  return usableProposals(output.proposals, memories);
 }
 
 /** Fills a schema the owner wrote from a list of memories. */

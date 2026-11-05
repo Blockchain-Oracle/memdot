@@ -89,6 +89,9 @@ export function memoryToolRoutes(services: Services) {
               id: row.id,
               text: openBody(keys, folderId, row.sealedText).text,
               createdAt: row.createdAt.toISOString(),
+              userId: row.userId,
+              agentId: row.agentId,
+              runId: row.runId,
             },
           ]
         : [],

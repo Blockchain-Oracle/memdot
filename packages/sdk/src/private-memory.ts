@@ -849,7 +849,14 @@ export class PrivateNamespace {
     const { languageModel, proposeDream } = await llmTools();
     const proposals = await proposeDream(
       languageModel(config),
-      memories.map(({ id, memory, createdAt }) => ({ id, text: memory, createdAt })),
+      entries.map((entry) => ({
+        id: entry.id,
+        text: entry.text,
+        createdAt: entry.createdAt,
+        userId: entry.userId,
+        agentId: entry.agentId,
+        runId: entry.runId,
+      })),
     );
     return { proposals, memories };
   }

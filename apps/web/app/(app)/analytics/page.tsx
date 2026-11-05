@@ -154,9 +154,10 @@ function RequestsChart({ data }: { data: Analytics }) {
           />
           <ChartTooltip
             cursor={{ fill: "var(--md-surface-2)" }}
+            itemSorter={() => 0}
             content={<ChartTooltipContent labelFormatter={(day) => shortDay(String(day))} />}
           />
-          <ChartLegend content={<ChartLegendContent />} />
+          <ChartLegend itemSorter={null} content={<ChartLegendContent />} />
           {KINDS.map((kind, index) => (
             <Bar
               key={kind}
@@ -189,7 +190,7 @@ function AddedChart({ data }: { data: Analytics }) {
   return (
     <ChartCard
       title="Memories added"
-      description="Assisted and Private together. Private ones are only counted."
+      description="Assisted and Private together."
       view={view}
       onView={setView}
       table={

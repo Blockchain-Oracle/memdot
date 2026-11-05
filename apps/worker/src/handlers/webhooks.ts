@@ -9,6 +9,12 @@ import { type Deps, errorText } from "../deps.js";
 const DELIVERY_TIMEOUT_MS = 10_000;
 const ERROR_CHARS = 200;
 
+class EndpointRefused extends Error {
+  constructor(status: number) {
+    super(`The endpoint answered ${status}.`);
+  }
+}
+
 /**
  * Sends one event, signed: `t=<unix seconds>,v1=<HMAC-SHA256 of "<t>.<body>">`. Signing the time as
  * well means a captured delivery can't be replayed later. Failing throws, and the queue tries again
@@ -64,8 +70,10 @@ export async function deliverWebhook(
         ...(delivered ? { deliveredAt: new Date() } : {}),
       })
       .where(eq(webhookDeliveries.id, delivery.id));
-    if (!delivered) throw new Error(`answered ${response.status}`);
+    // Written down above, in words a person can read. This only tells the queue to try again.
+    if (!delivered) throw new EndpointRefused(response.status);
   } catch (error) {
+    if (error instanceof EndpointRefused) throw error;
     const message = errorText(error).slice(0, ERROR_CHARS);
     await deps.db
       .update(webhookDeliveries)
