@@ -31,6 +31,14 @@ export async function deliverWebhook(
     .where(eq(webhookDeliveries.id, job.data.deliveryId));
   if (!row) return;
   const { delivery, webhook } = row;
+  // Turned off while this was waiting to try again. A test is asked for by hand, so it still goes.
+  if (!webhook.active && delivery.event !== "webhook.test") {
+    await deps.db
+      .update(webhookDeliveries)
+      .set({ status: "failed", error: "The webhook was turned off." })
+      .where(eq(webhookDeliveries.id, delivery.id));
+    return;
+  }
 
   const body = JSON.stringify({
     id: delivery.id,

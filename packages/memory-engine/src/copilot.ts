@@ -55,6 +55,8 @@ export async function* streamReply(
     if (part.type === "error") {
       throw part.error instanceof Error ? part.error : new Error(String(part.error));
     }
+    // Stopping closes the stream without an error, and half a reply must not read as a whole one.
+    if (part.type === "abort") throw new DOMException("Stopped.", "AbortError");
   }
 }
 
@@ -120,15 +122,29 @@ export function streamCopilot(
   model: LanguageModel,
   messages: ModelMessage[],
   data: CopilotData,
-  options: { onStepFinish?: () => void; signal?: AbortSignal } = {},
+  options: {
+    /** Asked before each step after the first. Say no to end the turn with what it has. */
+    beforeNextStep?: () => Promise<boolean>;
+    signal?: AbortSignal;
+  } = {},
 ): CopilotStream {
+  let outOfAllowance = false;
   return streamText<ToolSet>({
     model,
     instructions: COPILOT_SYSTEM,
     messages,
     tools: copilotTools(data),
-    stopWhen: stepCountIs(MAX_STEPS),
-    ...(options.onStepFinish ? { onStepFinish: options.onStepFinish } : {}),
+    stopWhen: [stepCountIs(MAX_STEPS), () => outOfAllowance],
+    ...(options.beforeNextStep
+      ? {
+          onStepFinish: async (step: { toolCalls: unknown[] }) => {
+            // Only a step that called a tool leads to another model call.
+            if (step.toolCalls.length > 0 && !(await options.beforeNextStep?.())) {
+              outOfAllowance = true;
+            }
+          },
+        }
+      : {}),
     ...(options.signal ? { abortSignal: options.signal } : {}),
   });
 }

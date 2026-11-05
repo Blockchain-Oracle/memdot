@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { MAX_SPACES_PER_ACCOUNT } from "@memdot/config";
-import { account as authAccount, folders, objects, spaces } from "@memdot/db";
+import { account as authAccount, folders, memoryProfiles, objects, spaces } from "@memdot/db";
+import { emitForgotten } from "@memdot/jobs";
 import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db.js";
 import { env } from "../env.js";
@@ -10,6 +11,7 @@ import { loadSpace } from "../lib/ownership.js";
 import { accountOf, principalOf, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { fromBase64, IdParam, SealedText, toBase64 } from "../schemas.js";
+import type { Services } from "../types.js";
 
 const Mode = z.enum(["sponsored", "self_signed"]).openapi({
   description:
@@ -50,7 +52,7 @@ async function hasWallet(userId: string): Promise<boolean> {
   return !!row;
 }
 
-export function spaceRoutes() {
+export function spaceRoutes(services: Services) {
   return createRouter()
     .openapi(
       createRoute({
@@ -240,8 +242,18 @@ export function spaceRoutes() {
       }),
       async (c) => {
         const space = await loadSpace(c, c.req.valid("param").id);
+        const forgotten: string[] = [];
         const tombstoned = await db.transaction(async (tx) => {
-          const n = await tombstoneObjects(tx, eq(objects.spaceId, space.id));
+          const n = await tombstoneObjects(tx, eq(objects.spaceId, space.id), forgotten);
+          // Folders are only marked deleted, so their sealed profiles wouldn't go by themselves.
+          await tx
+            .delete(memoryProfiles)
+            .where(
+              inArray(
+                memoryProfiles.folderId,
+                tx.select({ id: folders.id }).from(folders).where(eq(folders.spaceId, space.id)),
+              ),
+            );
           const now = new Date();
           await tx.update(folders).set({ deletedAt: now }).where(eq(folders.spaceId, space.id));
           await tx
@@ -250,6 +262,7 @@ export function spaceRoutes() {
             .where(eq(spaces.id, space.id));
           return n;
         });
+        await emitForgotten(services.boss, db, accountOf(c), forgotten);
         return c.json({ deleted: true as const, objects: tombstoned }, 200);
       },
     );

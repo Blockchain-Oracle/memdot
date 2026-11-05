@@ -340,7 +340,7 @@ async function handleImport(deps: Deps, job: typeof jobs.$inferSelect) {
     embedding: vectors[i],
     embeddingModel: models.embedder?.modelId,
   }));
-  await deps.db.transaction(async (tx) => {
+  const imported = await deps.db.transaction(async (tx) => {
     const { inserted, duplicates } = await insertDrafts(
       tx,
       deps.memoryKeys,
@@ -362,7 +362,14 @@ async function handleImport(deps: Deps, job: typeof jobs.$inferSelect) {
       },
       ...(inserted.length === 0 ? { status: "finalized" as const } : {}),
     });
+    return inserted;
   });
+  if (imported.length > 0) {
+    await emitWebhooks(deps.boss, deps.db, scope.accountId, "memory.added", {
+      namespace_id: folderId,
+      memory_ids: imported,
+    });
+  }
 }
 
 /** The newest version of every memory in a namespace's segments, read back from the chain. */

@@ -86,13 +86,16 @@ export async function handleStore(deps: Deps, job: JobWithMetadata<StoreBlobPayl
       await updateJob(tx, jobId, { txHash: result.txHash, block: result.location.block });
       await settleObject(tx, row.object.id, await openJobsOf(tx, row.object.id));
     });
-    await announceStored(deps, row.object.id);
     console.log(`[store] ${row.item.cid} → ${result.location.block}/${result.location.index}`);
   } catch (error) {
     if (job.retryCount >= job.retryLimit) await fail(errorText(error));
     else await updateJob(deps.db, jobId, { error: `Retrying: ${errorText(error)}` });
     throw error;
   }
+  // After the try: it's stored by now, so trouble telling anyone mustn't count as a failed store.
+  await announceStored(deps, row.object.id).catch((error: unknown) => {
+    console.warn("[webhooks] couldn't announce a store", errorText(error));
+  });
 }
 
 interface GiveUp {

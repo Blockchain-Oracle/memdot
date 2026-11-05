@@ -24,6 +24,7 @@ export {
 } from "./record.js";
 export { failObject, openJobsOf, settleObject } from "./settle.js";
 export {
+  emitForgotten,
   emitWebhooks,
   queueDelivery,
   WEBHOOK_EVENTS,

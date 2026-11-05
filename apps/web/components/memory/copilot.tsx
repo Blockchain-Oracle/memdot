@@ -1,13 +1,13 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import type { Namespace } from "@memdot/sdk";
+import type { MemDot, Namespace } from "@memdot/sdk";
 import { Button } from "@memdot/ui/components/button";
 import { Skeleton } from "@memdot/ui/components/skeleton";
 import { Spinner } from "@memdot/ui/components/spinner";
 import { Textarea } from "@memdot/ui/components/textarea";
 import { cn } from "@memdot/ui/lib/utils";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type ChatTransport,
   convertToModelMessages,
@@ -18,6 +18,7 @@ import { SendIcon, SparklesIcon, SquareIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/files/file-dialogs";
+import { useUploads } from "@/components/files/uploads";
 import { API_URL } from "@/lib/env";
 import { describeError } from "@/lib/errors";
 import { useMemDot } from "@/lib/memdot";
@@ -55,21 +56,20 @@ interface CardProps<Proposal> {
 
 const fail = (error: unknown) => toast.error(describeError(error).title);
 
-function useOwnMemory(namespace: Namespace, id: string) {
-  const memdot = useMemDot();
-  return useQuery({
+/** A model named this id, so it has to prove it's in the namespace being talked about. */
+function ownMemory(memdot: MemDot, namespace: Namespace, id: string) {
+  return {
     // Apart from the memory lists, so it isn't read again once it's changed or gone: the card keeps
     // showing what was proposed.
     queryKey: ["copilot-proposal", namespace.id, id],
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
-    // A model named this id, so it has to prove it's in the namespace being talked about.
     queryFn: async () => {
       const memory = await memdot.memories.get(id);
       if (memory.namespaceId !== namespace.id) throw new Error("Not in this namespace.");
       return memory;
     },
-  });
+  };
 }
 
 function CorrectionCard({
@@ -80,9 +80,11 @@ function CorrectionCard({
   refresh,
 }: CardProps<{ id: string; text: string; reason: string }>) {
   const memdot = useMemDot();
-  const memory = useOwnMemory(namespace, proposal.id);
+  const { wallet } = useUploads();
+  const memory = useQuery(ownMemory(memdot, namespace, proposal.id));
   const apply = useMutation({
-    mutationFn: () => memdot.memories.update(proposal.id, { text: proposal.text }),
+    mutationFn: () =>
+      memdot.memories.update(proposal.id, { text: proposal.text }, wallet ? { wallet } : {}),
     onSuccess: async () => {
       onState("applied");
       await refresh();
@@ -94,7 +96,7 @@ function CorrectionCard({
       title="Correct a memory"
       reason={proposal.reason}
       state={state}
-      busy={apply.isPending}
+      busy={apply.isPending || memory.isPending}
       blocked={memory.error ? "That memory isn't in this namespace." : null}
       onApply={() => apply.mutate()}
       onDismiss={() => onState("dismissed")}
@@ -108,29 +110,6 @@ function CorrectionCard({
   );
 }
 
-function OneToForget({
-  namespace,
-  id,
-  onMissing,
-}: {
-  namespace: Namespace;
-  id: string;
-  onMissing: () => void;
-}) {
-  const memory = useOwnMemory(namespace, id);
-  const missing = Boolean(memory.error);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reports it once
-  useEffect(() => {
-    if (missing) onMissing();
-  }, [missing]);
-  if (memory.isPending) return <Skeleton className="h-5 w-full" />;
-  return (
-    <li className="text-ui-sm text-text-2 line-through">
-      {memory.data?.memory ?? "A memory that isn't in this namespace"}
-    </li>
-  );
-}
-
 function ForgetCard({
   namespace,
   proposal,
@@ -140,22 +119,35 @@ function ForgetCard({
 }: CardProps<{ ids: string[]; reason: string }>) {
   const memdot = useMemDot();
   const [confirming, setConfirming] = useState(false);
-  const [unknown, setUnknown] = useState(false);
   const count = proposal.ids.length;
+  const memories = useQueries({
+    queries: proposal.ids.map((id) => ownMemory(memdot, namespace, id)),
+  });
   return (
     <ProposalCard
       title={`Forget ${count} ${count === 1 ? "memory" : "memories"}`}
       reason={proposal.reason}
       state={state}
       action="Forget"
-      blocked={unknown ? "One of these isn't in this namespace, so this can't be applied." : null}
+      busy={memories.some((memory) => memory.isPending)}
+      blocked={
+        memories.some((memory) => memory.error)
+          ? "One of these isn't in this namespace, so this can't be applied."
+          : null
+      }
       onApply={() => setConfirming(true)}
       onDismiss={() => onState("dismissed")}
     >
       <ul className="flex flex-col gap-1">
-        {proposal.ids.map((id) => (
-          <OneToForget key={id} namespace={namespace} id={id} onMissing={() => setUnknown(true)} />
-        ))}
+        {memories.map((memory, index) =>
+          memory.isPending ? (
+            <Skeleton key={proposal.ids[index]} className="h-5 w-full" />
+          ) : (
+            <li key={proposal.ids[index]} className="text-ui-sm text-text-2 line-through">
+              {memory.data?.memory ?? "A memory that isn't in this namespace"}
+            </li>
+          ),
+        )}
       </ul>
       <ConfirmDialog
         open={confirming}
@@ -332,7 +324,7 @@ export function Copilot({ namespace }: { namespace: Namespace }) {
                   key={starter}
                   variant="outline"
                   size="sm"
-                  className="h-auto whitespace-normal"
+                  className="h-auto max-w-full py-1.5 whitespace-normal"
                   onClick={() => send(starter)}
                 >
                   {starter}

@@ -19,6 +19,7 @@ import {
 } from "@memdot/config";
 import { blobStaging, jobs, objects, spaces, storedItems } from "@memdot/db";
 import {
+  emitForgotten,
   emitWebhooks,
   enqueueChainTx,
   JOB_KIND,
@@ -778,12 +779,15 @@ export function objectRoutes(services: Services) {
       }),
       async (c) => {
         const object = await loadObject(c, c.req.valid("param").id);
+        const forgotten: string[] = [];
         const deleted = await db.transaction((tx) =>
           tombstoneObjects(
             tx,
             sql`(${objects.id} = ${object.id} or ${objects.segmentId} = ${object.id})`,
+            forgotten,
           ),
         );
+        await emitForgotten(services.boss, db, accountOf(c), forgotten);
         if (object.kind === "file") {
           await emitWebhooks(services.boss, db, accountOf(c), "file.deleted", {
             object_id: object.id,

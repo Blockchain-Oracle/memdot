@@ -789,9 +789,11 @@ export class PrivateNamespace {
   }
 
   /** One person's profile, written with your own model. Only what's returned here knows it. */
-  async generateProfile(
-    userId: string,
-  ): Promise<{ profile: UserProfile; memoriesRead: number; sources: string[] }> {
+  async generateProfile(userId: string): Promise<{
+    profile: UserProfile;
+    memoriesRead: number;
+    sources: { id: string; version: number }[];
+  }> {
     const config = await this.requireLlm("profiles");
     const entries = (await this.list({ showExpired: false }))
       .filter((entry) => entry.userId === userId)
@@ -806,7 +808,7 @@ export class PrivateNamespace {
         entries.map((entry) => entry.text),
       ),
       memoriesRead: entries.length,
-      sources: entries.map((entry) => entry.id),
+      sources: entries.map(({ id, version }) => ({ id, version })),
     };
   }
 

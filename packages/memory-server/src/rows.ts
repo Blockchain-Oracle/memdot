@@ -2,6 +2,7 @@ import {
   type Database,
   memories,
   memoryHistory,
+  memoryProfiles,
   memoryTerms,
   objects,
   storedItems,
@@ -14,7 +15,7 @@ import {
   normalizeEntity,
   termFrequencies,
 } from "@memdot/memory-engine";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { AssistedKeys } from "./keys.js";
 
 export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -158,6 +159,12 @@ export async function forgetRows(
   where: ReturnType<typeof and>,
   actor: string | null,
 ): Promise<{ ids: string[]; segmentIds: string[] }> {
+  // A profile is written from someone's memories, so it may say what's being forgotten. It can be
+  // generated again from what's left. Read first: the update below wipes who a memory was about.
+  const people = await tx
+    .selectDistinct({ folderId: memories.folderId, userId: memories.userId })
+    .from(memories)
+    .where(and(where, isNull(memories.deletedAt), isNotNull(memories.userId)));
   const gone = await tx
     .update(memories)
     .set({
@@ -177,6 +184,13 @@ export async function forgetRows(
     })
     .where(and(where, sql`${memories.deletedAt} is null`))
     .returning({ id: memories.id, segmentId: memories.segmentId, version: memories.version });
+  for (const { folderId, userId } of people) {
+    await tx
+      .delete(memoryProfiles)
+      .where(
+        and(eq(memoryProfiles.folderId, folderId), eq(memoryProfiles.subject, userId as string)),
+      );
+  }
   const ids = gone.map((row) => row.id);
   for (let start = 0; start < ids.length; start += CHUNK) {
     const batch = ids.slice(start, start + CHUNK);

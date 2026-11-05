@@ -1,4 +1,4 @@
-import { openWith, sealTo } from "@memdot/crypto";
+import { openWith, sealTo, WrongKeyError } from "@memdot/crypto";
 import {
   type ChatMessage,
   type Embedder,
@@ -124,7 +124,7 @@ const CHAT_RECALL_THRESHOLD = 0.3;
 const CHAT_RECALL_LIMIT = 10;
 
 /** A Private profile as sealed, with the memories it was written from. */
-type KeptProfile = Omit<ProfileResult, "userId"> & { sources: string[] };
+type KeptProfile = Omit<ProfileResult, "userId"> & { sources: { id: string; version: number }[] };
 
 /** A change a model suggested, with the memories it would touch. */
 export type { DreamProposal };
@@ -445,7 +445,17 @@ export class MemoriesApi {
           jobs: this.jobs,
           embedder: () => this.localEmbedder(),
           llm: () => this.privateLlm(),
-          settings: (id) => this.openSettings(id),
+          settings: async (id) => {
+            try {
+              return await this.openSettings(id);
+            } catch (error) {
+              // Sealed for the owner alone. A connected agent works without them.
+              if (error instanceof WrongKeyError) {
+                return { instructions: null, categories: null, decayHalfLifeDays: null };
+              }
+              throw error;
+            }
+          },
         },
         namespace.id,
         namespace.space_id,
@@ -1102,14 +1112,20 @@ export class MemoriesApi {
     if (held) {
       const profiles = await this.openPrivateProfiles(held.id);
       const kept = profiles[userId];
-      if (!kept) return { userId, profile: null, memoriesRead: 0, generatedAt: null };
-      // Forgetting can happen on any device, or with nothing loaded, and the server can't tell whose
-      // memory went. So a profile is checked when it's read: if one of the memories it was written
-      // from is gone, it may still say what was forgotten, and it goes too.
-      if (kept.sources.some((id) => !held.holds(id))) {
+      const none = { userId, profile: null, memoriesRead: 0, generatedAt: null };
+      if (!kept) return none;
+      // Forgetting or editing can happen on any device, or with nothing loaded, and the server can't
+      // tell whose memory it was. So a profile is checked when it's read, against what's there now:
+      // if one of the memories it was written from has gone or changed, it may say what's no longer
+      // true, and it goes too.
+      const current = new Map(
+        (await held.list({ showExpired: true })).map((entry) => [entry.id, entry.version]),
+      );
+      if (kept.sources.some(({ id, version }) => current.get(id) !== version)) {
         delete profiles[userId];
-        await this.savePrivateProfiles(held.id, profiles);
-        return { userId, profile: null, memoriesRead: 0, generatedAt: null };
+        // A key that can only read can't remove it, and still mustn't be shown it.
+        await this.savePrivateProfiles(held.id, profiles).catch(() => {});
+        return none;
       }
       const { sources: _sources, ...shown } = kept;
       return { userId, ...shown };
@@ -1225,14 +1241,15 @@ export class MemoriesApi {
    * looked back on. Superseded memories are forgotten, merged ones become the first one, and a
    * synthesis is a new memory that names what it rests on and leaves those in place.
    */
-  async applyDream(proposal: DreamProposal): Promise<void> {
+  async applyDream(proposal: DreamProposal, options: { wallet?: Wallet } = {}): Promise<void> {
     if (proposal.kind === "supersede") {
       await this.batchDelete(proposal.sources);
       return;
     }
+    const { wallet } = options;
     const [first, ...others] = proposal.sources as [string, ...string[]];
     if (proposal.kind === "merge") {
-      await this.update(first, { text: proposal.text as string });
+      await this.update(first, { text: proposal.text as string }, wallet ? { wallet } : {});
       if (others.length) await this.batchDelete(others);
       return;
     }
@@ -1244,6 +1261,7 @@ export class MemoriesApi {
       ...(source.runId ? { runId: source.runId } : {}),
       infer: false,
       metadata: { synthesized_from: proposal.sources },
+      ...(wallet ? { wallet } : {}),
     });
   }
 
@@ -1277,6 +1295,13 @@ export class MemoriesApi {
         "Give at least one of userId, agentId or runId.",
       );
     }
+    if (Object.values(scope).includes("*")) {
+      throw new MemDotError(
+        400,
+        "SCOPE_WILDCARD",
+        "A chat is about one user, agent or run, not *.",
+      );
+    }
     const held = await this.route(options.namespaceId);
     const conversation = system
       ? [{ role: "system" as const, content: system }, ...messages]
@@ -1291,7 +1316,15 @@ export class MemoriesApi {
     if (!config) {
       throw new MemDotError(409, "MODEL_REQUIRED", "Set a model for Private memory to chat.");
     }
-    const query = messages
+    // The model takes system text apart from the conversation, as it does on the server.
+    const turns = messages.filter((message) => message.role !== "system");
+    const standing = [
+      system,
+      ...messages.filter((message) => message.role === "system").map(messageText),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const query = turns
       .slice(-CHAT_RECALL_TURNS)
       .map((message) => `${message.role}: ${messageText(message)}`)
       .join("\n");
@@ -1307,12 +1340,12 @@ export class MemoriesApi {
       memories: recalled.map(({ id, memory, score }) => ({ id, memory, score })),
     };
 
-    const instructions = withRecall(system, recallContext(recalled));
+    const instructions = withRecall(standing, recallContext(recalled));
     const { languageModel, streamReply } = await import("@memdot/memory-engine/llm");
     let reply = "";
     for await (const text of streamReply(
       languageModel(config),
-      messages.map(
+      turns.map(
         (message) => ({ role: message.role, content: messageText(message) }) as ModelMessage,
       ),
       { ...(instructions ? { instructions } : {}), ...(signal ? { signal } : {}) },
@@ -1322,7 +1355,7 @@ export class MemoriesApi {
     }
     if (!save) return;
     yield { type: "saving" };
-    const newTurns = messages.slice(messages.findLastIndex((m) => m.role === "assistant") + 1);
+    const newTurns = turns.slice(turns.findLastIndex((m) => m.role === "assistant") + 1);
     const added = await this.add([...newTurns, { role: "assistant", content: reply }], {
       namespaceId: held.id,
       ...scope,
@@ -1393,6 +1426,17 @@ export class MemoriesApi {
       type: "saved",
       memories: (event.results ?? []).map(({ id, memory }) => ({ id, memory: memory ?? null })),
     };
+  }
+
+  /**
+   * One turn of the assistant for an Assisted namespace, as an AI SDK UI message stream. It reads and
+   * proposes, and nothing changes until you apply what it suggests.
+   */
+  assistedCopilot(namespaceId: string, messages: unknown[], signal?: AbortSignal) {
+    return this.ctx.transport.send("POST", "/v1/copilot", {
+      json: { namespace_id: namespaceId, messages },
+      ...(signal ? { signal } : {}),
+    });
   }
 
   /**

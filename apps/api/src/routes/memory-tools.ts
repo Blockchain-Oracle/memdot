@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { memories, memoryProfiles, PRIVATE_PROFILES_SUBJECT } from "@memdot/db";
 import { exportToSchema, generateProfile, proposeDream } from "@memdot/memory-engine/llm";
 import { openBody, scopeOf } from "@memdot/memory-server";
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { badRequest, conflict } from "../lib/errors.js";
 import {
@@ -89,6 +89,7 @@ export function memoryToolRoutes(services: Services) {
               id: row.id,
               text: openBody(keys, folderId, row.sealedText).text,
               createdAt: row.createdAt.toISOString(),
+              version: row.version,
               userId: row.userId,
               agentId: row.agentId,
               runId: row.runId,
@@ -227,13 +228,41 @@ export function memoryToolRoutes(services: Services) {
           memoriesRead: read.length,
           generatedAt,
         };
-        await db
-          .insert(memoryProfiles)
-          .values({ folderId: namespace.id, subject: body.user_id, ...values })
-          .onConflictDoUpdate({
-            target: [memoryProfiles.folderId, memoryProfiles.subject],
-            set: values,
-          });
+        await db.transaction(async (tx) => {
+          // A model takes a while, and something it read may have been forgotten or changed since.
+          // Writing it now would bring that back. Holding these rows makes a forget wait for this
+          // and then remove the profile too.
+          const current = new Map(
+            (
+              await tx
+                .select({ id: memories.id, version: memories.version })
+                .from(memories)
+                .where(
+                  and(
+                    inArray(
+                      memories.id,
+                      read.map((memory) => memory.id),
+                    ),
+                    isNull(memories.deletedAt),
+                  ),
+                )
+                .for("share")
+            ).map((row) => [row.id, row.version]),
+          );
+          if (read.some((memory) => current.get(memory.id) !== memory.version)) {
+            throw conflict(
+              "MEMORIES_CHANGED",
+              "These memories changed while the profile was being written. Try again.",
+            );
+          }
+          await tx
+            .insert(memoryProfiles)
+            .values({ folderId: namespace.id, subject: body.user_id, ...values })
+            .onConflictDoUpdate({
+              target: [memoryProfiles.folderId, memoryProfiles.subject],
+              set: values,
+            });
+        });
         return c.json(
           {
             user_id: body.user_id,

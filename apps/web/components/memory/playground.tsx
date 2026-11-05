@@ -201,7 +201,7 @@ export function Playground({ namespace }: { namespace: Namespace }) {
                     key={starter}
                     variant="outline"
                     size="sm"
-                    className="h-auto whitespace-normal"
+                    className="h-auto max-w-full py-1.5 whitespace-normal"
                     disabled={!person}
                     onClick={() => void send(starter)}
                   >
@@ -269,7 +269,7 @@ export function Playground({ namespace }: { namespace: Namespace }) {
             rows={1}
             value={draft}
             aria-label="Message"
-            placeholder="Say something worth remembering…"
+            placeholder="Say something…"
             className="max-h-32 min-h-9 resize-none"
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {

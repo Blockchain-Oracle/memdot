@@ -11,6 +11,7 @@ import { MoonStarIcon, SparklesIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/files/file-dialogs";
+import { useUploads } from "@/components/files/uploads";
 import { useMemDot } from "@/lib/memdot";
 import { ModelError } from "./model-error";
 
@@ -36,6 +37,7 @@ const GROUPS: { kind: DreamProposal["kind"]; title: string; description: string 
 export function Dream({ namespace }: { namespace: Namespace }) {
   const memdot = useMemDot();
   const queryClient = useQueryClient();
+  const { wallet } = useUploads();
   const id = useId();
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const [applied, setApplied] = useState<Set<number>>(new Set());
@@ -108,7 +110,10 @@ export function Dream({ namespace }: { namespace: Namespace }) {
     let failed = 0;
     for (const index of chosen) {
       try {
-        await memdot.memories.applyDream(proposals[index] as DreamProposal);
+        await memdot.memories.applyDream(
+          proposals[index] as DreamProposal,
+          wallet ? { wallet } : {},
+        );
         done.add(index);
       } catch {
         failed += 1;

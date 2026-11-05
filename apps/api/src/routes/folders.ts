@@ -1,13 +1,15 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { folders, objects } from "@memdot/db";
+import { folders, memoryProfiles, objects } from "@memdot/db";
+import { emitForgotten } from "@memdot/jobs";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { badRequest, conflict } from "../lib/errors.js";
 import { tombstoneObjects } from "../lib/lifecycle.js";
 import { loadFolder, loadSpace } from "../lib/ownership.js";
-import { requireScope } from "../lib/principal.js";
+import { accountOf, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { fromBase64, IdParam, SealedText, toBase64, Uuid } from "../schemas.js";
+import type { Services } from "../types.js";
 
 const MemoryMode = z.enum(["off", "private", "assisted"]).openapi({
   description:
@@ -60,7 +62,7 @@ async function lockSpaceFolders(tx: Executor, spaceId: string): Promise<void> {
   await tx.execute(sql`select id from spaces where id = ${spaceId} for update`);
 }
 
-export function folderRoutes() {
+export function folderRoutes(services: Services) {
   return createRouter()
     .openapi(
       createRoute({
@@ -229,6 +231,7 @@ export function folderRoutes() {
       }),
       async (c) => {
         const folder = await loadFolder(c, c.req.valid("param").id);
+        const forgotten: string[] = [];
         const { ids, tombstoned } = await db.transaction(async (tx) => {
           await lockSpaceFolders(tx, folder.spaceId);
           const subtree = await subtreeIds(tx, folder.id, folder.spaceId);
@@ -236,13 +239,17 @@ export function folderRoutes() {
             tx,
             and(eq(objects.spaceId, folder.spaceId), inArray(objects.folderId, subtree)) ??
               sql`false`,
+            forgotten,
           );
+          // Folders are only marked deleted, so their sealed profiles wouldn't go by themselves.
+          await tx.delete(memoryProfiles).where(inArray(memoryProfiles.folderId, subtree));
           await tx
             .update(folders)
             .set({ deletedAt: new Date() })
             .where(inArray(folders.id, subtree));
           return { ids: subtree, tombstoned: n };
         });
+        await emitForgotten(services.boss, db, accountOf(c), forgotten);
         return c.json({ deleted: true as const, folders: ids.length, objects: tombstoned }, 200);
       },
     );

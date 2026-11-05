@@ -77,12 +77,21 @@ export function chatRoutes(services: Services) {
           "Give at least one of user_id, agent_id or run_id.",
         );
       }
+      // "*" in a filter means anyone, so an app forwarding its user's id could recall everyone's.
+      if ([body.user_id, body.agent_id, body.run_id].includes("*")) {
+        throw new HttpError(
+          400,
+          "SCOPE_WILDCARD",
+          "A chat is about one user, agent or run, not *.",
+        );
+      }
       const namespace = await resolveAssisted(c, body.namespace_id);
       const models = await searchEmbedder(c, services);
       if (!models.llm) {
         throw new HttpError(409, "MODEL_REQUIRED", "Set a model under Configuration first.");
       }
-      await spendSharedModel(c);
+      // The reply, and reading it afterwards for what to keep.
+      await spendSharedModel(c, body.store ? 2 : 1);
       const accountId = accountOf(c);
       const llm = models.llm;
 
@@ -226,6 +235,8 @@ export function chatRoutes(services: Services) {
         });
       return streamSSE(c, async (stream) => {
         let reply = "";
+        const stopped = new AbortController();
+        stream.onAbort(() => stopped.abort());
         await stream.writeSSE({
           data: chunk({ role: "assistant" }, null, {
             namespace_id: namespace.id,
@@ -236,6 +247,7 @@ export function chatRoutes(services: Services) {
           const { instructions: system, temperature, maxOutputTokens, topP } = settings;
           for await (const text of streamReply(llm, messages, {
             ...(system ? { instructions: system } : {}),
+            signal: stopped.signal,
             settings: {
               ...(temperature !== undefined ? { temperature } : {}),
               ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
@@ -246,6 +258,8 @@ export function chatRoutes(services: Services) {
             await stream.writeSSE({ data: chunk({ content: text }, null) });
           }
         } catch {
+          // Whoever was listening left, so there's no one to tell.
+          if (stopped.signal.aborted) return;
           // The way OpenAI's own streams report it. Nothing half-answered gets kept.
           await stream.writeSSE({
             data: JSON.stringify({

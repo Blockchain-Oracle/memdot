@@ -68,14 +68,17 @@ async function compactNamespaces(deps: Deps): Promise<number> {
 async function pruneRequestLog(deps: Deps): Promise<number> {
   const cutoff = new Date(Date.now() - REQUEST_LOG_DAYS * 24 * HOUR_MS);
   let total = 0;
-  for (;;) {
-    const result = await deps.db.execute(sql`
-      delete from request_logs where id in (
-        select id from request_logs where created_at < ${cutoff} limit ${PRUNE_BATCH}
-      )`);
-    total += result.rowCount ?? 0;
-    if ((result.rowCount ?? 0) < PRUNE_BATCH) return total;
+  for (const table of [sql`request_logs`, sql`webhook_deliveries`]) {
+    for (;;) {
+      const result = await deps.db.execute(sql`
+        delete from ${table} where id in (
+          select id from ${table} where created_at < ${cutoff} limit ${PRUNE_BATCH}
+        )`);
+      total += result.rowCount ?? 0;
+      if ((result.rowCount ?? 0) < PRUNE_BATCH) break;
+    }
   }
+  return total;
 }
 
 /**

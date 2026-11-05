@@ -60,13 +60,14 @@ export function copilotRoutes(services: Services) {
         throw conflict("MODEL_REQUIRED", "Set a model under Configuration to use Copilot.");
       }
       await spendSharedModel(c);
-      const embedder = (await searchEmbedder(c, services)).embedder;
 
       const open = (row: { sealedText: Uint8Array | null }) =>
         row.sealedText ? openBody(keys, namespace.id, row.sealedText).text : "";
 
       const data: CopilotData = {
         async search(query, limit) {
+          // Asked each time, since each search spends one of the account's embedded searches.
+          const { embedder } = await searchEmbedder(c, services);
           const hits = await searchMemories(db, keys, {
             folderId: namespace.id,
             query,
@@ -135,15 +136,13 @@ export function copilotRoutes(services: Services) {
         models.llm,
         await convertToModelMessages(body.messages as unknown as UIMessage[]),
         data,
+        // The first call was paid for above. Past the allowance, it answers with what it has.
         {
-          // The first call was paid for above. A step past the allowance still finishes the answer.
-          onStepFinish: (() => {
-            let steps = 0;
-            return () => {
-              steps += 1;
-              if (steps > 1) void spendSharedModel(c).catch(() => {});
-            };
-          })(),
+          beforeNextStep: () =>
+            spendSharedModel(c).then(
+              () => true,
+              () => false,
+            ),
         },
       );
       return result.toUIMessageStreamResponse() as never;

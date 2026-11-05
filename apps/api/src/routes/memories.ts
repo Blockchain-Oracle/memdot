@@ -29,7 +29,7 @@ import {
   tombstoneObjects,
   writeTerms,
 } from "@memdot/memory-server";
-import { and, asc, count, eq, inArray, isNotNull, isNull, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import type { Context } from "hono";
 import { db } from "../db.js";
@@ -251,6 +251,14 @@ async function applyUpdate(
       : {}),
   };
   await tx.update(memories).set(next).where(eq(memories.id, row.id));
+  // What it says now isn't what the profile was written from.
+  if (textChanged && row.userId) {
+    await tx
+      .delete(memoryProfiles)
+      .where(
+        and(eq(memoryProfiles.folderId, row.folderId), eq(memoryProfiles.subject, row.userId)),
+      );
+  }
   await tx.insert(memoryHistory).values({
     memoryId: row.id,
     event: "UPDATE",
@@ -267,22 +275,9 @@ async function forget(
   where: SQL,
   actor: string | null,
 ): Promise<string[]> {
-  // A profile is written from someone's memories, so it may say what's being forgotten. It can be
-  // generated again from what's left.
-  const people = await tx
-    .selectDistinct({ folderId: memories.folderId, userId: memories.userId })
-    .from(memories)
-    .where(and(where, isNull(memories.deletedAt), isNotNull(memories.userId)));
   const { ids, segmentIds } = await forgetRows(tx, where, actor);
   const empty = await emptySegments(tx, segmentIds);
   if (empty.length > 0) await tombstoneObjects(tx, inArray(objects.id, empty) as SQL);
-  for (const { folderId, userId } of people) {
-    await tx
-      .delete(memoryProfiles)
-      .where(
-        and(eq(memoryProfiles.folderId, folderId), eq(memoryProfiles.subject, userId as string)),
-      );
-  }
   return ids;
 }
 

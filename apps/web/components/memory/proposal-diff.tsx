@@ -3,29 +3,33 @@
 import { Button } from "@memdot/ui/components/button";
 import { Spinner } from "@memdot/ui/components/spinner";
 import { Status, StatusIndicator, StatusLabel } from "@memdot/ui/components/status";
-import { diffWords } from "diff";
+import { diffArrays } from "diff";
+
+const WORDS = /(\s+)/;
 
 /** A change shown in place: what goes struck through, what comes marked. */
 export function ProposalDiff({ before, after }: { before: string; after: string }) {
   return (
     <p className="text-ui break-words whitespace-pre-wrap">
-      {diffWords(before, after).map((part, index) => {
+      {/* By whole words: "9:00" to "10:30" reads as one change, not as "9" and "00" swapped. */}
+      {diffArrays(before.split(WORDS), after.split(WORDS)).map((part, index) => {
         const key = index; // a diff's parts never reorder
+        const text = part.value.join("");
         if (part.added) {
           return (
             <ins key={key} className="rounded-sm bg-ok/15 text-ok-fg no-underline">
-              {part.value}
+              {text}
             </ins>
           );
         }
         if (part.removed) {
           return (
             <del key={key} className="rounded-sm bg-danger/10 text-danger-fg">
-              {part.value}
+              {text}
             </del>
           );
         }
-        return <span key={key}>{part.value}</span>;
+        return <span key={key}>{text}</span>;
       })}
     </p>
   );

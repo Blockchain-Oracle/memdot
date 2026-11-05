@@ -119,8 +119,8 @@ export function createApp(services: Services) {
 
   app
     .route("/", accountRoutes(services))
-    .route("/", spaceRoutes())
-    .route("/", folderRoutes())
+    .route("/", spaceRoutes(services))
+    .route("/", folderRoutes(services))
     .route("/", objectRoutes(services))
     .route("/", gatewayRoutes(services))
     .route("/", grantRoutes())

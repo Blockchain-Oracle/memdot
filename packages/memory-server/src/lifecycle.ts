@@ -15,7 +15,12 @@ type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
  * Memories follow (R8): those stored in a tombstoned segment or read from a tombstoned file are
  * forgotten, and a segment left with nothing live is tombstoned in turn.
  */
-export async function tombstoneObjects(tx: Tx, where: SQL): Promise<number> {
+export async function tombstoneObjects(
+  tx: Tx,
+  where: SQL,
+  /** Filled with the memories this forgot, for whoever needs to announce it after the commit. */
+  forgotten?: string[],
+): Promise<number> {
   // Jobs still following these objects end now, so no progress stream waits on them forever.
   const openJobs = await tx
     .select({ id: jobs.id })
@@ -61,16 +66,17 @@ export async function tombstoneObjects(tx: Tx, where: SQL): Promise<number> {
 
   const ids = result.rows.map((row) => row.id);
   if (ids.length > 0) {
-    const { segmentIds } = await forgetRows(
+    const { ids: memoryIds, segmentIds } = await forgetRows(
       tx,
       or(inArray(memories.segmentId, ids), inArray(memories.sourceObjectId, ids)),
       null,
     );
+    forgotten?.push(...memoryIds);
     const empty = await emptySegments(
       tx,
       segmentIds.filter((id) => !ids.includes(id)),
     );
-    if (empty.length > 0) await tombstoneObjects(tx, inArray(objects.id, empty) as SQL);
+    if (empty.length > 0) await tombstoneObjects(tx, inArray(objects.id, empty) as SQL, forgotten);
   }
   return ids.length;
 }

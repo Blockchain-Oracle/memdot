@@ -8,7 +8,7 @@ import {
   memorySettings,
   objects,
 } from "@memdot/db";
-import { emitWebhooks, enqueueMemory, JOB_KIND } from "@memdot/jobs";
+import { emitForgotten, emitWebhooks, enqueueMemory, JOB_KIND } from "@memdot/jobs";
 import { parseMemoryImport } from "@memdot/memory-engine";
 import { compactIfDue, openBody, sealWrite, tombstoneObjects } from "@memdot/memory-server";
 import { and, desc, eq, inArray, isNull, notInArray, type SQL, sql } from "drizzle-orm";
@@ -348,6 +348,7 @@ export function namespaceRoutes(services: Services) {
       }),
       async (c) => {
         const namespace = await loadNamespace(c, c.req.valid("param").id);
+        const forgotten: string[] = [];
         const segments = await db.transaction(async (tx) => {
           await tx.delete(memoryProfiles).where(eq(memoryProfiles.folderId, namespace.id));
           return tombstoneObjects(
@@ -356,8 +357,10 @@ export function namespaceRoutes(services: Services) {
               eq(objects.folderId, namespace.id),
               inArray(objects.kind, ["segment", "index_snapshot"]),
             ) as SQL,
+            forgotten,
           );
         });
+        await emitForgotten(services.boss, db, accountOf(c), forgotten, namespace.id);
         return c.json({ message: "The namespace is empty.", segments }, 200);
       },
     )
@@ -697,7 +700,20 @@ export function namespaceRoutes(services: Services) {
             ),
           );
         if (!segment) throw badRequest("SEGMENT", "That segment isn't in this namespace.");
-        const recorded = await db.transaction(async (tx) => {
+        const { recorded, added, updated } = await db.transaction(async (tx) => {
+          const known = new Map(
+            (
+              await tx
+                .select({ id: memories.id, version: memories.version })
+                .from(memories)
+                .where(
+                  inArray(
+                    memories.id,
+                    body.entries.map((entry) => entry.id),
+                  ),
+                )
+            ).map((row) => [row.id, row.version]),
+          );
           await tx
             .insert(memorySegments)
             .values({ objectId: segment.id, folderId: namespace.id, entries: body.entries.length })
@@ -730,16 +746,27 @@ export function namespaceRoutes(services: Services) {
                 isNull(memories.deletedAt),
               ),
             })
-            .returning({ id: memories.id });
-          return rows.map((row) => row.id);
+            .returning({ id: memories.id, version: memories.version });
+          // A compaction rewrites the same versions into a new segment: nothing has changed.
+          return {
+            recorded: rows.length,
+            added: rows.filter((row) => !known.has(row.id)).map((row) => row.id),
+            updated: rows
+              .filter((row) => (known.get(row.id) ?? row.version) < row.version)
+              .map((row) => row.id),
+          };
         });
-        if (recorded.length > 0) {
-          await emitWebhooks(services.boss, db, accountId, "memory.added", {
+        for (const [event, memoryIds] of [
+          ["memory.added", added],
+          ["memory.updated", updated],
+        ] as const) {
+          if (memoryIds.length === 0) continue;
+          await emitWebhooks(services.boss, db, accountId, event, {
             namespace_id: namespace.id,
-            memory_ids: recorded,
+            memory_ids: memoryIds,
           });
         }
-        return c.json({ recorded: recorded.length }, 201);
+        return c.json({ recorded }, 201);
       },
     );
 }

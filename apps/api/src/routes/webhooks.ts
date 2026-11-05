@@ -7,7 +7,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Context } from "hono";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
-import { accountOf, requireScope } from "../lib/principal.js";
+import { accountOf, requireAccountWide, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import { IdParam } from "../schemas.js";
 import type { AppEnv, Services } from "../types.js";
@@ -78,6 +78,7 @@ const newSecret = () => `${SECRET_PREFIX}${randomBytes(SECRET_BYTES).toString("b
 
 export function webhookRoutes(services: Services) {
   const keys = services.memoryKeys;
+  // Every space's events go to a webhook, so a key limited to some spaces can't see or change them.
   const read = requireScope("usage", "read");
   // Whoever can add one chooses where this account's events go.
   const manage = requireScope("keys", "write");
@@ -90,7 +91,7 @@ export function webhookRoutes(services: Services) {
         tags: ["Webhooks"],
         summary: "Your webhooks",
         security: authenticated,
-        middleware: read,
+        middleware: [read, requireAccountWide] as const,
         responses: {
           200: {
             description: "Webhooks",
@@ -117,7 +118,7 @@ export function webhookRoutes(services: Services) {
         description:
           "Deliveries are signed, and carry ids and event types only, never what a memory or file says. The signing secret is returned once, here.",
         security: authenticated,
-        middleware: manage,
+        middleware: [manage, requireAccountWide] as const,
         request: {
           body: {
             content: jsonContent(
@@ -159,7 +160,7 @@ export function webhookRoutes(services: Services) {
         tags: ["Webhooks"],
         summary: "Change a webhook, or pause it",
         security: authenticated,
-        middleware: manage,
+        middleware: [manage, requireAccountWide] as const,
         request: {
           params: IdParam,
           body: {
@@ -200,7 +201,7 @@ export function webhookRoutes(services: Services) {
         summary: "Replace the signing secret",
         description: "The old secret stops at once. The new one is returned once, here.",
         security: authenticated,
-        middleware: manage,
+        middleware: [manage, requireAccountWide] as const,
         request: { params: IdParam },
         responses: {
           200: {
@@ -228,7 +229,7 @@ export function webhookRoutes(services: Services) {
         tags: ["Webhooks"],
         summary: "Remove a webhook, and its delivery log",
         security: authenticated,
-        middleware: manage,
+        middleware: [manage, requireAccountWide] as const,
         request: { params: IdParam },
         responses: {
           200: {
@@ -252,7 +253,7 @@ export function webhookRoutes(services: Services) {
         tags: ["Webhooks"],
         summary: "Send a test event",
         security: authenticated,
-        middleware: manage,
+        middleware: [manage, requireAccountWide] as const,
         request: { params: IdParam },
         responses: {
           202: {
@@ -276,7 +277,7 @@ export function webhookRoutes(services: Services) {
         tags: ["Webhooks"],
         summary: "What was sent, and how it went",
         security: authenticated,
-        middleware: read,
+        middleware: [read, requireAccountWide] as const,
         request: { params: IdParam },
         responses: {
           200: {
@@ -321,7 +322,7 @@ export function webhookRoutes(services: Services) {
         summary: "Send an event again",
         description: "As a new delivery, with the same event and ids.",
         security: authenticated,
-        middleware: manage,
+        middleware: [manage, requireAccountWide] as const,
         request: { params: IdParam.extend({ deliveryId: z.uuid() }) },
         responses: {
           202: {

@@ -44,6 +44,9 @@ export async function queueDelivery(
  * Tells whoever subscribed. Telling them is never worth failing what actually happened, so a problem
  * here is logged and goes no further.
  */
+/** Keeps one delivery small, since a namespace reset can forget thousands. */
+const IDS_PER_EVENT = 500;
+
 export async function emitWebhooks(
   boss: PgBoss,
   db: Executor,
@@ -65,5 +68,21 @@ export async function emitWebhooks(
     for (const { id } of subscribed) await queueDelivery(boss, db, id, event, data);
   } catch (error) {
     console.warn("[webhooks] couldn't queue", event, (error as Error).message);
+  }
+}
+
+/** A memory.deleted for each batch of what was forgotten, however big the delete was. */
+export async function emitForgotten(
+  boss: PgBoss,
+  db: Executor,
+  accountId: string,
+  memoryIds: string[],
+  namespaceId?: string,
+): Promise<void> {
+  for (let start = 0; start < memoryIds.length; start += IDS_PER_EVENT) {
+    await emitWebhooks(boss, db, accountId, "memory.deleted", {
+      ...(namespaceId ? { namespace_id: namespaceId } : {}),
+      memory_ids: memoryIds.slice(start, start + IDS_PER_EVENT),
+    });
   }
 }
