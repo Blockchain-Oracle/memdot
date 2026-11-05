@@ -58,7 +58,13 @@ section("skills and bundles");
 const SKILL_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const WANTED_SKILLS = ["search", "remember", "forget", "status", "pause", "resume", "login"];
 const SKILL_FIELDS: Record<string, string[]> = {
-  "claude-code-plugin": ["name", "description", "argument-hint", "disable-model-invocation"],
+  "claude-code-plugin": [
+    "name",
+    "description",
+    "argument-hint",
+    "disable-model-invocation",
+    "metadata",
+  ],
   "cursor-plugin": ["name", "description", "disable-model-invocation"],
   "kimi-plugin": ["name", "description", "disable-model-invocation"],
   "antigravity-plugin": ["name", "description", "disable-model-invocation"],

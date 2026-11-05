@@ -3,6 +3,7 @@ name: remember
 description: Save one fact to MemDot right now, exactly as given.
 argument-hint: "[what to remember]"
 disable-model-invocation: true
+metadata: { internal: true }
 ---
 
 # Remember in MemDot

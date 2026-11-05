@@ -1,6 +1,7 @@
 ---
 name: status
 description: Check whether MemDot memory is connected and saving in this repository.
+metadata: { internal: true }
 ---
 
 # MemDot status

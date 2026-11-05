@@ -2,6 +2,7 @@
 name: pause
 description: Stop MemDot saving and recalling on its own, until resumed.
 disable-model-invocation: true
+metadata: { internal: true }
 ---
 
 # Pause MemDot

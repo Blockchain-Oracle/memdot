@@ -3,6 +3,7 @@ name: forget
 description: Permanently forget memories from MemDot, after confirming with the user.
 argument-hint: "[what to forget, or --repo]"
 disable-model-invocation: true
+metadata: { internal: true }
 ---
 
 # Forget from MemDot

@@ -2,6 +2,7 @@
 name: resume
 description: Turn MemDot's saving and recall back on after a pause.
 disable-model-invocation: true
+metadata: { internal: true }
 ---
 
 # Resume MemDot

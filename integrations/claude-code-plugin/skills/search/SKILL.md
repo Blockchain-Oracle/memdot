@@ -3,6 +3,7 @@ name: search
 description: Search what MemDot remembers about this repository and this user.
 argument-hint: "[question] [--scope repo|mine|all] [--top-k n]"
 disable-model-invocation: true
+metadata: { internal: true }
 ---
 
 # Search MemDot

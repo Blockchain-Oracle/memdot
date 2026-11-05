@@ -32,6 +32,13 @@ jobs:
       - run: pnpm test
       - name: Every agent plugin matches its source and what its host accepts
         run: pnpm --filter @memdot/agent-plugin-core conformance
+      - name: The CLI reference in the skills matches the CLI
+        run: node scripts/skills-cli-reference.mjs --check
+      - name: The Zapier app is valid
+        working-directory: integrations/zapier-memdot
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx zapier-platform validate --without-style
 
   python:
     runs-on: ubuntu-latest

@@ -33,7 +33,13 @@ const pretty = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 export type Files = Record<string, string>;
 
 /** Which frontmatter fields each host's skills can carry, beyond name and description. */
-const RICH_FRONTMATTER = ["argument-hint", "disable-model-invocation"];
+const RICH_FRONTMATTER = [
+  "argument-hint",
+  "disable-model-invocation",
+  // `npx skills add` finds this plugin through the marketplace file. This keeps its skills out of that
+  // list, since they only work inside the plugin.
+  "metadata",
+];
 
 interface SkillStyle {
   hostName: string;

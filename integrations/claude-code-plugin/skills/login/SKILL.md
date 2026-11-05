@@ -2,6 +2,7 @@
 name: login
 description: Connect this machine to MemDot so memories can be saved and recalled.
 disable-model-invocation: true
+metadata: { internal: true }
 ---
 
 # Connect MemDot
