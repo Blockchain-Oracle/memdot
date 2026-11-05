@@ -264,7 +264,7 @@ console.log("\n── An AI Agent with MemDot in its memory slot");
   const first = await executeWithModel(
     await prepare(
       "agent-with-memory",
-      message(`Please remember this for later: my locker code word is ${word}.`, `one-${stamp}`),
+      message(`Please remember this for later: my bicycle is called ${word}.`, `one-${stamp}`),
       firstId,
     ),
     firstId,
@@ -280,7 +280,7 @@ console.log("\n── An AI Agent with MemDot in its memory slot");
   const same = await executeWithModel(
     await prepare(
       "agent-with-memory",
-      message("What did I just ask you to remember?", `one-${stamp}`),
+      message("What did I just tell you my bicycle is called?", `one-${stamp}`),
       sameId,
     ),
     sameId,
@@ -297,11 +297,11 @@ console.log("\n── An AI Agent with MemDot in its memory slot");
     "remember-and-search",
     (node) => {
       if (node.name === "Remember") {
-        node.parameters.text = `${user} is checking their locker`;
+        node.parameters.text = `${user} is looking for their bicycle`;
         node.parameters.userId = user;
       }
       if (node.name === "Search") {
-        node.parameters.query = "locker code word";
+        node.parameters.query = "what is the bicycle called";
         node.parameters.userId = user;
         node.parameters.limit = 5;
       }
@@ -322,7 +322,7 @@ console.log("\n── An AI Agent with MemDot in its memory slot");
   const other = await executeWithModel(
     await prepare(
       "agent-with-memory",
-      message("What is my locker code word?", `two-${stamp}`),
+      message("What is my bicycle called?", `two-${stamp}`),
       otherId,
     ),
     otherId,
@@ -376,7 +376,7 @@ console.log("\n── An AI Agent with MemDot in its memory slot");
     await prepare(
       "agent-with-memory",
       (node) => {
-        message("What is my locker code word?", `three-${stamp}`)(node);
+        message("What is my bicycle called?", `three-${stamp}`)(node);
         if (node.name === "MemDot Chat Memory") node.parameters.userId = `${user}-someone-else`;
       },
       strangerId,

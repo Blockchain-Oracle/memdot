@@ -145,7 +145,7 @@ const rows = [
         ],
       ]
     : []),
-  ...(integrations
+  ...(integrations?.n8n
     ? [
         [
           "A file encrypted inside an n8n workflow, read back and verified there",

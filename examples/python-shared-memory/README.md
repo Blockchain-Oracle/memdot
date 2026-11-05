@@ -11,7 +11,7 @@ The whole idea is two lines of [`team.py`](team.py):
 
 ```python
 self.memory.add(text, agent_id=self.name, run_id=self.project, infer=False)
-hits = self.memory.search(query, run_id=self.project)
+notes = self.memory.get_all(run_id=self.project).results
 ```
 
 ## Run it

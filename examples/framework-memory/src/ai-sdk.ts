@@ -15,15 +15,15 @@ const model = memdot.wrap(google(MODEL), { userId, whenNoModel: "as-written" });
 console.log(`First session, as ${userId}…`);
 const first = await generateText({
   model,
-  prompt: `Please remember this for later: my locker code word is ${word}.`,
+  prompt: `Please remember this for later: my bicycle is called ${word}.`,
 });
 console.log(first.text.trim());
 
 const memory = memdot.memory({ userId });
-await waitUntilFound(() => memory.search("locker code word"), word);
+await waitUntilFound(() => memory.search("what is the bicycle called"), word);
 
 console.log("\nA new session, streaming, with nothing carried over but memory…");
-const second = streamText({ model, prompt: "What's my locker code word?" });
+const second = streamText({ model, prompt: "What's my bicycle called?" });
 let answer = "";
 for await (const text of second.textStream) answer += text;
 report(word, answer);
@@ -33,7 +33,7 @@ const tools = await generateText({
   model: google(MODEL),
   tools: memdot.tools({ userId }),
   stopWhen: stepCountIs(4),
-  prompt: "Use your memory tools to find my locker code word, then tell me what it is.",
+  prompt: "Use your memory tools to find what my bicycle is called, then tell me.",
 });
 report(word, tools.text);
 

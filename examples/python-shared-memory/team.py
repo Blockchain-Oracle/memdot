@@ -29,12 +29,18 @@ def ask(prompt: str) -> str:
     """Any model works here. This one has a free tier, which limits requests by the minute."""
     key = os.environ["GEMINI_API_KEY"]
     for attempt in range(1, MODEL_RETRIES + 1):
-        response = httpx.post(
-            MODEL_URL,
-            headers={"x-goog-api-key": key},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=60,
-        )
+        try:
+            response = httpx.post(
+                MODEL_URL,
+                headers={"x-goog-api-key": key},
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+                timeout=60,
+            )
+        except httpx.TimeoutException:
+            if attempt == MODEL_RETRIES:
+                raise
+            print("  (the model didn't answer; trying again)")
+            continue
         if response.status_code in RETRY_STATUSES and attempt < MODEL_RETRIES:
             print(f"  (the model is busy; trying again in {MODEL_RETRY_SECONDS} s)")
             time.sleep(MODEL_RETRY_SECONDS)
@@ -71,19 +77,10 @@ class Agent:
         """Under this agent only, with no project, so the others' project searches don't find it."""
         self.memory.add(text, agent_id=self.name, namespace_id=NAMESPACE, infer=False)
 
-    def read_project(self, query: str) -> list[tuple[str, str]]:
+    def read_project(self) -> list[tuple[str, str]]:
         """Everyone's notes on this project, and who wrote each one."""
-        hits = self.memory.search(query, run_id=self.project, namespace_id=NAMESPACE, top_k=20)
-        return [(hit.agent_id or "unknown", hit.memory) for hit in hits]
-
-
-def wait_for_notes(agent: Agent, query: str, want: int) -> list[tuple[str, str]]:
-    deadline = time.time() + 60
-    notes = agent.read_project(query)
-    while len(notes) < want and time.time() < deadline:
-        time.sleep(2)
-        notes = agent.read_project(query)
-    return notes
+        page = self.memory.get_all(run_id=self.project, namespace_id=NAMESPACE)
+        return [(note.agent_id or "unknown", note.memory) for note in page.results]
 
 
 def main() -> int:
@@ -105,7 +102,7 @@ def main() -> int:
             print(f"  noted: {fact}")
 
         print(f"\n{critic.name} reads what's there, knowing nothing else…")
-        seen = wait_for_notes(critic, topic, len(facts))
+        seen = critic.read_project()
         assert seen, "the critic found nothing"
         listed = "\n".join(f"- {text}" for _, text in seen)
         risk = lines_of(
@@ -118,7 +115,7 @@ def main() -> int:
         print(f"  saw {len(seen)} notes, and added: {risk}")
 
         print(f"\n{writer.name} gets one question and whatever's in memory…")
-        everything = wait_for_notes(writer, topic, len(facts) + 1)
+        everything = writer.read_project()
         authors = sorted({author for author, _ in everything})
         print(f"  found {len(everything)} notes, from: {', '.join(authors)}")
         credited = "\n".join(f"- ({author}) {text}" for author, text in everything)
@@ -130,7 +127,7 @@ def main() -> int:
 
         print("Each agent can also keep something to itself.")
         writer.remember_alone(f"My reader for {project} prefers short sentences.")
-        shared = writer.read_project("who prefers short sentences?")
+        shared = writer.read_project()
         mine = writer.memory.search(
             "who prefers short sentences?",
             agent_id=writer.name,

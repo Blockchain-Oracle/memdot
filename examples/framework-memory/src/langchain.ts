@@ -13,20 +13,20 @@ const agent = createAgent({ model: llm, tools: [], middleware: [memdotMiddleware
 console.log(`First session, as ${userId}…`);
 const first = await agent.invoke({
   messages: [
-    { role: "user", content: `Please remember this for later: my locker code word is ${word}.` },
+    { role: "user", content: `Please remember this for later: my bicycle is called ${word}.` },
   ],
 });
 console.log(first.messages.at(-1)?.text);
 
 const [, recall] = memdotTools({ userId });
 await waitUntilFound(async () => {
-  const text = await recall.invoke({ query: "locker code word" });
+  const text = await recall.invoke({ query: "what is the bicycle called" });
   return [{ memory: String(text) }];
 }, word);
 
 console.log("\nA new session, with nothing carried over but memory…");
 const second = await agent.invoke({
-  messages: [{ role: "user", content: "What's my locker code word?" }],
+  messages: [{ role: "user", content: "What's my bicycle called?" }],
 });
 report(word, second.messages.at(-1)?.text ?? "");
 

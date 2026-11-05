@@ -1,0 +1,25 @@
+{
+  "stage": "S12",
+  "at": "2026-11-05T14:16:59.218Z",
+  "api": "https://api.84.46.247.92.sslip.io",
+  "app": "https://app.84.46.247.92.sslip.io",
+  "passed": [
+    "cli",
+    "n8n",
+    "zapier",
+    "skills",
+    "frameworks",
+    "python"
+  ],
+  "cli": "0.1.4",
+  "cookbookFile": "0x5fec635334432baf1a59614550d1c0f52dd433bad80a7ede06466a4a2674f201",
+  "mcpTools": 27,
+  "n8n": {
+    "file": {
+      "txHash": "0xf1d1daccd30052f59b66fa658ec364ad208d130538c38d1fe9af25fbcf586324",
+      "block": 335736,
+      "name": "cellar-note.txt"
+    },
+    "cid": "bafk2bzacedfxfuso5baoxmdg4zngrpgevjbptp55zbre4azedmrhswzwamcn4"
+  }
+}
