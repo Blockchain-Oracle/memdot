@@ -1,11 +1,11 @@
 import { CLIENT_HEADER, IDEMPOTENCY_HEADER, REQUEST_ID_HEADER } from "@memdot/config";
 import { Scalar } from "@scalar/hono-api-reference";
 import { bodyLimit } from "hono/body-limit";
-import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { auth } from "./auth/index.js";
 import { env } from "./env.js";
+import { corsFor } from "./lib/cors.js";
 import { errorResponse } from "./lib/errors.js";
 import { resolvePrincipal } from "./lib/principal.js";
 import { RateLimiter, rateLimit } from "./lib/rate-limit.js";
@@ -53,22 +53,7 @@ export function createApp(services: Services) {
 
   app.use("*", requestId({ headerName: REQUEST_ID_HEADER }));
   app.use("*", secureHeaders({ crossOriginResourcePolicy: "cross-origin" }));
-  const corsRules = {
-    allowHeaders: ["content-type", "authorization", "x-api-key", IDEMPOTENCY_HEADER, CLIENT_HEADER],
-    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    exposeHeaders: [REQUEST_ID_HEADER, "retry-after"],
-    maxAge: 600,
-  };
-  const dashboardCors = cors({ ...corsRules, origin: env.WEB_ORIGIN, credentials: true });
-  // Anyone's page can call the API with a key, which is what the browser SDK is for. Cookies stay out
-  // of it: without allow-credentials a browser won't send or read a session from another address.
-  const openCors = cors({ ...corsRules, origin: "*" });
-  app.use("*", (c, next) => {
-    // The answer differs by origin, and the CID gateway's responses are cached for a year.
-    c.header("Vary", "Origin", { append: true });
-    // Returned, not just awaited: a preflight is answered here, and goes no further.
-    return (c.req.header("origin") === env.WEB_ORIGIN ? dashboardCors : openCors)(c, next);
-  });
+  app.use("*", corsFor(env.WEB_ORIGIN));
 
   const jsonLimit = bodyLimit({
     maxSize: JSON_BODY_LIMIT,

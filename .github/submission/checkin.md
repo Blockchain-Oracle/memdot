@@ -41,12 +41,13 @@ Working live on V3 today:
 - A dashboard on desktop and phone, in light and dark. A CLI with an agent JSON mode. TypeScript and Python SDKs on the same encryption formats, tested against each other, with Python integrations for LangGraph, CrewAI, Strands and the OpenAI Agents SDK. A REST API with OpenAPI, API keys and rate limits.
 - Agent plugins for ten coding agents and harnesses, plus a portable package, generated from one core and installable from this repository. They recall at the start of work, note what happened with secrets removed, and save in the background. A real session answered from an earlier one on Codex, Kimi Code, OpenCode, Pi and OpenClaw.
 - Deployed: API, worker, web and Postgres on our own server, with health checks and daily database backups.
+- Memory for the AI SDK, LangChain and Mastra, an n8n node with encrypted files and the AI Agent's memory slot, a Zapier app, five installable skills, and runnable examples, including a file vault and private notes that run entirely in the browser. The n8n node ran in a real n8n, and everything else ran against the live service.
 
 ## Outstanding items
 
 - A signed-in Claude Code session through the plugin (it installs and its hooks run), and Cursor, which needs a sign-in.
 - Walking real extensions and Touch ID on the live site. Wallet sign-in, MetaMask sign-in and wallet-paid stores have run in the dashboard on a local build against live V3 with test wallets; passkey and recovery-code flows have run end to end
-- TypeScript framework adapters and automation nodes
+- Pushing the Zapier app to a Zapier account. Every action already runs against the live service
 - Docs site and landing page
 - The final domain, memdot.xyz, to replace the temporary address
 - Rebuilding spaces and objects from registry records (stored items and renewals already rebuild from chain events)

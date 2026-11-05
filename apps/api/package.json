@@ -14,7 +14,8 @@
     "walk:s04": "tsx scripts/walk-s04.ts",
     "check:guards": "tsx scripts/check-guards.ts",
     "openapi": "tsx scripts/openapi.ts",
-    "auth:generate": "auth generate --config src/auth/index.ts --output ../../packages/db/src/schema/auth.ts --yes"
+    "auth:generate": "auth generate --config src/auth/index.ts --output ../../packages/db/src/schema/auth.ts --yes",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@better-auth/api-key": "^1.7.15",

@@ -49,5 +49,5 @@ Open <http://localhost:5183>. Tell it something about yourself, press **New conv
 ## Limits of this example
 
 - **The cookie stands in for a real sign-in.** Each browser gets a random user ID. Use your own session in a real app, and never take the user ID from the request body.
-- **The shared model has a daily allowance.** Past it, the chat still answers, but it stops saving new memories until the next day, and the server log says why. An account's own model key removes the limit.
+- **The shared model has a daily allowance of 10 calls per account.** Past it, the chat still answers, but it stops saving new memories until the next day, and the server log says why. An account's own model key removes the limit.
 - **Assisted only, as written.** MemDot's server reads this text to distill and search. For a Private namespace, connect with `memdot login --print-env` and set `MEMDOT_AGENT_IDENTITY` too, so search runs on this server with a local model and only ciphertext reaches MemDot.
