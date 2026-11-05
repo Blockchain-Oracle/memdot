@@ -1,4 +1,4 @@
-import { CLIENT_HEADER, IDEMPOTENCY_HEADER, REQUEST_ID_HEADER } from "@memdot/config";
+import { CLIENT_HEADER, REQUEST_ID_HEADER } from "@memdot/config";
 import { Scalar } from "@scalar/hono-api-reference";
 import { bodyLimit } from "hono/body-limit";
 import { requestId } from "hono/request-id";
