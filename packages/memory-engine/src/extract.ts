@@ -241,26 +241,40 @@ const scopeLabel = ({ userId, agentId, runId }: DreamMemory) =>
     .join(", ");
 
 /**
- * What a person may be shown. A proposal that names an id it wasn't given, reuses one, doesn't make
- * sense for its kind, or crosses from one person's memories to another's is dropped rather than
- * trusted: merging across people would quietly move what's known about one onto the other.
+ * What a person may be shown. Models are loose about the details, so what's safe to fix is fixed: a
+ * merge or synthesis has no use for `kept`, and a supersede can't replace the memory it keeps. A
+ * supersede also only loses the sources that belong to someone else, since it writes no new text. A
+ * merge or synthesis across people is dropped whole, because its text may already blend them.
+ *
+ * Anything else that doesn't fit is dropped rather than trusted: an id it wasn't given, one already
+ * used, or a kind missing what it needs. Crossing from one person's memories to another's would
+ * quietly move what's known about one onto the other.
  */
 export function usableProposals(proposals: DreamProposal[], memories: DreamMemory[]) {
   const scopes = new Map(memories.map((memory) => [memory.id, scopeLabel(memory)]));
   const used = new Set<string>();
-  return proposals.filter((proposal) => {
-    const named = [...proposal.sources, ...(proposal.kept ? [proposal.kept] : [])];
+  const usable: DreamProposal[] = [];
+  for (const proposal of proposals) {
+    const { kind, kept } = proposal;
+    const sources = [...new Set(proposal.sources)].filter(
+      (id) => kind !== "supersede" || (id !== kept && scopes.get(id) === scopes.get(kept ?? "")),
+    );
+    const tidied: DreamProposal = {
+      ...proposal,
+      sources,
+      kept: kind === "supersede" ? kept : null,
+    };
+    const named = [...sources, ...(tidied.kept ? [tidied.kept] : [])];
     const fits =
       named.every((id) => scopes.has(id) && !used.has(id)) &&
-      new Set(named).size === named.length &&
       new Set(named.map((id) => scopes.get(id))).size === 1 &&
-      proposal.sources.length > 0 &&
-      (proposal.kind === "supersede"
-        ? Boolean(proposal.kept)
-        : Boolean(proposal.text?.trim()) && proposal.sources.length > 1);
-    if (fits) for (const id of named) used.add(id);
-    return fits;
-  });
+      sources.length > 0 &&
+      (kind === "supersede" ? Boolean(kept) : Boolean(proposal.text?.trim()) && sources.length > 1);
+    if (!fits) continue;
+    for (const id of named) used.add(id);
+    usable.push(tidied);
+  }
+  return usable;
 }
 
 /** Changes a model suggests to a list of memories. It only reads and proposes: nothing here writes. */

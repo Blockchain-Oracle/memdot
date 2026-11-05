@@ -33,6 +33,25 @@ test("memories about different people, or a person and an agent, can't", () => {
   assert.equal(usableProposals([crossing], memories).length, 0);
 });
 
+test("a merge with a pointless kept still counts, without it", () => {
+  const [usable] = usableProposals([{ ...merge("a", "b"), kept: "b" }], memories);
+  assert.equal(usable?.kept, null);
+  assert.deepEqual(usable?.sources, ["a", "b"]);
+});
+
+test("a supersede loses other people's memories, and keeps its own", () => {
+  const swept: DreamProposal = {
+    kind: "supersede",
+    sources: ["a", "c", "b"],
+    kept: "b",
+    text: null,
+    reason: "newer",
+  };
+  const [usable] = usableProposals([swept], memories);
+  assert.deepEqual(usable?.sources, ["a"]);
+  assert.equal(usable?.kept, "b");
+});
+
 test("unknown ids, reused ids and incomplete proposals are dropped", () => {
   assert.equal(usableProposals([merge("a", "zzz")], memories).length, 0);
   assert.equal(usableProposals([merge("a", "a")], memories).length, 0);
