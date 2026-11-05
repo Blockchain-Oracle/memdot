@@ -15,12 +15,15 @@ import { handleMemory } from "./handlers/memory.js";
 import { handleRegistry } from "./handlers/registry.js";
 import { handleRenew } from "./handlers/renew.js";
 import { handleStore } from "./handlers/store.js";
+import { deliverWebhook } from "./handlers/webhooks.js";
 import { startHealthServer } from "./health.js";
 
 const BREAKER_CHECK_MS = 60_000;
 const CHAIN_TX_POLL_SECONDS = 2;
 const MEMORY_POLL_SECONDS = 1;
 const MEMORY_CONCURRENCY = 4;
+/** A slow receiver only holds one of these. */
+const WEBHOOK_CONCURRENCY = 4;
 const SHUTDOWN_GRACE_MS = 30_000;
 
 const database = createDatabase(env.DATABASE_URL, 5);
@@ -86,6 +89,14 @@ await boss.work(
   },
   async ([job]: JobWithMetadata<unknown>[]) => {
     if (job) await handleMemory(deps, { ...job, data: memoryPayload.parse(job.data) });
+  },
+);
+
+await boss.work(
+  QUEUE.webhooks,
+  { includeMetadata: true, localConcurrency: WEBHOOK_CONCURRENCY },
+  async ([job]: JobWithMetadata<{ deliveryId: string }>[]) => {
+    if (job) await deliverWebhook(deps, job);
   },
 );
 

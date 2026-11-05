@@ -13,9 +13,11 @@ import { createRouter } from "./lib/router.js";
 import { accountRoutes } from "./routes/account.js";
 import { activityRoutes } from "./routes/activity.js";
 import { agentRoutes } from "./routes/agents.js";
+import { analyticsRoutes } from "./routes/analytics.js";
 import { chatRoutes } from "./routes/chat.js";
 import { configureRoutes } from "./routes/configure.js";
 import { connectRoutes } from "./routes/connect.js";
+import { copilotRoutes } from "./routes/copilot.js";
 import { folderRoutes } from "./routes/folders.js";
 import { gatewayRoutes } from "./routes/gateway.js";
 import { grantRoutes } from "./routes/grants.js";
@@ -24,6 +26,7 @@ import { jobRoutes } from "./routes/jobs.js";
 import { keyRoutes } from "./routes/keys.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { memoryRoutes } from "./routes/memories.js";
+import { memoryToolRoutes } from "./routes/memory-tools.js";
 import { namespaceRoutes } from "./routes/namespaces.js";
 import { objectRoutes } from "./routes/objects.js";
 import { proofRoutes } from "./routes/proof.js";
@@ -31,6 +34,7 @@ import { registryRoutes } from "./routes/registry.js";
 import { sharedRoutes } from "./routes/shared.js";
 import { spaceRoutes } from "./routes/spaces.js";
 import { usageRoutes } from "./routes/usage.js";
+import { webhookRoutes } from "./routes/webhooks.js";
 import type { Services } from "./types.js";
 
 /** Dashboard sessions: generous, since one page fires several queries. */
@@ -133,7 +137,11 @@ export function createApp(services: Services) {
     .route("/", namespaceRoutes(services))
     .route("/", memoryRoutes(services))
     .route("/", configureRoutes(services))
-    .route("/", chatRoutes(services));
+    .route("/", chatRoutes(services))
+    .route("/", memoryToolRoutes(services))
+    .route("/", copilotRoutes(services))
+    .route("/", webhookRoutes(services))
+    .route("/", analyticsRoutes());
 
   app.openAPIRegistry.registerComponent("securitySchemes", "ApiKey", {
     type: "http",

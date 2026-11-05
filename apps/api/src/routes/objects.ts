@@ -19,6 +19,7 @@ import {
 } from "@memdot/config";
 import { blobStaging, jobs, objects, spaces, storedItems } from "@memdot/db";
 import {
+  emitWebhooks,
   enqueueChainTx,
   JOB_KIND,
   jobEventOf,
@@ -783,6 +784,12 @@ export function objectRoutes(services: Services) {
             sql`(${objects.id} = ${object.id} or ${objects.segmentId} = ${object.id})`,
           ),
         );
+        if (object.kind === "file") {
+          await emitWebhooks(services.boss, db, accountOf(c), "file.deleted", {
+            object_id: object.id,
+            ...(object.spaceId ? { space_id: object.spaceId } : {}),
+          });
+        }
         return c.json({ deleted }, 200);
       },
     )

@@ -1,6 +1,7 @@
 import { contentHash, storeChunk, type TxStage, toHex } from "@memdot/chain";
 import { blobStaging, jobs, objects, storedItems } from "@memdot/db";
 import {
+  emitWebhooks,
   failObject,
   JOB_KIND,
   type JobStatus,
@@ -85,6 +86,7 @@ export async function handleStore(deps: Deps, job: JobWithMetadata<StoreBlobPayl
       await updateJob(tx, jobId, { txHash: result.txHash, block: result.location.block });
       await settleObject(tx, row.object.id, await openJobsOf(tx, row.object.id));
     });
+    await announceStored(deps, row.object.id);
     console.log(`[store] ${row.item.cid} → ${result.location.block}/${result.location.index}`);
   } catch (error) {
     if (job.retryCount >= job.retryLimit) await fail(errorText(error));
@@ -134,4 +136,25 @@ async function giveUp(deps: Deps, failure: GiveUp): Promise<void> {
     message: `A store gave up after retries: ${reason}`,
     detail: { objectId, jobId, accountId: owner?.accountId ?? null },
   });
+}
+
+/** Tells whoever subscribed about the files this finished: itself, or the tiny files in a segment. */
+async function announceStored(deps: Deps, objectId: string): Promise<void> {
+  const [stored] = await deps.db.select().from(objects).where(eq(objects.id, objectId));
+  if (stored?.status !== "stored") return;
+  const files =
+    stored.kind === "file"
+      ? [stored]
+      : stored.kind === "segment"
+        ? await deps.db
+            .select()
+            .from(objects)
+            .where(and(eq(objects.segmentId, objectId), eq(objects.kind, "file")))
+        : [];
+  for (const file of files) {
+    await emitWebhooks(deps.boss, deps.db, file.accountId, "file.stored", {
+      object_id: file.id,
+      ...(file.spaceId ? { space_id: file.spaceId } : {}),
+    });
+  }
 }

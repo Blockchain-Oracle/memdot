@@ -17,6 +17,7 @@ import { SharingApi } from "./sharing.js";
 import { FoldersApi, SpacesApi } from "./spaces.js";
 import { Transport, type TransportOptions, unwrap } from "./transport.js";
 import { Vault } from "./vault.js";
+import { WebhooksApi } from "./webhooks.js";
 
 export type Usage = Schemas["Usage"];
 
@@ -58,6 +59,7 @@ export class MemDot {
   readonly memories: MemoriesApi;
   readonly data: DataApi;
   readonly agents: AgentsApi;
+  readonly webhooks: WebhooksApi;
 
   private readonly transport: Transport;
   private readonly registry: RegistryLog;
@@ -94,6 +96,7 @@ export class MemDot {
     );
     this.data = new DataApi(ctx, this.spaces, this.folders, this.files, this.memories);
     this.agents = new AgentsApi(ctx, this.sharing);
+    this.webhooks = new WebhooksApi(ctx);
     this.account = new AccountApi(ctx, options.origin, () => this.afterUnlock());
   }
 

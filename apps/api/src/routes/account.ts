@@ -12,6 +12,7 @@ import {
   jobs,
   memoryConfig,
   memoryInbox,
+  memoryProfiles,
   memorySettings,
   oauthAccessToken,
   oauthConsent,
@@ -21,6 +22,7 @@ import {
   session,
   spaces,
   walletAddress,
+  webhooks,
 } from "@memdot/db";
 import { enqueueChainTx, updateJob } from "@memdot/jobs";
 import { Address, verifySignature } from "@talismn/siws";
@@ -460,6 +462,15 @@ export function accountRoutes(services: Services) {
             .set({ revokedAt: now, namespaces: null })
             .where(eq(agents.accountId, accountId));
           await tx.delete(memoryConfig).where(eq(memoryConfig.accountId, accountId));
+          await tx.delete(webhooks).where(eq(webhooks.accountId, accountId));
+          await tx
+            .delete(memoryProfiles)
+            .where(
+              inArray(
+                memoryProfiles.folderId,
+                tx.select({ id: folders.id }).from(folders).where(inArray(folders.spaceId, owned)),
+              ),
+            );
           await tx
             .delete(memorySettings)
             .where(

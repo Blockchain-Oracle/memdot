@@ -1,6 +1,14 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { jobs, memories, memoryInbox, memorySegments, memorySettings, objects } from "@memdot/db";
-import { enqueueMemory, JOB_KIND } from "@memdot/jobs";
+import {
+  jobs,
+  memories,
+  memoryInbox,
+  memoryProfiles,
+  memorySegments,
+  memorySettings,
+  objects,
+} from "@memdot/db";
+import { emitWebhooks, enqueueMemory, JOB_KIND } from "@memdot/jobs";
 import { parseMemoryImport } from "@memdot/memory-engine";
 import { compactIfDue, openBody, sealWrite, tombstoneObjects } from "@memdot/memory-server";
 import { and, desc, eq, inArray, isNull, notInArray, type SQL, sql } from "drizzle-orm";
@@ -253,6 +261,7 @@ export function namespaceRoutes(services: Services) {
             custom_instructions: row?.customInstructions ?? null,
             categories:
               (row?.categories as { name: string; description?: string }[] | null) ?? null,
+            decay_half_life_days: row?.decayHalfLifeDays ?? null,
             sealed: toBase64(row?.sealed ?? null),
           },
           200,
@@ -295,6 +304,7 @@ export function namespaceRoutes(services: Services) {
         const values = {
           customInstructions: body.custom_instructions ?? null,
           categories: body.categories ?? null,
+          decayHalfLifeDays: body.decay_half_life_days ?? null,
           sealed: body.sealed ? fromBase64(body.sealed) : null,
           updatedAt: new Date(),
         };
@@ -308,6 +318,7 @@ export function namespaceRoutes(services: Services) {
             custom_instructions: row?.customInstructions ?? null,
             categories:
               (row?.categories as { name: string; description?: string }[] | null) ?? null,
+            decay_half_life_days: row?.decayHalfLifeDays ?? null,
             sealed: toBase64(row?.sealed ?? null),
           },
           200,
@@ -334,15 +345,16 @@ export function namespaceRoutes(services: Services) {
       }),
       async (c) => {
         const namespace = await loadNamespace(c, c.req.valid("param").id);
-        const segments = await db.transaction((tx) =>
-          tombstoneObjects(
+        const segments = await db.transaction(async (tx) => {
+          await tx.delete(memoryProfiles).where(eq(memoryProfiles.folderId, namespace.id));
+          return tombstoneObjects(
             tx,
             and(
               eq(objects.folderId, namespace.id),
               inArray(objects.kind, ["segment", "index_snapshot"]),
             ) as SQL,
-          ),
-        );
+          );
+        });
         return c.json({ message: "The namespace is empty.", segments }, 200);
       },
     )
@@ -716,9 +728,15 @@ export function namespaceRoutes(services: Services) {
               ),
             })
             .returning({ id: memories.id });
-          return rows.length;
+          return rows.map((row) => row.id);
         });
-        return c.json({ recorded }, 201);
+        if (recorded.length > 0) {
+          await emitWebhooks(services.boss, db, accountId, "memory.added", {
+            namespace_id: namespace.id,
+            memory_ids: recorded,
+          });
+        }
+        return c.json({ recorded: recorded.length }, 201);
       },
     );
 }

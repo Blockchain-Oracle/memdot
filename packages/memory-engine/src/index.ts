@@ -40,6 +40,7 @@ export {
 } from "./messages.js";
 export {
   AGENT_SCOPE_SUFFIX,
+  COPILOT_SYSTEM,
   DEFAULT_CATEGORIES,
   EXTRACTION_SYSTEM,
   INSTRUCTIONS_SYSTEM,
@@ -61,9 +62,12 @@ export {
   SERVER_EMBEDDING_DIMENSIONS,
 } from "./providers.js";
 export {
+  applyDecay,
   type Candidate,
   candidateCount,
   combineScores,
+  DECAY_OVERFETCH,
+  decayFactor,
   ENTITY_BOOST,
   entityCandidates,
   normalizeBm25,

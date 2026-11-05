@@ -1,7 +1,15 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { IDEMPOTENCY_HEADER } from "@memdot/config";
-import { folders, jobs, memories, memoryHistory, memoryInbox, objects } from "@memdot/db";
-import { enqueueMemory, JOB_KIND } from "@memdot/jobs";
+import {
+  folders,
+  jobs,
+  memories,
+  memoryHistory,
+  memoryInbox,
+  memoryProfiles,
+  objects,
+} from "@memdot/db";
+import { emitWebhooks, enqueueMemory, JOB_KIND } from "@memdot/jobs";
 import { buildGraph, normalizeMessages } from "@memdot/memory-engine";
 import { rerankTexts, summarizeMemories } from "@memdot/memory-engine/llm";
 import {
@@ -21,7 +29,7 @@ import {
   tombstoneObjects,
   writeTerms,
 } from "@memdot/memory-server";
-import { and, asc, count, eq, inArray, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, isNull, type SQL, sql } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import type { Context } from "hono";
 import { db } from "../db.js";
@@ -29,6 +37,7 @@ import { badRequest, conflict, isUniqueViolation, notFound } from "../lib/errors
 import {
   accountModels,
   assertAssisted,
+  decayOf,
   loadMemory,
   loadNamespace,
   parseFilters,
@@ -257,11 +266,24 @@ async function forget(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   where: SQL,
   actor: string | null,
-): Promise<number> {
+): Promise<string[]> {
+  // A profile is written from someone's memories, so it may say what's being forgotten. It can be
+  // generated again from what's left.
+  const people = await tx
+    .selectDistinct({ folderId: memories.folderId, userId: memories.userId })
+    .from(memories)
+    .where(and(where, isNull(memories.deletedAt), isNotNull(memories.userId)));
   const { ids, segmentIds } = await forgetRows(tx, where, actor);
   const empty = await emptySegments(tx, segmentIds);
   if (empty.length > 0) await tombstoneObjects(tx, inArray(objects.id, empty) as SQL);
-  return ids.length;
+  for (const { folderId, userId } of people) {
+    await tx
+      .delete(memoryProfiles)
+      .where(
+        and(eq(memoryProfiles.folderId, folderId), eq(memoryProfiles.subject, userId as string)),
+      );
+  }
+  return ids;
 }
 
 export function memoryRoutes(services: Services) {
@@ -419,6 +441,8 @@ export function memoryRoutes(services: Services) {
           asOf,
           showExpired: body.show_expired,
           embedder: models.embedder,
+          // A search looking back at a moment in time isn't using these memories now.
+          decayHalfLifeDays: asOf ? null : await decayOf(namespace.id),
         });
         const rows = await rowsById(ranked.map((hit) => hit.id));
         const serialized = await serialize(keys, rows);
@@ -787,6 +811,10 @@ export function memoryRoutes(services: Services) {
           throw error;
         }
         await compactIfDue(db, services.boss, row);
+        await emitWebhooks(services.boss, db, row.accountId, "memory.updated", {
+          namespace_id: row.folderId,
+          memory_ids: [row.id],
+        });
         const [memory] = await serialize(keys, await rowsById([row.id]));
         return c.json(memory as z.infer<typeof Memory>, 200);
       },
@@ -813,7 +841,13 @@ export function memoryRoutes(services: Services) {
       async (c) => {
         const row = await loadMemory(c, c.req.valid("param").id);
         await refuseHostedOnPrivate(c, row.folderId);
-        await db.transaction((tx) => forget(tx, eq(memories.id, row.id) as SQL, actorOf(c)));
+        const forgotten = await db.transaction((tx) =>
+          forget(tx, eq(memories.id, row.id) as SQL, actorOf(c)),
+        );
+        await emitWebhooks(services.boss, db, accountOf(c), "memory.deleted", {
+          namespace_id: row.folderId,
+          memory_ids: forgotten,
+        });
         await compactIfDue(db, services.boss, row);
         return c.json({ message: "Memory forgotten." }, 200);
       },
@@ -860,7 +894,13 @@ export function memoryRoutes(services: Services) {
           match(memories.agentId, query.agent_id),
           match(memories.runId, query.run_id),
         ) as SQL;
-        const deleted = await db.transaction((tx) => forget(tx, where, actorOf(c)));
+        const forgotten = await db.transaction((tx) => forget(tx, where, actorOf(c)));
+        const deleted = forgotten.length;
+        if (deleted > 0) {
+          await emitWebhooks(services.boss, db, accountOf(c), "memory.deleted", {
+            memory_ids: forgotten,
+          });
+        }
         await compactIfDue(db, services.boss, { accountId: accountOf(c), folderId: namespace.id });
         return c.json({ message: `Forgot ${deleted} memories.`, deleted }, 200);
       },
@@ -981,6 +1021,9 @@ export function memoryRoutes(services: Services) {
         for (const folderId of new Set(rows.map((row) => row.folderId))) {
           await compactIfDue(db, services.boss, { accountId: accountOf(c), folderId });
         }
+        await emitWebhooks(services.boss, db, accountOf(c), "memory.updated", {
+          memory_ids: rows.map((row) => row.id),
+        });
         return c.json({ message: `Updated ${rows.length} memories.` }, 200);
       },
     )
@@ -1019,9 +1062,13 @@ export function memoryRoutes(services: Services) {
         for (const folderId of new Set(rows.map((row) => row.folderId))) {
           await refuseHostedOnPrivate(c, folderId);
         }
-        const deleted = await db.transaction((tx) =>
+        const forgotten = await db.transaction((tx) =>
           forget(tx, inArray(memories.id, ids) as SQL, actorOf(c)),
         );
+        const deleted = forgotten.length;
+        await emitWebhooks(services.boss, db, accountOf(c), "memory.deleted", {
+          memory_ids: forgotten,
+        });
         for (const folderId of new Set(rows.map((row) => row.folderId))) {
           await compactIfDue(db, services.boss, { accountId: accountOf(c), folderId });
         }
@@ -1178,9 +1225,16 @@ export function memoryRoutes(services: Services) {
         const column = { user: memories.userId, agent: memories.agentId, run: memories.runId }[
           type
         ];
-        const deleted = await db.transaction((tx) =>
+        const forgotten = await db.transaction((tx) =>
           forget(tx, and(eq(memories.folderId, namespace.id), eq(column, id)) as SQL, actorOf(c)),
         );
+        const deleted = forgotten.length;
+        if (deleted > 0) {
+          await emitWebhooks(services.boss, db, accountOf(c), "memory.deleted", {
+            namespace_id: namespace.id,
+            memory_ids: forgotten,
+          });
+        }
         return c.json({ message: `Forgot ${deleted} memories.`, deleted }, 200);
       },
     );

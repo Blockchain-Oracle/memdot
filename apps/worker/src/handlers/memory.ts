@@ -14,7 +14,7 @@ import {
   storedItems,
 } from "@memdot/db";
 import type { MemoryPayload } from "@memdot/jobs";
-import { updateJob } from "@memdot/jobs";
+import { emitWebhooks, updateJob } from "@memdot/jobs";
 import {
   decodeEntry,
   type Embedder,
@@ -273,6 +273,7 @@ async function handleAdd(deps: Deps, job: typeof jobs.$inferSelect, finalAttempt
     embeddingModel: models.embedder?.modelId,
   }));
 
+  let added: string[] = [];
   await deps.db.transaction(async (tx) => {
     const { inserted, duplicates } = await insertDrafts(
       tx,
@@ -281,6 +282,7 @@ async function handleAdd(deps: Deps, job: typeof jobs.$inferSelect, finalAttempt
       prepared,
       write.actor ?? null,
     );
+    added = inserted;
     await persistMemories(tx, deps.boss, deps.memoryKeys, {
       folderId,
       memoryIds: inserted,
@@ -300,6 +302,12 @@ async function handleAdd(deps: Deps, job: typeof jobs.$inferSelect, finalAttempt
       ...(inserted.length === 0 ? { status: "finalized" as const } : {}),
     });
   });
+  if (added.length > 0) {
+    await emitWebhooks(deps.boss, deps.db, scope.accountId, "memory.added", {
+      namespace_id: folderId,
+      memory_ids: added,
+    });
+  }
   await compactIfDue(deps.db, deps.boss, scope);
 }
 

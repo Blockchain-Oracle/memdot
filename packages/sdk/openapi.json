@@ -2367,6 +2367,15 @@
               ]
             }
           },
+          "decay_half_life_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 3650,
+            "description": "Set: search favours what's been touched recently, with this half-life. It only reorders: nothing is deleted or hidden. Null: off."
+          },
           "sealed": {
             "type": [
               "string",
@@ -2377,6 +2386,7 @@
         "required": [
           "custom_instructions",
           "categories",
+          "decay_half_life_days",
           "sealed"
         ]
       },
@@ -3750,6 +3760,384 @@
         },
         "required": [
           "messages"
+        ]
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "none"
+            ]
+          },
+          "profile": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "summary": {
+                "type": "string"
+              },
+              "facts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "value"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "summary",
+              "facts"
+            ]
+          },
+          "memories_read": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "user_id",
+          "status",
+          "profile",
+          "memories_read",
+          "generated_at"
+        ]
+      },
+      "DreamProposal": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "supersede",
+              "merge",
+              "synthesis"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "kept": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "sources",
+          "kept",
+          "text",
+          "reason"
+        ]
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "events",
+          "active",
+          "created_at"
+        ]
+      },
+      "WebhookDelivery": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "delivered",
+              "failed"
+            ]
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "response_status": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "latency_ms": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "event",
+          "status",
+          "attempts",
+          "response_status",
+          "latency_ms",
+          "error",
+          "payload",
+          "created_at"
+        ]
+      },
+      "Analytics": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer"
+          },
+          "requests": {
+            "type": "integer"
+          },
+          "errors": {
+            "type": "integer"
+          },
+          "avg_latency_ms": {
+            "type": "integer"
+          },
+          "p95_latency_ms": {
+            "type": "integer"
+          },
+          "requests_by_day": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string"
+                },
+                "add": {
+                  "type": "integer"
+                },
+                "search": {
+                  "type": "integer"
+                },
+                "read": {
+                  "type": "integer"
+                },
+                "other": {
+                  "type": "integer"
+                },
+                "errors": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "day",
+                "add",
+                "search",
+                "read",
+                "other",
+                "errors"
+              ]
+            }
+          },
+          "memories_by_day": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "day",
+                "count"
+              ]
+            }
+          },
+          "memories": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "assisted": {
+                "type": "integer"
+              },
+              "private": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "assisted",
+              "private"
+            ]
+          },
+          "top_users": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "name",
+                "count"
+              ]
+            }
+          },
+          "top_agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "name",
+                "count"
+              ]
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "name",
+                "count"
+              ]
+            }
+          },
+          "top_clients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "name",
+                "count"
+              ]
+            }
+          }
+        },
+        "required": [
+          "days",
+          "requests",
+          "errors",
+          "avg_latency_ms",
+          "p95_latency_ms",
+          "requests_by_day",
+          "memories_by_day",
+          "memories",
+          "top_users",
+          "top_agents",
+          "categories",
+          "top_clients"
         ]
       }
     },
@@ -11127,6 +11515,15 @@
                       ]
                     }
                   },
+                  "decay_half_life_days": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 3650,
+                    "description": "Set: search favours what's been touched recently, with this half-life. It only reorders: nothing is deleted or hidden. Null: off."
+                  },
                   "sealed": {
                     "type": [
                       "string",
@@ -14790,6 +15187,2046 @@
               "text/event-stream": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/namespaces/{id}/categories": {
+      "get": {
+        "tags": [
+          "Namespaces"
+        ],
+        "summary": "How many memories are filed under each category",
+        "description": "Assisted namespaces. A Private one's categories are sealed, and the SDK counts them on your device.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Categories, most used first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "count"
+                        ]
+                      }
+                    },
+                    "uncategorized": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "categories",
+                    "uncategorized"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/profiles": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "One person's generated profile",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^\\S+$"
+            },
+            "required": true,
+            "name": "user_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "namespace_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Generate or refresh one person's profile",
+        "description": "One model call, reading their newest memories. It's kept sealed like a memory, and goes when the memories it read go. Assisted namespaces: for a Private one, the SDK does this on your device.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^\\S+$"
+                  },
+                  "namespace_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/namespaces/{id}/private/profiles": {
+      "get": {
+        "tags": [
+          "Namespaces"
+        ],
+        "summary": "A Private namespace's profiles, sealed",
+        "description": "One blob, opened on your device. The server can't see who has a profile.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sealed profiles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sealed": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sealed"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Namespaces"
+        ],
+        "summary": "Save a Private namespace's profiles, sealed on your device",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sealed": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000000
+                  }
+                },
+                "required": [
+                  "sealed"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "saved": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "saved"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/memories/exports": {
+      "post": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Fill a JSON schema from memories",
+        "description": "One model call reads the memories a filter finds and fills your schema. For everything as it's stored, list the memories instead. Assisted namespaces: for a Private one, the SDK does this on your device.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schema": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "namespace_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "filters": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, source_object_id, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; \"*\" means any value.",
+                    "example": {
+                      "AND": [
+                        {
+                          "user_id": "alice"
+                        },
+                        {
+                          "created_at": {
+                            "gte": "2026-10-01"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "schema"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The filled schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "result": {},
+                    "memories_read": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "memories_read"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/memories/dream": {
+      "post": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Suggest how to tidy memories",
+        "description": "One model call reads memories and proposes what to supersede, merge or draw together. It changes nothing: you apply what you agree with, using the ordinary update, delete and add calls. Assisted namespaces: for a Private one, the SDK does this on your device.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "namespace_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "filters": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, source_object_id, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; \"*\" means any value.",
+                    "example": {
+                      "AND": [
+                        {
+                          "user_id": "alice"
+                        },
+                        {
+                          "created_at": {
+                            "gte": "2026-10-01"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Proposals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "proposals": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DreamProposal"
+                      }
+                    },
+                    "memories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "memory": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "memory",
+                          "created_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "proposals",
+                    "memories"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/copilot": {
+      "post": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "An assistant that reads your memories and proposes changes",
+        "description": "Streams an AI SDK UI message stream. Its tools only read or propose: nothing changes until you apply a proposal yourself, with the ordinary calls. Assisted namespaces only: for a Private one, the SDK runs this in your browser with your own model.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "namespace_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "messages"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A stream of UI messages",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Your webhooks",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhooks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Webhook"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Add a webhook",
+        "description": "Deliveries are signed, and carry ids and event types only, never what a memory or file says. The signing secret is returned once, here.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "format": "uri"
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "memory.added",
+                        "memory.updated",
+                        "memory.deleted",
+                        "file.stored",
+                        "file.deleted"
+                      ]
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "name",
+                  "url",
+                  "events"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created, with its signing secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Webhook"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "secret": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "secret"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}": {
+      "patch": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Change a webhook, or pause it",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "format": "uri"
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "memory.added",
+                        "memory.updated",
+                        "memory.deleted",
+                        "file.stored",
+                        "file.deleted"
+                      ]
+                    },
+                    "minItems": 1
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Remove a webhook, and its delivery log",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "deleted"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/rotate": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Replace the signing secret",
+        "description": "The old secret stops at once. The new one is returned once, here.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new secret",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "secret": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "secret"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send a test event",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "delivery_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "delivery_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/deliveries": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "What was sent, and how it went",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deliveries, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WebhookDelivery"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/{id}/deliveries/{deliveryId}/resend": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send an event again",
+        "description": "As a new delivery, with the same event and ids.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "example": "0b8d3f4e-6a1c-4f7e-9a51-2c3d4e5f6a7b"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "deliveryId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "delivery_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "delivery_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/analytics": {
+      "get": {
+        "tags": [
+          "Usage"
+        ],
+        "summary": "How your memories are used",
+        "description": "From request metadata and the server's index, never from what a memory says. Private memories are counted, but who they're about and how they're filed stay on your device, so they're not in the top lists.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30,
+              "default": 7
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analytics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Analytics"
                 }
               }
             }

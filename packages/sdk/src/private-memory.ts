@@ -2,9 +2,11 @@ import { bitswapGet } from "@memdot/chain";
 import { SEGMENT_PACK_BYTES } from "@memdot/config";
 import { openSegment, openWith, sealSegment, sealTo, WrongKeyError } from "@memdot/crypto";
 import {
+  applyDecay,
   buildGraph,
   type ChatMessage,
   candidateCount,
+  DECAY_OVERFETCH,
   decodeEntry,
   dedupeKey,
   type Embedder,
@@ -31,6 +33,7 @@ import {
   readSnapshot,
   tokenize,
 } from "@memdot/memory-engine";
+import type { UserProfile } from "@memdot/memory-engine/llm";
 import type { Context } from "./context.js";
 import { MemDotError } from "./errors.js";
 import type { JobsApi } from "./jobs.js";
@@ -70,6 +73,11 @@ const toFilterable = (entry: MemoryEntry): FilterableMemory => ({
   metadata: entry.metadata,
   sourceObjectId: entry.source?.objectId,
 });
+
+/** Memories a profile reads at most, newest first. The same on the server. */
+const PROFILE_MEMORIES = 200;
+const EXPORT_MEMORIES = 500;
+const DREAM_MEMORIES = 100;
 
 export interface PrivateAdd {
   messages: ChatMessage[];
@@ -111,6 +119,7 @@ export interface PrivateDeps {
   settings: (namespaceId: string) => Promise<{
     instructions: string | null;
     categories: PromptCategory[] | null;
+    decayHalfLifeDays: number | null;
   }>;
 }
 
@@ -309,6 +318,7 @@ export class PrivateNamespace {
       }
     }
     const named = new Set(entityCandidates(input.query));
+    const halfLifeDays = input.asOf ? null : (await this.deps.settings(this.id)).decayHalfLifeDays;
     const ranked = rank(
       [...new Set([...semantic.keys(), ...keyword.keys()])].map((id) => ({
         id,
@@ -320,12 +330,24 @@ export class PrivateNamespace {
       })),
       {
         queryTerms: queryTermCount(input.query),
-        limit: input.limit,
+        limit: halfLifeDays ? input.limit * DECAY_OVERFETCH : input.limit,
         threshold: input.threshold,
         mode: input.mode,
       },
     );
-    const results = ranked.map((hit) => ({ ...(this.entries.get(hit.id) as MemoryEntry), ...hit }));
+    // No access history here: what a device reads stays on that device, so age counts from the last
+    // change. A search looking back at a moment in time isn't using these memories now.
+    const ordered = halfLifeDays
+      ? applyDecay(ranked, (id) => new Date((this.entries.get(id) as MemoryEntry).updatedAt), {
+          now: new Date(),
+          halfLifeDays,
+          limit: input.limit,
+        })
+      : ranked;
+    const results = ordered.map((hit) => ({
+      ...(this.entries.get(hit.id) as MemoryEntry),
+      ...hit,
+    }));
     if (input.rerank && results.length > 1) {
       const config = await this.deps.llm();
       if (config) {
@@ -732,6 +754,104 @@ export class PrivateNamespace {
     this.index = null;
     await this.sync(true);
     return { restored: this.entries.size, segments: this.opened.size };
+  }
+
+  /** How many memories are filed under each category, counted here. */
+  async categories(): Promise<{
+    categories: { name: string; count: number }[];
+    uncategorized: number;
+  }> {
+    const entries = await this.list({ showExpired: false });
+    const counts = new Map<string, number>();
+    let uncategorized = 0;
+    for (const entry of entries) {
+      if (!entry.categories?.length) uncategorized += 1;
+      for (const name of entry.categories ?? []) counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return {
+      categories: [...counts]
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
+      uncategorized,
+    };
+  }
+
+  private async requireLlm(what: string): Promise<LlmConfig> {
+    const config = await this.deps.llm();
+    if (!config) {
+      throw new MemDotError(
+        409,
+        "MODEL_REQUIRED",
+        `Set a model for Private memory to use ${what}.`,
+      );
+    }
+    return config;
+  }
+
+  /** One person's profile, written with your own model. Only what's returned here knows it. */
+  async generateProfile(
+    userId: string,
+  ): Promise<{ profile: UserProfile; memoriesRead: number; sources: string[] }> {
+    const config = await this.requireLlm("profiles");
+    const entries = (await this.list({ showExpired: false }))
+      .filter((entry) => entry.userId === userId)
+      .slice(0, PROFILE_MEMORIES);
+    if (entries.length === 0) {
+      throw new MemDotError(409, "NOTHING_TO_READ", "Nothing is remembered about this person yet.");
+    }
+    const { generateProfile, languageModel } = await llmTools();
+    return {
+      profile: await generateProfile(
+        languageModel(config),
+        entries.map((entry) => entry.text),
+      ),
+      memoriesRead: entries.length,
+      sources: entries.map((entry) => entry.id),
+    };
+  }
+
+  /** Fills a schema from memories, with your own model. */
+  async exportToSchema(input: {
+    schema: Record<string, unknown>;
+    filter?: FilterNode | undefined;
+    instructions?: string | undefined;
+  }): Promise<{ result: unknown; memoriesRead: number }> {
+    const config = await this.requireLlm("schema exports");
+    const entries = (await this.list({ filter: input.filter, showExpired: false })).slice(
+      0,
+      EXPORT_MEMORIES,
+    );
+    if (entries.length === 0) {
+      throw new MemDotError(409, "NOTHING_TO_READ", "Nothing here to export.");
+    }
+    const { exportToSchema, languageModel } = await llmTools();
+    return {
+      result: await exportToSchema(
+        languageModel(config),
+        entries.map((entry) => entry.text),
+        input.schema,
+        input.instructions,
+      ),
+      memoriesRead: entries.length,
+    };
+  }
+
+  /** What a model suggests tidying. It changes nothing. */
+  async dream(options: { filter?: FilterNode | undefined }) {
+    const config = await this.requireLlm("tidying");
+    const entries = (await this.list({ ...options, showExpired: false })).slice(0, DREAM_MEMORIES);
+    const memories = entries.map((entry) => ({
+      id: entry.id,
+      memory: entry.text,
+      createdAt: entry.createdAt,
+    }));
+    if (entries.length < 2) return { proposals: [], memories: [] };
+    const { languageModel, proposeDream } = await llmTools();
+    const proposals = await proposeDream(
+      languageModel(config),
+      memories.map(({ id, memory, createdAt }) => ({ id, text: memory, createdAt })),
+    );
+    return { proposals, memories };
   }
 
   /** Entities and how they connect, from what's on this device. Nothing leaves it. */

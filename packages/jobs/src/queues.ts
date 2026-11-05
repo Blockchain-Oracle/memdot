@@ -12,6 +12,8 @@ export const QUEUE = {
   maintenance: "maintenance",
   /** Reads and writes memories with a model. Separate, because models are slow and rate limited. */
   memory: "memory",
+  /** Telling an account's webhooks what happened. Separate, so a slow receiver only slows itself. */
+  webhooks: "webhooks",
 } as const;
 
 /**

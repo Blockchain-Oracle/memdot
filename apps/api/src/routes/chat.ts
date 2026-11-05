@@ -10,7 +10,7 @@ import { inArray } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 import { db } from "../db.js";
 import { HttpError } from "../lib/errors.js";
-import { resolveAssisted, searchEmbedder, spendSharedModel } from "../lib/namespaces.js";
+import { decayOf, resolveAssisted, searchEmbedder, spendSharedModel } from "../lib/namespaces.js";
 import { accountOf, requireScope } from "../lib/principal.js";
 import { authenticated, createRouter, errorResponses, jsonContent } from "../lib/router.js";
 import type { Services } from "../types.js";
@@ -105,6 +105,7 @@ export function chatRoutes(services: Services) {
         at: new Date(),
         showExpired: false,
         embedder: models.embedder,
+        decayHalfLifeDays: await decayOf(namespace.id),
       });
       const rows = hits.length
         ? await db

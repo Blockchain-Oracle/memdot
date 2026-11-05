@@ -88,6 +88,36 @@ export function rank(candidates: Candidate[], options: RankOptions): Ranked[] {
   return ranked.sort((a, b) => b.score - a.score).slice(0, options.limit);
 }
 
+/** The least decay can leave of a score, so an old memory can still surface if nothing else fits. */
+const DECAY_FLOOR = 0.3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Decay reorders, so it looks at more than it returns. */
+export const DECAY_OVERFETCH = 3;
+
+/** How much of a score survives this long since the memory was last touched: 1 down to the floor. */
+export function decayFactor(lastTouched: Date, now: Date, halfLifeDays: number): number {
+  const ageDays = Math.max(0, now.getTime() - lastTouched.getTime()) / DAY_MS;
+  return DECAY_FLOOR + (1 - DECAY_FLOOR) * 0.5 ** (ageDays / halfLifeDays);
+}
+
+/**
+ * Favours what's still in use. It only reorders: nothing is deleted, nothing is hidden, and turning
+ * it off brings the old order straight back.
+ */
+export function applyDecay<T extends { id: string; score: number }>(
+  ranked: T[],
+  lastTouched: (id: string) => Date,
+  options: { now: Date; halfLifeDays: number; limit: number },
+): T[] {
+  return ranked
+    .map((hit) => ({
+      ...hit,
+      score: hit.score * decayFactor(lastTouched(hit.id), options.now, options.halfLifeDays),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, options.limit);
+}
+
 /** Lowercased, single-spaced: how entity names compare. */
 export const normalizeEntity = (name: string) =>
   name.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();

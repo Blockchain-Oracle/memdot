@@ -1,14 +1,17 @@
-import { generateText, type LanguageModel, type ModelMessage, Output } from "ai";
+import { generateText, jsonSchema, type LanguageModel, type ModelMessage, Output } from "ai";
 import { z } from "zod";
 import type { ChatMessage, ContentPart as MessagePart } from "./messages.js";
 import {
   AGENT_SCOPE_SUFFIX,
   DEFAULT_CATEGORIES,
+  DREAM_SYSTEM,
   EXTRACTION_SYSTEM,
   INSTRUCTIONS_SYSTEM,
   PROCEDURAL_SYSTEM,
+  PROFILE_SYSTEM,
   type PromptCategory,
   RERANK_SYSTEM,
+  STRUCTURED_EXPORT_SYSTEM,
   SUMMARY_SYSTEM,
 } from "./prompts.js";
 
@@ -186,6 +189,92 @@ export async function summarizeMemories(model: LanguageModel, texts: string[]): 
     prompt: texts.map((memory) => `- ${memory}`).join("\n"),
   });
   return text.trim();
+}
+
+const Profile = z.object({
+  summary: z.string(),
+  facts: z.array(z.object({ label: z.string(), value: z.string() })),
+});
+export type UserProfile = z.infer<typeof Profile>;
+
+/** One person, from what's stored about them. Newest facts first, so conflicts resolve to them. */
+export async function generateProfile(model: LanguageModel, texts: string[]): Promise<UserProfile> {
+  const { output } = await generateText({
+    model,
+    abortSignal: timeout(),
+    instructions: PROFILE_SYSTEM,
+    output: Output.object({ schema: Profile }),
+    prompt: texts.map((memory) => `- ${memory}`).join("\n"),
+  });
+  return output;
+}
+
+export const DreamKind = z.enum(["supersede", "merge", "synthesis"]);
+const DreamProposal = z.object({
+  kind: DreamKind,
+  sources: z.array(z.string()),
+  /** supersede: the memory that stays. */
+  kept: z.string().nullable(),
+  /** merge and synthesis: the new memory. */
+  text: z.string().nullable(),
+  reason: z.string(),
+});
+export type DreamProposal = z.infer<typeof DreamProposal>;
+const DreamOutput = z.object({ proposals: z.array(DreamProposal) });
+
+/**
+ * Changes a model suggests to a list of memories. It only reads and proposes: nothing here writes,
+ * and a person applies what they agree with. A proposal that names an id it wasn't given, reuses one
+ * or doesn't make sense for its kind is dropped rather than trusted.
+ */
+export async function proposeDream(
+  model: LanguageModel,
+  memories: { id: string; text: string; createdAt: string }[],
+): Promise<DreamProposal[]> {
+  const { output } = await generateText({
+    model,
+    abortSignal: timeout(),
+    instructions: DREAM_SYSTEM,
+    output: Output.object({ schema: DreamOutput }),
+    prompt: memories
+      .map((memory) => `[${memory.id}] ${memory.createdAt}: ${memory.text}`)
+      .join("\n"),
+  });
+  const known = new Set(memories.map((memory) => memory.id));
+  const used = new Set<string>();
+  return output.proposals.filter((proposal) => {
+    const named = [...proposal.sources, ...(proposal.kept ? [proposal.kept] : [])];
+    const fits =
+      named.every((id) => known.has(id) && !used.has(id)) &&
+      new Set(named).size === named.length &&
+      proposal.sources.length > 0 &&
+      (proposal.kind === "supersede"
+        ? Boolean(proposal.kept)
+        : Boolean(proposal.text?.trim()) && proposal.sources.length > 1);
+    if (fits) for (const id of named) used.add(id);
+    return fits;
+  });
+}
+
+/** Fills a schema the owner wrote from a list of memories. */
+export async function exportToSchema(
+  model: LanguageModel,
+  texts: string[],
+  schema: Record<string, unknown>,
+  instructions?: string | null,
+): Promise<unknown> {
+  const { output } = await generateText({
+    model,
+    abortSignal: timeout(),
+    instructions: STRUCTURED_EXPORT_SYSTEM,
+    output: Output.object({ schema: jsonSchema(schema) }),
+    prompt: [
+      ...(instructions ? [`Export instructions:\n${instructions}`] : []),
+      "Memories:",
+      ...texts.map((memory) => `- ${memory}`),
+    ].join("\n\n"),
+  });
+  return output;
 }
 
 const Relevance = z.object({ scores: z.array(z.number()) });

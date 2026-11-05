@@ -12,6 +12,12 @@ import {
   parseFilter,
   parseMemoryImport,
 } from "@memdot/memory-engine";
+import type {
+  CopilotStream,
+  DreamProposal,
+  ModelMessage,
+  UserProfile,
+} from "@memdot/memory-engine/llm";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
 import type { Context, Schemas } from "./context.js";
 import { MemDotError } from "./errors.js";
@@ -84,6 +90,27 @@ export interface Namespace {
   lastWrite: string | null;
   createdAt: string;
 }
+
+/** A namespace's extraction settings, and whether its search favours what's in use. */
+export interface NamespaceSettings {
+  customInstructions: string | null;
+  categories: PromptCategory[] | null;
+  /** Set: search favours what's been touched recently, with this half-life. It only reorders. */
+  decayHalfLifeDays?: number | null;
+}
+
+export interface ProfileResult {
+  userId: string;
+  profile: UserProfile | null;
+  memoriesRead: number;
+  generatedAt: string | null;
+}
+
+/** A Private profile as sealed, with the memories it was written from. */
+type KeptProfile = Omit<ProfileResult, "userId"> & { sources: string[] };
+
+/** A change a model suggested, with the memories it would touch. */
+export type { DreamProposal };
 
 export interface MemoryScope {
   userId?: string;
@@ -383,12 +410,13 @@ export class MemoriesApi {
     return row.mode === "private" ? this.privateOf(row) : null;
   }
 
-  async settings(namespaceId: string): Promise<{
-    customInstructions: string | null;
-    categories: PromptCategory[] | null;
-  }> {
+  async settings(namespaceId: string): Promise<NamespaceSettings> {
     const opened = await this.openSettings(namespaceId);
-    return { customInstructions: opened.instructions, categories: opened.categories };
+    return {
+      customInstructions: opened.instructions,
+      categories: opened.categories,
+      decayHalfLifeDays: opened.decayHalfLifeDays,
+    };
   }
 
   private async openSettings(namespaceId: string) {
@@ -406,20 +434,19 @@ export class MemoriesApi {
       const settings = JSON.parse(new TextDecoder().decode(text)) as {
         instructions: string | null;
         categories: PromptCategory[] | null;
+        decayHalfLifeDays?: number | null;
       };
-      return settings;
+      return { ...settings, decayHalfLifeDays: settings.decayHalfLifeDays ?? null };
     }
     return {
       instructions: row.custom_instructions,
       categories: row.categories as PromptCategory[] | null,
+      decayHalfLifeDays: row.decay_half_life_days,
     };
   }
 
   /** Assisted: the server reads these to extract. Private: sealed here, and only kept there. */
-  async setSettings(
-    namespaceId: string,
-    settings: { customInstructions: string | null; categories: PromptCategory[] | null },
-  ): Promise<void> {
+  async setSettings(namespaceId: string, settings: NamespaceSettings): Promise<void> {
     const row = await this.namespaceRow(namespaceId);
     const body =
       row.mode === "private"
@@ -430,6 +457,7 @@ export class MemoriesApi {
                   JSON.stringify({
                     instructions: settings.customInstructions,
                     categories: settings.categories,
+                    decayHalfLifeDays: settings.decayHalfLifeDays ?? null,
                   }),
                 ),
                 [this.ctx.vault.recipient()],
@@ -439,6 +467,7 @@ export class MemoriesApi {
         : {
             custom_instructions: settings.customInstructions,
             categories: settings.categories,
+            decay_half_life_days: settings.decayHalfLifeDays ?? null,
           };
     await unwrap(
       this.ctx.transport.api.PUT("/v1/namespaces/{id}/settings", {
@@ -962,6 +991,245 @@ export class MemoriesApi {
         },
       }),
     );
+  }
+
+  /** How many memories are filed under each category. Private ones are counted on this device. */
+  async categories(
+    namespaceId: string,
+  ): Promise<{ categories: { name: string; count: number }[]; uncategorized: number }> {
+    const held = await this.route(namespaceId);
+    if (held) return held.categories();
+    return unwrap(
+      this.ctx.transport.api.GET("/v1/namespaces/{id}/categories", {
+        params: { path: { id: namespaceId } },
+      }),
+    );
+  }
+
+  private async openPrivateProfiles(namespaceId: string): Promise<Record<string, KeptProfile>> {
+    const { sealed } = await unwrap(
+      this.ctx.transport.api.GET("/v1/namespaces/{id}/private/profiles", {
+        params: { path: { id: namespaceId } },
+      }),
+    );
+    if (!sealed) return {};
+    const row = await this.namespaceRow(namespaceId);
+    const opened = await openWith(
+      fromBase64(sealed),
+      this.ctx.vault.ownedIdentities(row.space_id, row.key_epoch),
+      "these profiles",
+    );
+    return JSON.parse(new TextDecoder().decode(opened)) as Record<string, KeptProfile>;
+  }
+
+  private async savePrivateProfiles(
+    namespaceId: string,
+    profiles: Record<string, KeptProfile>,
+  ): Promise<void> {
+    const row = await this.namespaceRow(namespaceId);
+    const sealed = await sealTo(utf8ToBytes(JSON.stringify(profiles)), [
+      this.ctx.vault.sealTo(row.space_id, row.key_epoch),
+    ]);
+    await unwrap(
+      this.ctx.transport.api.PUT("/v1/namespaces/{id}/private/profiles", {
+        params: { path: { id: namespaceId } },
+        body: { sealed: toBase64(sealed) },
+      }),
+    );
+  }
+
+  /** One person's generated profile, or `profile: null` if there isn't one yet. */
+  async profile(userId: string, named: { namespaceId?: string } = {}): Promise<ProfileResult> {
+    const options = this.inDefault(named);
+    const held = await this.route(options.namespaceId);
+    if (held) {
+      const profiles = await this.openPrivateProfiles(held.id);
+      const kept = profiles[userId];
+      if (!kept) return { userId, profile: null, memoriesRead: 0, generatedAt: null };
+      // Forgetting can happen on any device, or with nothing loaded, and the server can't tell whose
+      // memory went. So a profile is checked when it's read: if one of the memories it was written
+      // from is gone, it may still say what was forgotten, and it goes too.
+      if (kept.sources.some((id) => !held.holds(id))) {
+        delete profiles[userId];
+        await this.savePrivateProfiles(held.id, profiles);
+        return { userId, profile: null, memoriesRead: 0, generatedAt: null };
+      }
+      const { sources: _sources, ...shown } = kept;
+      return { userId, ...shown };
+    }
+    const row = await unwrap(
+      this.ctx.transport.api.GET("/v1/profiles", {
+        params: {
+          query: {
+            user_id: userId,
+            ...(options.namespaceId ? { namespace_id: options.namespaceId } : {}),
+          },
+        },
+      }),
+    );
+    return {
+      userId,
+      profile: row.profile,
+      memoriesRead: row.memories_read,
+      generatedAt: row.generated_at,
+    };
+  }
+
+  /** Writes or refreshes someone's profile from their memories: one model call. */
+  async generateProfile(
+    userId: string,
+    named: { namespaceId?: string } = {},
+  ): Promise<ProfileResult> {
+    const options = this.inDefault(named);
+    const held = await this.route(options.namespaceId);
+    if (held) {
+      const { profile, memoriesRead, sources } = await held.generateProfile(userId);
+      const shown = { profile, memoriesRead, generatedAt: new Date().toISOString() };
+      const profiles = await this.openPrivateProfiles(held.id);
+      await this.savePrivateProfiles(held.id, { ...profiles, [userId]: { ...shown, sources } });
+      return { userId, ...shown };
+    }
+    const row = await unwrap(
+      this.ctx.transport.api.POST("/v1/profiles", {
+        body: {
+          user_id: userId,
+          ...(options.namespaceId ? { namespace_id: options.namespaceId } : {}),
+        },
+      }),
+    );
+    return {
+      userId,
+      profile: row.profile,
+      memoriesRead: row.memories_read,
+      generatedAt: row.generated_at,
+    };
+  }
+
+  /** Fills a JSON schema from the memories a filter finds: one model call. */
+  async exportToSchema(input: {
+    schema: Record<string, unknown>;
+    namespaceId?: string;
+    filters?: Record<string, unknown>;
+    instructions?: string;
+  }): Promise<{ result: unknown; memoriesRead: number }> {
+    const options = this.inDefault(input);
+    const held = await this.route(options.namespaceId);
+    if (held) {
+      return held.exportToSchema({
+        schema: input.schema,
+        filter: parseFilters(input.filters),
+        instructions: input.instructions,
+      });
+    }
+    const { result, memories_read } = await unwrap(
+      this.ctx.transport.api.POST("/v1/memories/exports", {
+        body: {
+          schema: input.schema,
+          ...(options.namespaceId ? { namespace_id: options.namespaceId } : {}),
+          ...(input.filters ? { filters: input.filters } : {}),
+          ...(input.instructions ? { instructions: input.instructions } : {}),
+        },
+      }),
+    );
+    return { result, memoriesRead: memories_read };
+  }
+
+  /**
+   * What a model suggests tidying: what's out of date, what's said twice, and patterns worth keeping.
+   * One model call, and nothing changes. Apply what you agree with using `applyDream`.
+   */
+  async dream(named: { namespaceId?: string; filters?: Record<string, unknown> } = {}): Promise<{
+    proposals: DreamProposal[];
+    memories: { id: string; memory: string; createdAt: string }[];
+  }> {
+    const options = this.inDefault(named);
+    const held = await this.route(options.namespaceId);
+    if (held) return held.dream({ filter: parseFilters(options.filters) });
+    const { proposals, memories } = await unwrap(
+      this.ctx.transport.api.POST("/v1/memories/dream", {
+        body: {
+          ...(options.namespaceId ? { namespace_id: options.namespaceId } : {}),
+          ...(options.filters ? { filters: options.filters } : {}),
+        },
+      }),
+    );
+    return {
+      proposals,
+      memories: memories.map((memory) => ({
+        id: memory.id,
+        memory: memory.memory,
+        createdAt: memory.created_at,
+      })),
+    };
+  }
+
+  /**
+   * Does what a proposal says, with the ordinary calls, so it's in each memory's history and can be
+   * looked back on. Superseded memories are forgotten, merged ones become the first one, and a
+   * synthesis is a new memory that names what it rests on and leaves those in place.
+   */
+  async applyDream(proposal: DreamProposal): Promise<void> {
+    if (proposal.kind === "supersede") {
+      await this.batchDelete(proposal.sources);
+      return;
+    }
+    const [first, ...others] = proposal.sources as [string, ...string[]];
+    if (proposal.kind === "merge") {
+      await this.update(first, { text: proposal.text as string });
+      if (others.length) await this.batchDelete(others);
+      return;
+    }
+    const source = await this.get(first);
+    await this.add(proposal.text as string, {
+      namespaceId: source.namespaceId,
+      ...(source.userId ? { userId: source.userId } : {}),
+      ...(source.agentId ? { agentId: source.agentId } : {}),
+      ...(source.runId ? { runId: source.runId } : {}),
+      infer: false,
+      metadata: { synthesized_from: proposal.sources },
+    });
+  }
+
+  /**
+   * One turn of the assistant for a Private namespace, here in this tab with your own model. It reads
+   * and proposes, and nothing reaches MemDot. Assisted namespaces use the `/v1/copilot` route.
+   */
+  async privateCopilot(namespaceId: string, messages: ModelMessage[]): Promise<CopilotStream> {
+    const held = await this.route(namespaceId);
+    if (!held) throw new MemDotError(400, "NOT_PRIVATE", "Only for a Private namespace.");
+    const config = await this.privateLlm();
+    if (!config) {
+      throw new MemDotError(
+        409,
+        "MODEL_REQUIRED",
+        "Set a model for Private memory to use Copilot.",
+      );
+    }
+    const { languageModel, streamCopilot } = await import("@memdot/memory-engine/llm");
+    return streamCopilot(languageModel(config), messages, {
+      search: async (query, limit) =>
+        (await this.search(query, { namespaceId, topK: limit })).map(({ id, memory, score }) => ({
+          id,
+          memory,
+          score,
+        })),
+      list: async (limit) =>
+        (await this.list({ namespaceId, pageSize: limit })).results.map((row) => ({
+          id: row.id,
+          memory: row.memory,
+          user_id: row.userId,
+        })),
+      settings: async () => {
+        const settings = await this.settings(namespaceId);
+        return {
+          mode: "private" as const,
+          custom_instructions: settings.customInstructions,
+          categories: settings.categories,
+          decay_half_life_days: settings.decayHalfLifeDays ?? null,
+        };
+      },
+      categories: async () => (await this.categories(namespaceId)).categories,
+    });
   }
 
   /**

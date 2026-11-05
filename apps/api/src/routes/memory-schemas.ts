@@ -233,6 +233,10 @@ export const NamespaceSettings = z
   .object({
     custom_instructions: z.string().max(8_000).nullable(),
     categories: z.array(CategoryDefinition).nullable(),
+    decay_half_life_days: z.number().int().min(1).max(3650).nullable().openapi({
+      description:
+        "Set: search favours what's been touched recently, with this half-life. It only reorders: nothing is deleted or hidden. Null: off.",
+    }),
     /** Private namespaces: the same settings, sealed on the device. */
     sealed: z.string().nullable(),
   })

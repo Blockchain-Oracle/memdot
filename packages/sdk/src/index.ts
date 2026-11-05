@@ -6,6 +6,7 @@ export type {
   MemoryGraph,
   MemoryRelation,
 } from "@memdot/memory-engine";
+export type { DreamProposal, UserProfile } from "@memdot/memory-engine/llm";
 export {
   type Account,
   AccountApi,
@@ -17,7 +18,12 @@ export {
   type SignInOptions,
   type UnlockWrap,
 } from "./account.js";
-export { ActivityApi, type ChainTransaction, type RequestLogEntry } from "./activity.js";
+export {
+  ActivityApi,
+  type Analytics,
+  type ChainTransaction,
+  type RequestLogEntry,
+} from "./activity.js";
 export {
   AgentMemory,
   type AgentMemoryOptions,
@@ -84,6 +90,8 @@ export {
   type MemoryScope,
   type MemoryUpdate,
   type Namespace,
+  type NamespaceSettings,
+  type ProfileResult,
   type ScoredMemory,
   type SearchOptions,
 } from "./memories.js";
@@ -108,3 +116,11 @@ export {
 export { type Folder, FoldersApi, type Space, SpacesApi } from "./spaces.js";
 export type { ReceivedKeys } from "./vault.js";
 export { type Wallet, walletFromMnemonic } from "./wallet.js";
+export {
+  verifyWebhook,
+  WEBHOOK_EVENTS,
+  type Webhook,
+  type WebhookDelivery,
+  type WebhookEventName,
+  WebhooksApi,
+} from "./webhooks.js";

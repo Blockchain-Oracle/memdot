@@ -71,6 +71,8 @@ export const memories = pgTable(
     termCount: integer("term_count").notNull().default(0),
     feedback: text("feedback"),
     feedbackReason: text("feedback_reason"),
+    /** Last returned by a search. With decay on, what's still in use keeps its place. */
+    accessedAt: timestamp("accessed_at", { withTimezone: true, precision: 3 }),
     occurredAt: timestamp("occurred_at", { withTimezone: true, precision: 3 }),
     expiresAt: timestamp("expires_at", { withTimezone: true, precision: 3 }),
     createdAt: createdAt(),
@@ -187,6 +189,8 @@ export const memorySettings = pgTable("memory_settings", {
     .references(() => folders.id),
   customInstructions: text("custom_instructions"),
   categories: jsonb("categories"),
+  /** Set: search favours what's been touched recently, with this half-life. Null: decay is off. */
+  decayHalfLifeDays: integer("decay_half_life_days"),
   /** Private namespaces: the same settings, sealed on the device to the space key. */
   sealed: bytea("sealed"),
   keyEpoch: integer("key_epoch"),
@@ -208,3 +212,66 @@ export const memoryConfig = pgTable("memory_config", {
   privateSealed: bytea("private_sealed"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * A generated summary of one person, regenerable at any time from their memories. Assisted: one row
+ * per user, sealed with the namespace's server key. Private: one row holding all of them, sealed on
+ * the device, so the server can't even see who has a profile.
+ */
+export const memoryProfiles = pgTable(
+  "memory_profiles",
+  {
+    folderId: uuid("folder_id")
+      .notNull()
+      .references(() => folders.id, { onDelete: "cascade" }),
+    /** The user id, or `PRIVATE_PROFILES_SUBJECT` for a Private namespace's one sealed row. */
+    subject: text("subject").notNull(),
+    sealed: bytea("sealed").notNull(),
+    memoriesRead: integer("memories_read").notNull().default(0),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.folderId, t.subject] })],
+);
+
+export const PRIVATE_PROFILES_SUBJECT = "*private*";
+
+/** Where to tell an account about what happened. Its signing secret is shown once, then sealed. */
+export const webhooks = pgTable(
+  "webhooks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id),
+    name: text("name").notNull(),
+    url: text("url").notNull(),
+    events: text("events").array().notNull(),
+    secretSealed: bytea("secret_sealed").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("webhooks_account_idx").on(t.accountId)],
+);
+
+/** One event for one webhook, and how it went. Ids only (R10), never anything a memory says. */
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    webhookId: uuid("webhook_id")
+      .notNull()
+      .references(() => webhooks.id, { onDelete: "cascade" }),
+    event: text("event").notNull(),
+    payload: jsonb("payload").notNull(),
+    /** pending, delivered or failed. */
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    responseStatus: integer("response_status"),
+    latencyMs: integer("latency_ms"),
+    error: text("error"),
+    createdAt: createdAt(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  },
+  (t) => [index("webhook_deliveries_webhook_idx").on(t.webhookId, t.createdAt)],
+);

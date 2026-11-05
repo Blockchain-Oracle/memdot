@@ -5,6 +5,9 @@ import { fromDrizzle, PgBoss } from "pg-boss";
 import type { ChainTxPayload, MemoryPayload } from "./payloads.js";
 import { PRIORITY, QUEUE } from "./queues.js";
 
+/** About a day of growing gaps, then the delivery stays failed until someone resends it. */
+const WEBHOOK_RETRIES = 8;
+const WEBHOOK_RETRY_DELAY_SECONDS = 30;
 const CHAIN_TX_RETRIES = 5;
 const CHAIN_TX_RETRY_DELAY_SECONDS = 15;
 /** A 7 MB store waits for finality (~2 blocks); a renew batch waits for up to 20. */
@@ -46,6 +49,11 @@ export async function startBoss(connectionString: string, role: BossRole): Promi
   await boss.createQueue(QUEUE.indexer, { policy: "exclusive" });
   await boss.createQueue(QUEUE.alerts, { retryLimit: 3, retryDelay: 30, retryBackoff: true });
   await boss.createQueue(QUEUE.maintenance, { policy: "exclusive" });
+  await boss.createQueue(QUEUE.webhooks, {
+    retryLimit: WEBHOOK_RETRIES,
+    retryDelay: WEBHOOK_RETRY_DELAY_SECONDS,
+    retryBackoff: true,
+  });
   await boss.createQueue(QUEUE.memory, {
     retryLimit: MEMORY_RETRIES,
     retryDelay: MEMORY_RETRY_DELAY_SECONDS,

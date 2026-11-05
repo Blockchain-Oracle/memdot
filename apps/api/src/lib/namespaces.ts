@@ -1,4 +1,11 @@
-import { folders, memories, memoryConfig, memoryModelUsage, spaces } from "@memdot/db";
+import {
+  folders,
+  memories,
+  memoryConfig,
+  memoryModelUsage,
+  memorySettings,
+  spaces,
+} from "@memdot/db";
 import { FilterError, type FilterNode, parseFilter } from "@memdot/memory-engine";
 import { modelsFor } from "@memdot/memory-server";
 import { and, asc, eq, inArray, isNull, type SQL, sql } from "drizzle-orm";
@@ -134,6 +141,15 @@ export async function spendSharedModel(c: Context<AppEnv>, calls = 1): Promise<v
       `This account has used its ${env.MEMORY_DAILY_SHARED_WRITES} calls for today on MemDot's model. Add your own key under Configuration, or store with infer: false.`,
     );
   }
+}
+
+/** The half-life a namespace's search decays with, or null when decay is off. */
+export async function decayOf(folderId: string): Promise<number | null> {
+  const [row] = await db
+    .select({ days: memorySettings.decayHalfLifeDays })
+    .from(memorySettings)
+    .where(eq(memorySettings.folderId, folderId));
+  return row?.days ?? null;
 }
 
 /** The embedder a search may use: past the daily allowance on MemDot's key, none, so keywords only. */

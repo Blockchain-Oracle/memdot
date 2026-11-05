@@ -1,7 +1,9 @@
 import { type Database, memories, memoryTerms } from "@memdot/db";
 import {
+  applyDecay,
   type Candidate,
   candidateCount,
+  DECAY_OVERFETCH,
   type Embedder,
   ENTITY_BOOST,
   entityCandidates,
@@ -33,6 +35,8 @@ export interface SearchInput {
   showExpired: boolean;
   asOf?: Date | undefined;
   embedder: Embedder | null;
+  /** Set: favour what's been touched recently, with this half-life, and count this as a touch. */
+  decayHalfLifeDays?: number | null | undefined;
 }
 
 /** Live memories in a namespace matching a filter, not expired. Shared by search and lists. */
@@ -191,10 +195,45 @@ export async function searchMemories(
     keyword: keyword.get(id) ?? 0,
     entity: entityBoost.get(id) ?? 0,
   }));
-  return rank(candidates, {
+  const halfLifeDays = input.decayHalfLifeDays ?? null;
+  const ranked = rank(candidates, {
     queryTerms: queryTermCount(input.query),
-    limit: input.limit,
+    limit: halfLifeDays ? input.limit * DECAY_OVERFETCH : input.limit,
     threshold: input.threshold,
     mode: input.mode,
   });
+  if (!halfLifeDays || ranked.length === 0) return ranked;
+
+  const touched = await db
+    .select({
+      id: memories.id,
+      at: sql<Date>`greatest(${memories.accessedAt}, ${memories.updatedAt})`.mapWith(
+        memories.updatedAt,
+      ),
+    })
+    .from(memories)
+    .where(
+      inArray(
+        memories.id,
+        ranked.map((hit) => hit.id),
+      ),
+    );
+  const lastTouched = new Map(touched.map((row) => [row.id, row.at]));
+  const results = applyDecay(ranked, (id) => lastTouched.get(id) ?? input.at, {
+    now: input.at,
+    halfLifeDays,
+    limit: input.limit,
+  });
+  // Recording it can wait, and a failure only means this search doesn't count as a touch.
+  void db
+    .update(memories)
+    .set({ accessedAt: input.at })
+    .where(
+      inArray(
+        memories.id,
+        results.map((hit) => hit.id),
+      ),
+    )
+    .catch((error: unknown) => console.warn("[memory] touch skipped:", error));
+  return results;
 }
