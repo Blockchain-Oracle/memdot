@@ -447,6 +447,11 @@ export class MemoriesApi {
 
   /** Assisted: the server reads these to extract. Private: sealed here, and only kept there. */
   async setSettings(namespaceId: string, settings: NamespaceSettings): Promise<void> {
+    // Left out, it stays as it is. Private settings are one sealed blob, so it has to be read back.
+    const decayHalfLifeDays =
+      settings.decayHalfLifeDays === undefined
+        ? (await this.openSettings(namespaceId)).decayHalfLifeDays
+        : settings.decayHalfLifeDays;
     const row = await this.namespaceRow(namespaceId);
     const body =
       row.mode === "private"
@@ -457,7 +462,7 @@ export class MemoriesApi {
                   JSON.stringify({
                     instructions: settings.customInstructions,
                     categories: settings.categories,
-                    decayHalfLifeDays: settings.decayHalfLifeDays ?? null,
+                    decayHalfLifeDays,
                   }),
                 ),
                 [this.ctx.vault.recipient()],
@@ -467,7 +472,7 @@ export class MemoriesApi {
         : {
             custom_instructions: settings.customInstructions,
             categories: settings.categories,
-            decay_half_life_days: settings.decayHalfLifeDays ?? null,
+            decay_half_life_days: decayHalfLifeDays,
           };
     await unwrap(
       this.ctx.transport.api.PUT("/v1/namespaces/{id}/settings", {

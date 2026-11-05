@@ -304,7 +304,10 @@ export function namespaceRoutes(services: Services) {
         const values = {
           customInstructions: body.custom_instructions ?? null,
           categories: body.categories ?? null,
-          decayHalfLifeDays: body.decay_half_life_days ?? null,
+          // Left out, it stays as it is: a client that doesn't know this setting mustn't clear it.
+          ...(body.decay_half_life_days === undefined
+            ? {}
+            : { decayHalfLifeDays: body.decay_half_life_days }),
           sealed: body.sealed ? fromBase64(body.sealed) : null,
           updatedAt: new Date(),
         };

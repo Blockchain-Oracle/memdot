@@ -4,7 +4,9 @@ import type { Namespace } from "@memdot/sdk";
 import { Button } from "@memdot/ui/components/button";
 import { Input } from "@memdot/ui/components/input";
 import { Label } from "@memdot/ui/components/label";
+import { SegmentedControl } from "@memdot/ui/components/segmented-control";
 import { Spinner } from "@memdot/ui/components/spinner";
+import { Switch } from "@memdot/ui/components/switch";
 import { Textarea } from "@memdot/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DownloadIcon, PlusIcon, SparklesIcon, UploadIcon, XIcon } from "lucide-react";
@@ -15,9 +17,17 @@ import { ConfirmDialog } from "@/components/files/file-dialogs";
 import { saveBytes } from "@/components/files/file-sheet";
 import { useUploads } from "@/components/files/uploads";
 import { describeError } from "@/lib/errors";
+import { formatNumber } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
 
 const MAX_IMPORT_BYTES = 1024 * 1024;
+const DEFAULT_HALF_LIFE_DAYS = 30;
+const HALF_LIVES = [
+  { value: "7", label: "A week" },
+  { value: "30", label: "A month" },
+  { value: "90", label: "3 months" },
+  { value: "365", label: "A year" },
+];
 
 function Group({
   title,
@@ -91,6 +101,11 @@ export function NamespaceSettings({ namespace }: { namespace: Namespace }) {
     setCategories(settings.data.categories ?? []);
   }, [settings.data]);
 
+  const counted = useQuery({
+    queryKey: ["memories", namespace.id, "categories"],
+    queryFn: () => memdot.memories.categories(namespace.id),
+  });
+
   const fail = (error: unknown) => toast.error(describeError(error).title);
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ["memories", namespace.id] });
@@ -109,6 +124,18 @@ export function NamespaceSettings({ namespace }: { namespace: Namespace }) {
       toast.success("Saved. New memories follow these from now on.");
       await queryClient.invalidateQueries({ queryKey: ["namespace-settings", namespace.id] });
     },
+    onError: fail,
+  });
+  // Saved as it's changed, and from what's stored, so it doesn't save half-typed instructions too.
+  const setDecay = useMutation({
+    mutationFn: (decayHalfLifeDays: number | null) =>
+      memdot.memories.setSettings(namespace.id, {
+        customInstructions: settings.data?.customInstructions ?? null,
+        categories: settings.data?.categories ?? null,
+        decayHalfLifeDays,
+      }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["namespace-settings", namespace.id] }),
     onError: fail,
   });
   const generate = useMutation({
@@ -266,11 +293,64 @@ export function NamespaceSettings({ namespace }: { namespace: Namespace }) {
             With none set, memories are filed under a standard list such as food, travel and
             technology.
           </p>
+          {counted.data && counted.data.categories.length > 0 && (
+            <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+              <span className="eyebrow">In use</span>
+              <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                {counted.data.categories.map(({ name, count }) => (
+                  <li key={name} className="flex items-baseline gap-1.5 text-ui-sm">
+                    {name}
+                    <span className="font-mono text-text-3 tabular">{formatNumber(count)}</span>
+                  </li>
+                ))}
+                {counted.data.uncategorized > 0 && (
+                  <li className="flex items-baseline gap-1.5 text-ui-sm text-text-3">
+                    Not filed
+                    <span className="font-mono tabular">
+                      {formatNumber(counted.data.uncategorized)}
+                    </span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
         </div>
         <div className="flex justify-end">
           <Button disabled={save.isPending || settings.isPending} onClick={() => save.mutate()}>
             {save.isPending && <Spinner data-icon="inline-start" />} Save
           </Button>
+        </div>
+      </Group>
+
+      <Group
+        title="Favour what's in use"
+        description={
+          isPrivate
+            ? "Search leans towards what changed recently. It only reorders: nothing is deleted or hidden, and turning it off brings the old order back. Reads aren't recorded, since they stay on this device."
+            : "Search leans towards what was used or changed recently. It only reorders: nothing is deleted or hidden, and turning it off brings the old order back."
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor={`${id}-decay`}>Lean towards recent memories</Label>
+            <Switch
+              id={`${id}-decay`}
+              disabled={settings.isPending || setDecay.isPending}
+              checked={Boolean(settings.data?.decayHalfLifeDays)}
+              onCheckedChange={(on) => setDecay.mutate(on ? DEFAULT_HALF_LIFE_DAYS : null)}
+            />
+          </div>
+          {settings.data?.decayHalfLifeDays && (
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-ui-sm text-text-3">A memory's weight halves if unused for</span>
+              <SegmentedControl
+                options={HALF_LIVES}
+                label="Half-life"
+                value={String(settings.data.decayHalfLifeDays)}
+                onValueChange={(days) => setDecay.mutate(Number(days))}
+              />
+            </div>
+          )}
         </div>
       </Group>
 

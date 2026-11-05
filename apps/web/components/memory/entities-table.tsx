@@ -15,11 +15,16 @@ import {
 } from "@memdot/ui/components/table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TrashIcon } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/files/file-dialogs";
 import { describeError } from "@/lib/errors";
 import { formatNumber, formatRelative } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
+
+/** After the `#`, so a Private namespace's user id stays out of what the web server is asked for. */
+export const personHref = (namespaceId: string, userId: string) =>
+  `/entities/${namespaceId}#${encodeURIComponent(userId)}`;
 
 /** The users, agents and runs a namespace remembers. Forgetting one forgets its memories. */
 export function EntitiesTable({ namespace }: { namespace: Namespace }) {
@@ -64,7 +69,18 @@ export function EntitiesTable({ namespace }: { namespace: Namespace }) {
         <TableBody>
           {entities.data.map((entity) => (
             <TableRow key={`${entity.type}:${entity.id}`}>
-              <TableCell className="max-w-48 truncate font-mono text-ui-sm">{entity.id}</TableCell>
+              <TableCell className="max-w-48 truncate font-mono text-ui-sm">
+                {entity.type === "user" ? (
+                  <Link
+                    href={personHref(namespace.id, entity.id)}
+                    className="underline-offset-4 hover:underline"
+                  >
+                    {entity.id}
+                  </Link>
+                ) : (
+                  entity.id
+                )}
+              </TableCell>
               <TableCell>
                 <Badge variant="outline" className="font-normal">
                   {entity.type}

@@ -56,7 +56,12 @@ const MODES = [
   { value: "keyword", label: "Exact words" },
 ];
 
-const COLUMN: Record<string, string> = { user: "user_id", agent: "agent_id", run: "run_id" };
+const COLUMN: Record<string, string> = {
+  user: "user_id",
+  agent: "agent_id",
+  run: "run_id",
+  category: "categories",
+};
 
 /** The filter tokens as the API's filter language. */
 function toFilters(tokens: Filter[]): Record<string, unknown> | undefined {
@@ -101,12 +106,18 @@ function ModelDownload() {
 }
 
 /** Search, filter tokens, and every memory in a namespace in a virtualized table. */
-export function MemoryExplorer({ namespace }: { namespace: Namespace }) {
+export function MemoryExplorer({
+  namespace,
+  initialFilters = [],
+}: {
+  namespace: Namespace;
+  initialFilters?: Filter[];
+}) {
   const memdot = useMemDot();
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [mode, setMode] = useState("hybrid");
-  const [tokens, setTokens] = useState<Filter[]>([]);
+  const [tokens, setTokens] = useState<Filter[]>(initialFilters);
   const [open, setOpen] = useState<Memory | null>(null);
   const [adding, setAdding] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -157,6 +168,11 @@ export function MemoryExplorer({ namespace }: { namespace: Namespace }) {
     queryFn: () => memdot.memories.entities({ namespaceId: namespace.id }),
   });
 
+  const categories = useQuery({
+    queryKey: ["memories", namespace.id, "categories"],
+    queryFn: () => memdot.memories.categories(namespace.id),
+  });
+
   const fields = useMemo<FilterFieldDef[]>(() => {
     const options = (type: string) =>
       (entities.data ?? [])
@@ -166,6 +182,15 @@ export function MemoryExplorer({ namespace }: { namespace: Namespace }) {
       { id: "user", label: "User", operators: IS_OPERATORS, options: options("user") },
       { id: "agent", label: "Agent", operators: IS_OPERATORS, options: options("agent") },
       { id: "run", label: "Run", operators: IS_OPERATORS, options: options("run") },
+      {
+        id: "category",
+        label: "Category",
+        operators: IS_OPERATORS,
+        options: (categories.data?.categories ?? []).map(({ name, count }) => ({
+          value: name,
+          label: `${name} (${count})`,
+        })),
+      },
       {
         id: "created",
         label: "Added",
@@ -179,7 +204,7 @@ export function MemoryExplorer({ namespace }: { namespace: Namespace }) {
         options: [{ value: "file", label: "a file" }],
       },
     ];
-  }, [entities.data]);
+  }, [entities.data, categories.data]);
 
   const searching = Boolean(debounced);
   const pending = searching ? search.isPending : list.isPending;
