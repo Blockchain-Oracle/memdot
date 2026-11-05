@@ -1,0 +1,29 @@
+{
+  "name": "@memdot/example-chat-with-memory",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A chat assistant with a memory panel, on Next.js and the AI SDK.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 5183",
+    "build": "next build",
+    "start": "next start --port 5183",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^4.0.109",
+    "@ai-sdk/react": "4.0.166",
+    "@memdot/ai-sdk": "workspace:*",
+    "@memdot/sdk": "workspace:*",
+    "ai": "^7.0.159",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "catalog:"
+  }
+}

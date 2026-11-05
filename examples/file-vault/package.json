@@ -1,0 +1,24 @@
+{
+  "name": "@memdot/example-file-vault",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An encrypted file vault that runs entirely in the browser.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@memdot/sdk": "workspace:*",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5",
+    "typescript": "catalog:",
+    "vite": "^7"
+  }
+}

@@ -1,0 +1,200 @@
+:root {
+  color-scheme: light dark;
+  --bg: #faf7f2;
+  --card: #ffffff;
+  --ink: #26221c;
+  --quiet: #6f675c;
+  --line: #e4ddd2;
+  --accent: #ff5c35;
+  --bad: #b3261e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16140f;
+    --card: #1f1c16;
+    --ink: #ede6da;
+    --quiet: #a59c8e;
+    --line: #35302a;
+    --bad: #f2877e;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font:
+    15px / 1.5 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  max-width: 1040px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+h1 {
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+}
+
+h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  white-space: pre-wrap;
+}
+
+.message.user {
+  align-self: flex-end;
+}
+
+.used {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--quiet);
+}
+
+.used ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+
+form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.panel ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panel li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel li button {
+  font-size: 12px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+.quiet {
+  color: var(--quiet);
+}
+
+.bad {
+  color: var(--bad);
+}
+
+p {
+  margin: 0 0 8px;
+}
+
+@media (max-width: 720px) {
+  .page {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(420px, 1fr) auto;
+    height: auto;
+    min-height: 100%;
+  }
+}
