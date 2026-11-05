@@ -1,0 +1,3 @@
+[mcp_servers.memdot]
+command = "memdot"
+args = ["mcp"]

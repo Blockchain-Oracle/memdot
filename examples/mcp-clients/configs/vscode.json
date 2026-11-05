@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "memdot": {
+      "type": "stdio",
+      "command": "memdot",
+      "args": ["mcp"]
+    }
+  }
+}

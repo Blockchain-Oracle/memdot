@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "memdot": {
+      "command": "memdot",
+      "args": ["mcp"]
+    }
+  }
+}
