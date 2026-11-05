@@ -1,0 +1,46 @@
+{
+  "stage": "S13",
+  "at": "2026-11-05T19:19:33.680Z",
+  "api": "https://api.84.46.247.92.sslip.io",
+  "app": "https://app.84.46.247.92.sslip.io",
+  "assisted": {
+    "namespaceId": "981e4121-b6e5-4e4d-b61b-fe84572b626e",
+    "chatKept": 2,
+    "graph": {
+      "nodes": 5,
+      "edges": 5
+    },
+    "dream": [
+      "supersede",
+      "merge"
+    ],
+    "csvRows": 6,
+    "copilotToolCalls": 2
+  },
+  "private": {
+    "namespaceId": "35708840-6e6b-45ec-80b8-9ee863c871db",
+    "chatKept": 2,
+    "graph": {
+      "nodes": 5,
+      "edges": 6
+    },
+    "dream": [
+      "supersede",
+      "merge"
+    ],
+    "csvRows": 6,
+    "copilotToolCalls": 2
+  },
+  "webhooks": {
+    "deliveries": 4
+  },
+  "analytics": {
+    "requests": 3296,
+    "memories": {
+      "total": 71,
+      "assisted": 43,
+      "private": 28
+    }
+  },
+  "passed": true
+}

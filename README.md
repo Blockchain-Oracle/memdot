@@ -164,7 +164,7 @@ Track: **Modular Cloud & Middleware**, "focusing on decentralized middleware, st
 Recorded by [`docs/evidence/s07-seed-2026-11-01.json`](docs/evidence/s07-seed-2026-11-01.json), [`docs/evidence/s07-self-signed-2026-11-01.json`](docs/evidence/s07-self-signed-2026-11-01.json), [`docs/evidence/s08-seed-2026-11-02.json`](docs/evidence/s08-seed-2026-11-02.json), [`docs/evidence/s08-live-2026-11-02.json`](docs/evidence/s08-live-2026-11-02.json), [`docs/evidence/s09-agents-2026-11-02.json`](docs/evidence/s09-agents-2026-11-02.json) and [`docs/evidence/s10-python-2026-11-02.json`](docs/evidence/s10-python-2026-11-02.json), [`docs/evidence/s11-plugin-2026-11-03.json`](docs/evidence/s11-plugin-2026-11-03.json). Registry transaction hashes are the EVM hashes Revive's RPC reports.
 <!-- evidence:end -->
 
-Earlier runs are in [`docs/evidence/`](docs/evidence): the first store and renew round trip, the service walk and the SDK journey.
+Earlier runs are in [`docs/evidence/`](docs/evidence): the first store and renew round trip, the service walk and the SDK journey. [`s13-pro-features-2026-11-05.json`](docs/evidence/s13-pro-features-2026-11-05.json) records the Playground's chat, the graph, decay, profiles, Dream, exports and Copilot on the live service in both modes, and signed webhooks reaching a receiver on a public address: 56 checks, from `pnpm --filter @memdot/sdk journey:pro`.
 
 ## What's in the product today
 
