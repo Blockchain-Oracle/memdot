@@ -162,6 +162,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ai-sdk/react':
+        specifier: 4.0.166
+        version: 4.0.166(react@19.3.1)(zod@4.6.7)
       '@huggingface/transformers':
         specifier: ^4.3.2
         version: 4.3.2(@types/node@24.19.2)
@@ -192,6 +195,12 @@ importers:
       '@tanstack/react-virtual':
         specifier: ~3.14.23
         version: 3.14.23(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      ai:
+        specifier: ^7.0.162
+        version: 7.0.162(zod@4.6.7)
+      diff:
+        specifier: 9.0.0
+        version: 9.0.0
       lucide-react:
         specifier: ^1.64.0
         version: 1.64.0(@types/react@19.3.0)(react@19.3.1)
@@ -4895,6 +4904,10 @@ packages:
 
   diff@8.0.4:
     resolution: {integrity: sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw==}
+    engines: {node: '>=0.3.1'}
+
+  diff@9.0.0:
+    resolution: {integrity: sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw==}
     engines: {node: '>=0.3.1'}
 
   dot-prop@6.0.1:
@@ -10963,6 +10976,8 @@ snapshots:
       dequal: 2.0.3
 
   diff@8.0.4: {}
+
+  diff@9.0.0: {}
 
   dot-prop@6.0.1:
     dependencies:

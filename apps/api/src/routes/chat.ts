@@ -3,9 +3,9 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { jobs, memories, memoryInbox } from "@memdot/db";
 import { enqueueMemory, JOB_KIND } from "@memdot/jobs";
 import { messageText, parseFilter, RECALL_PREAMBLE } from "@memdot/memory-engine";
-import { ChatMessageSchema } from "@memdot/memory-engine/llm";
+import { ChatMessageSchema, streamReply } from "@memdot/memory-engine/llm";
 import { openBody, sealWrite, searchMemories } from "@memdot/memory-server";
-import { generateText, type ModelMessage, streamText } from "ai";
+import { generateText, type ModelMessage } from "ai";
 import { inArray } from "drizzle-orm";
 import { streamSSE } from "hono/streaming";
 import { db } from "../db.js";
@@ -118,9 +118,20 @@ export function chatRoutes(services: Services) {
               ),
             )
         : [];
-      const recalled = rows.flatMap((row) =>
-        row.sealedText ? [`- ${openBody(keys, namespace.id, row.sealedText).text}`] : [],
-      );
+      const sealedById = new Map(rows.map((row) => [row.id, row.sealedText]));
+      const used = hits.flatMap((hit) => {
+        const sealedText = sealedById.get(hit.id);
+        return sealedText
+          ? [
+              {
+                id: hit.id,
+                memory: openBody(keys, namespace.id, sealedText).text,
+                score: hit.score,
+              },
+            ]
+          : [];
+      });
+      const recalled = used.map((memory) => `- ${memory.memory}`);
 
       // The model takes system text apart from the conversation.
       const instructions = [
@@ -137,11 +148,17 @@ export function chatRoutes(services: Services) {
         ...(body.top_p !== undefined ? { topP: body.top_p } : {}),
       };
 
-      const remember = async (reply: string) => {
-        if (!body.store) return;
+      // Only what's new since the last reply: each call already saved what came before it, and
+      // reading it again would turn the same facts into near-duplicates.
+      const newTurns = body.messages
+        .slice(body.messages.findLastIndex((message) => message.role === "assistant") + 1)
+        .filter((message) => message.role !== "system");
+
+      const remember = async (reply: string): Promise<string | null> => {
+        if (!body.store) return null;
         const sealed = sealWrite(keys, namespace.id, {
           kind: "add",
-          messages: [...body.messages, { role: "assistant", content: reply }],
+          messages: [...newTurns, { role: "assistant", content: reply }],
           userId: body.user_id,
           agentId: body.agent_id,
           runId: body.run_id,
@@ -149,14 +166,15 @@ export function chatRoutes(services: Services) {
           procedural: false,
           source: { kind: "conversation", label: "chat-completions" },
         });
-        await db.transaction(async (tx) => {
+        return db.transaction(async (tx) => {
           const [row] = await tx
             .insert(jobs)
             .values({ accountId, kind: JOB_KIND.memoryAdd, payload: { folderId: namespace.id } })
             .returning({ id: jobs.id });
-          if (!row) return;
+          if (!row) return null;
           await tx.insert(memoryInbox).values({ jobId: row.id, folderId: namespace.id, sealed });
           await enqueueMemory(services.boss, tx, { op: "add", jobId: row.id });
+          return row.id;
         });
       };
 
@@ -185,31 +203,64 @@ export function chatRoutes(services: Services) {
               completion_tokens: result.usage.outputTokens ?? 0,
               total_tokens: result.usage.totalTokens ?? 0,
             },
-            memdot: { recalled: recalled.length, namespace_id: namespace.id },
+            memdot: { recalled: recalled.length, namespace_id: namespace.id, memories: used },
           },
           200,
         );
       }
 
-      const chunk = (delta: Record<string, string>, finish: string | null) =>
+      // Extra fields under `memdot`, which OpenAI clients ignore: what was recalled, in the first
+      // chunk, and the write that keeps this exchange, in the last.
+      const chunk = (
+        delta: Record<string, string>,
+        finish: string | null,
+        extra?: Record<string, unknown>,
+      ) =>
         JSON.stringify({
           id,
           object: "chat.completion.chunk",
           created,
           model,
           choices: [{ index: 0, delta, finish_reason: finish }],
+          ...(extra ? { memdot: extra } : {}),
         });
       return streamSSE(c, async (stream) => {
-        const result = streamText({ model: llm, messages, ...settings });
         let reply = "";
-        await stream.writeSSE({ data: chunk({ role: "assistant" }, null) });
-        for await (const text of result.textStream) {
-          reply += text;
-          await stream.writeSSE({ data: chunk({ content: text }, null) });
+        await stream.writeSSE({
+          data: chunk({ role: "assistant" }, null, {
+            namespace_id: namespace.id,
+            memories: used,
+          }),
+        });
+        try {
+          const { instructions: system, temperature, maxOutputTokens, topP } = settings;
+          for await (const text of streamReply(llm, messages, {
+            ...(system ? { instructions: system } : {}),
+            settings: {
+              ...(temperature !== undefined ? { temperature } : {}),
+              ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+              ...(topP !== undefined ? { topP } : {}),
+            },
+          })) {
+            reply += text;
+            await stream.writeSSE({ data: chunk({ content: text }, null) });
+          }
+        } catch {
+          // The way OpenAI's own streams report it. Nothing half-answered gets kept.
+          await stream.writeSSE({
+            data: JSON.stringify({
+              error: { code: "MODEL_FAILED", message: "The model didn't answer. Try again." },
+            }),
+          });
+          await stream.writeSSE({ data: "[DONE]" });
+          return;
         }
-        await stream.writeSSE({ data: chunk({}, "stop") });
+        const eventId = await remember(reply).catch((error: unknown) => {
+          console.error("[chat] saving an exchange failed", error);
+          return null;
+        });
+        await stream.writeSSE({ data: chunk({}, "stop", { event_id: eventId }) });
         await stream.writeSSE({ data: "[DONE]" });
-        await remember(reply);
       }) as never;
     },
   );

@@ -9,10 +9,13 @@ import {
   KeyRoundIcon,
   LayoutGridIcon,
   type LucideIcon,
+  MessagesSquareIcon,
+  MoonStarIcon,
   NetworkIcon,
   RefreshCwIcon,
   SettingsIcon,
   SlidersHorizontalIcon,
+  SparklesIcon,
   UsersIcon,
   WebhookIcon,
 } from "lucide-react";
@@ -62,6 +65,29 @@ export const NAV: { label: string; items: NavItem[] }[] = [
         href: "/shared",
         icon: UsersIcon,
         keywords: ["grants", "received"],
+      },
+    ],
+  },
+  {
+    label: "Tools",
+    items: [
+      {
+        title: "Playground",
+        href: "/playground",
+        icon: MessagesSquareIcon,
+        keywords: ["chat", "try", "test", "stream"],
+      },
+      {
+        title: "Copilot",
+        href: "/copilot",
+        icon: SparklesIcon,
+        keywords: ["assistant", "ask", "ai", "help", "suggest"],
+      },
+      {
+        title: "Dream",
+        href: "/dream",
+        icon: MoonStarIcon,
+        keywords: ["tidy", "merge", "duplicates", "consolidate", "clean"],
       },
     ],
   },

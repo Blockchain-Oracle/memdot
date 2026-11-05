@@ -73,7 +73,12 @@ export class Transport {
   async send(
     method: string,
     path: string,
-    init: { body?: BodyInit | null; json?: unknown; headers?: Record<string, string> } = {},
+    init: {
+      body?: BodyInit | null;
+      json?: unknown;
+      headers?: Record<string, string>;
+      signal?: AbortSignal;
+    } = {},
   ): Promise<Response> {
     const headers = new Headers(init.headers);
     this.decorate(headers);
@@ -87,6 +92,7 @@ export class Transport {
       method,
       headers,
       body,
+      ...(init.signal ? { signal: init.signal } : {}),
       ...(isBrowser ? { credentials: this.browserCredentials } : {}),
     });
     this.remember(response);

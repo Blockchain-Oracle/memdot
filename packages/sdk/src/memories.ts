@@ -7,6 +7,7 @@ import {
   type LlmConfig,
   type MemoryEntry,
   type MemoryGraph,
+  messageText,
   normalizeMessages,
   type PromptCategory,
   parseFilter,
@@ -19,6 +20,7 @@ import type {
   UserProfile,
 } from "@memdot/memory-engine/llm";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
+import { recallContext, scopeFilter, withRecall } from "./agent-memory.js";
 import type { Context, Schemas } from "./context.js";
 import { MemDotError } from "./errors.js";
 import type { JobsApi } from "./jobs.js";
@@ -105,6 +107,21 @@ export interface ProfileResult {
   memoriesRead: number;
   generatedAt: string | null;
 }
+
+/** What a chat turn does, in order, in either mode. */
+export type ChatEvent =
+  /** What was remembered and given to the model, before it answers. */
+  | { type: "recalled"; memories: { id: string; memory: string; score: number }[] }
+  | { type: "text"; text: string }
+  /** The reply is complete and being kept. */
+  | { type: "saving" }
+  /** Kept. Empty when there was nothing worth keeping. */
+  | { type: "saved"; memories: { id: string; memory: string | null }[] };
+
+/** Recent turns that make up the recall query, and how close a memory has to be. The same on the server. */
+const CHAT_RECALL_TURNS = 6;
+const CHAT_RECALL_THRESHOLD = 0.3;
+const CHAT_RECALL_LIMIT = 10;
 
 /** A Private profile as sealed, with the memories it was written from. */
 type KeptProfile = Omit<ProfileResult, "userId"> & { sources: string[] };
@@ -1231,10 +1248,162 @@ export class MemoriesApi {
   }
 
   /**
+   * One turn of a chat that remembers: recalls what's relevant, streams the model's reply, then keeps
+   * the exchange. Assisted runs on the server. Private runs here, with your own model, and nothing
+   * reaches MemDot but the sealed result.
+   */
+  async *chat(
+    messages: ChatMessage[],
+    named: MemoryScope & {
+      namespaceId?: string;
+      save?: boolean;
+      system?: string;
+      signal?: AbortSignal;
+      wallet?: Wallet;
+    },
+  ): AsyncGenerator<ChatEvent> {
+    const options = this.inDefault(named);
+    const { signal, system, wallet } = named;
+    const save = named.save ?? true;
+    const scope = {
+      ...(options.userId ? { userId: options.userId } : {}),
+      ...(options.agentId ? { agentId: options.agentId } : {}),
+      ...(options.runId ? { runId: options.runId } : {}),
+    };
+    if (!scope.userId && !scope.agentId && !scope.runId) {
+      throw new MemDotError(
+        400,
+        "SCOPE_REQUIRED",
+        "Give at least one of userId, agentId or runId.",
+      );
+    }
+    const held = await this.route(options.namespaceId);
+    const conversation = system
+      ? [{ role: "system" as const, content: system }, ...messages]
+      : messages;
+
+    if (!held) {
+      yield* this.assistedChat(conversation, { ...options, scope, save, signal });
+      return;
+    }
+
+    const config = await this.privateLlm();
+    if (!config) {
+      throw new MemDotError(409, "MODEL_REQUIRED", "Set a model for Private memory to chat.");
+    }
+    const query = messages
+      .slice(-CHAT_RECALL_TURNS)
+      .map((message) => `${message.role}: ${messageText(message)}`)
+      .join("\n");
+    const filters = scopeFilter(scope);
+    const recalled = await this.search(query, {
+      namespaceId: held.id,
+      topK: CHAT_RECALL_LIMIT,
+      threshold: CHAT_RECALL_THRESHOLD,
+      ...(filters ? { filters } : {}),
+    });
+    yield {
+      type: "recalled",
+      memories: recalled.map(({ id, memory, score }) => ({ id, memory, score })),
+    };
+
+    const instructions = withRecall(system, recallContext(recalled));
+    const { languageModel, streamReply } = await import("@memdot/memory-engine/llm");
+    let reply = "";
+    for await (const text of streamReply(
+      languageModel(config),
+      messages.map(
+        (message) => ({ role: message.role, content: messageText(message) }) as ModelMessage,
+      ),
+      { ...(instructions ? { instructions } : {}), ...(signal ? { signal } : {}) },
+    )) {
+      reply += text;
+      yield { type: "text", text };
+    }
+    if (!save) return;
+    yield { type: "saving" };
+    const newTurns = messages.slice(messages.findLastIndex((m) => m.role === "assistant") + 1);
+    const added = await this.add([...newTurns, { role: "assistant", content: reply }], {
+      namespaceId: held.id,
+      ...scope,
+      ...(wallet ? { wallet } : {}),
+    });
+    yield {
+      type: "saved",
+      memories: added.results.map(({ id, memory }) => ({ id, memory })),
+    };
+  }
+
+  private async *assistedChat(
+    messages: ChatMessage[],
+    options: {
+      namespaceId?: string;
+      scope: { userId?: string; agentId?: string; runId?: string };
+      save: boolean;
+      signal: AbortSignal | undefined;
+    },
+  ): AsyncGenerator<ChatEvent> {
+    const { scope, save, signal } = options;
+    const response = await this.ctx.transport.send("POST", "/v1/chat/completions", {
+      json: {
+        messages,
+        stream: true,
+        store: save,
+        ...(options.namespaceId ? { namespace_id: options.namespaceId } : {}),
+        ...(scope.userId ? { user_id: scope.userId } : {}),
+        ...(scope.agentId ? { agent_id: scope.agentId } : {}),
+        ...(scope.runId ? { run_id: scope.runId } : {}),
+      },
+      ...(signal ? { signal } : {}),
+    });
+    if (!response.body) throw new MemDotError(502, "NO_STREAM", "The reply didn't stream.");
+
+    let eventId: string | null = null;
+    let waiting = "";
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      waiting += value;
+      const lines = waiting.split("\n");
+      waiting = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice("data: ".length).trim();
+        if (data === "[DONE]") continue;
+        const chunk = JSON.parse(data) as {
+          error?: { code: string; message: string };
+          choices?: { delta?: { content?: string } }[];
+          memdot?: {
+            memories?: { id: string; memory: string; score: number }[];
+            event_id?: string | null;
+          };
+        };
+        if (chunk.error) throw new MemDotError(502, chunk.error.code, chunk.error.message);
+        if (chunk.memdot?.memories) yield { type: "recalled", memories: chunk.memdot.memories };
+        if (chunk.memdot?.event_id) eventId = chunk.memdot.event_id;
+        const text = chunk.choices?.[0]?.delta?.content;
+        if (text) yield { type: "text", text };
+      }
+    }
+    if (!save || !eventId) return;
+    yield { type: "saving" };
+    const event = await this.waitForEvent(eventId);
+    yield {
+      type: "saved",
+      memories: (event.results ?? []).map(({ id, memory }) => ({ id, memory: memory ?? null })),
+    };
+  }
+
+  /**
    * One turn of the assistant for a Private namespace, here in this tab with your own model. It reads
    * and proposes, and nothing reaches MemDot. Assisted namespaces use the `/v1/copilot` route.
    */
-  async privateCopilot(namespaceId: string, messages: ModelMessage[]): Promise<CopilotStream> {
+  async privateCopilot(
+    namespaceId: string,
+    messages: ModelMessage[],
+    signal?: AbortSignal,
+  ): Promise<CopilotStream> {
     const held = await this.route(namespaceId);
     if (!held) throw new MemDotError(400, "NOT_PRIVATE", "Only for a Private namespace.");
     const config = await this.privateLlm();
@@ -1246,30 +1415,35 @@ export class MemoriesApi {
       );
     }
     const { languageModel, streamCopilot } = await import("@memdot/memory-engine/llm");
-    return streamCopilot(languageModel(config), messages, {
-      search: async (query, limit) =>
-        (await this.search(query, { namespaceId, topK: limit })).map(({ id, memory, score }) => ({
-          id,
-          memory,
-          score,
-        })),
-      list: async (limit) =>
-        (await this.list({ namespaceId, pageSize: limit })).results.map((row) => ({
-          id: row.id,
-          memory: row.memory,
-          user_id: row.userId,
-        })),
-      settings: async () => {
-        const settings = await this.settings(namespaceId);
-        return {
-          mode: "private" as const,
-          custom_instructions: settings.customInstructions,
-          categories: settings.categories,
-          decay_half_life_days: settings.decayHalfLifeDays ?? null,
-        };
+    return streamCopilot(
+      languageModel(config),
+      messages,
+      {
+        search: async (query, limit) =>
+          (await this.search(query, { namespaceId, topK: limit })).map(({ id, memory, score }) => ({
+            id,
+            memory,
+            score,
+          })),
+        list: async (limit) =>
+          (await this.list({ namespaceId, pageSize: limit })).results.map((row) => ({
+            id: row.id,
+            memory: row.memory,
+            user_id: row.userId,
+          })),
+        settings: async () => {
+          const settings = await this.settings(namespaceId);
+          return {
+            mode: "private" as const,
+            custom_instructions: settings.customInstructions,
+            categories: settings.categories,
+            decay_half_life_days: settings.decayHalfLifeDays ?? null,
+          };
+        },
+        categories: async () => (await this.categories(namespaceId)).categories,
       },
-      categories: async () => (await this.categories(namespaceId)).categories,
-    });
+      signal ? { signal } : {},
+    );
   }
 
   /**

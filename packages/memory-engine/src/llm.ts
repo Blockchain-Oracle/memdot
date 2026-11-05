@@ -7,6 +7,7 @@ export {
   type CopilotStream,
   copilotTools,
   streamCopilot,
+  streamReply,
 } from "./copilot.js";
 export {
   ChatMessageSchema,

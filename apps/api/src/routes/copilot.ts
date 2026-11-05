@@ -135,14 +135,16 @@ export function copilotRoutes(services: Services) {
         models.llm,
         await convertToModelMessages(body.messages as unknown as UIMessage[]),
         data,
-        // The first call was paid for above. A step past the allowance still finishes the answer.
-        (() => {
-          let steps = 0;
-          return () => {
-            steps += 1;
-            if (steps > 1) void spendSharedModel(c).catch(() => {});
-          };
-        })(),
+        {
+          // The first call was paid for above. A step past the allowance still finishes the answer.
+          onStepFinish: (() => {
+            let steps = 0;
+            return () => {
+              steps += 1;
+              if (steps > 1) void spendSharedModel(c).catch(() => {});
+            };
+          })(),
+        },
       );
       return result.toUIMessageStreamResponse() as never;
     },

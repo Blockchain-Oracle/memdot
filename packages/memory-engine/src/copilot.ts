@@ -13,6 +13,12 @@ import { COPILOT_SYSTEM } from "./prompts.js";
 const MAX_STEPS = 5;
 const MAX_RESULTS = 30;
 
+interface StreamSettings {
+  temperature?: number;
+  maxOutputTokens?: number;
+  topP?: number;
+}
+
 /** What the assistant can read, from the server's rows or this device's entries. */
 export interface CopilotData {
   search(query: string, limit: number): Promise<{ id: string; memory: string; score: number }[]>;
@@ -27,6 +33,30 @@ export interface CopilotData {
 }
 
 export type CopilotStream = ReturnType<typeof streamText<ToolSet>>;
+
+/**
+ * A reply's text as it arrives. `textStream` alone ends quietly when a model fails, which reads as a
+ * blank answer, so a failure here throws.
+ */
+export async function* streamReply(
+  model: LanguageModel,
+  messages: ModelMessage[],
+  options: { instructions?: string; signal?: AbortSignal; settings?: StreamSettings } = {},
+): AsyncGenerator<string> {
+  const result = streamText({
+    model,
+    messages,
+    ...(options.instructions ? { instructions: options.instructions } : {}),
+    ...(options.signal ? { abortSignal: options.signal } : {}),
+    ...options.settings,
+  });
+  for await (const part of result.fullStream) {
+    if (part.type === "text-delta") yield part.text;
+    if (part.type === "error") {
+      throw part.error instanceof Error ? part.error : new Error(String(part.error));
+    }
+  }
+}
 
 const limitField = z.number().int().min(1).max(MAX_RESULTS).optional();
 
@@ -90,7 +120,7 @@ export function streamCopilot(
   model: LanguageModel,
   messages: ModelMessage[],
   data: CopilotData,
-  onStepFinish?: () => void,
+  options: { onStepFinish?: () => void; signal?: AbortSignal } = {},
 ): CopilotStream {
   return streamText<ToolSet>({
     model,
@@ -98,6 +128,7 @@ export function streamCopilot(
     messages,
     tools: copilotTools(data),
     stopWhen: stepCountIs(MAX_STEPS),
-    ...(onStepFinish ? { onStepFinish } : {}),
+    ...(options.onStepFinish ? { onStepFinish: options.onStepFinish } : {}),
+    ...(options.signal ? { abortSignal: options.signal } : {}),
   });
 }

@@ -80,6 +80,7 @@ export { MemDot, type MemDotOptions, type Usage } from "./memdot.js";
 export {
   type AddOptions,
   type AddResult,
+  type ChatEvent,
   type Entity,
   type HistoryEvent,
   type ListOptions,
