@@ -155,7 +155,9 @@ async function walkMode(mode: "assisted" | "private") {
     await memdot.memories.add(text, { namespaceId, userId, infer: false });
   }
   await sleep(mode === "assisted" ? 8000 : 0);
-  const dream = await memdot.memories.dream({ namespaceId });
+  // A model may see nothing worth changing, which is why the page has "Look again" too.
+  let dream = await memdot.memories.dream({ namespaceId });
+  if (dream.proposals.length === 0) dream = await memdot.memories.dream({ namespaceId });
   const owners = new Map<string, string | null>();
   for (const row of (await memdot.memories.list({ namespaceId, pageSize: 100 })).results) {
     owners.set(row.id, row.userId);
