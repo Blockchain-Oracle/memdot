@@ -15,7 +15,7 @@ const { memdot, resolved } = await connectFromMachine("my-app");
 const client = MemDot.create({ baseUrl: "https://api.84.46.247.92.sslip.io", apiKey: process.env.MEMDOT_API_KEY, client: "my-app" });
 
 // A connected agent also holds keys for what it was given: files and Private namespaces.
-client.useAgent({ apiKey, identity });
+client.connectAgent({ apiKey, identity });
 ```
 
 `@memdot/sdk/credentials` is Node only. In a browser, use `memdot.account` to sign in and unlock, with a Worker-backed `embedder` for Private search.

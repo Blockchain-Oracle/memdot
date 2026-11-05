@@ -37,7 +37,7 @@ const privateNs = await owner.memories.createNamespace({
 });
 const key = await owner.keys.create({ name: "smoke", role: "read_write" });
 const agent = client();
-agent.useApiKey(key.key);
+agent.setApiKey(key.key);
 
 // ── Assisted, with an API key alone ─────────────────────────────────────────────────────────
 const added = await agent.memories.add("Priya leads payments at Flutterwave in Lagos.", {

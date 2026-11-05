@@ -47,7 +47,7 @@ export async function clientFor(
     completeGrantsOnUnlock: false,
   });
   const identity = credential.identity?.trim();
-  if (identity) memdot.useAgent({ apiKey: credential.apiKey, identity });
+  if (identity) memdot.connectAgent({ apiKey: credential.apiKey, identity });
   return { memdot, holdsKeys: Boolean(identity) };
 }
 

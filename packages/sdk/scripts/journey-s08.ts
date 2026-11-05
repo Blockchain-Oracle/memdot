@@ -62,7 +62,7 @@ check("Kofi makes an Assisted and a Private namespace", Boolean(assisted.id && p
 
 const key = await kofi.keys.create({ name: "kofi-agent", role: "read_write" });
 const agent = client();
-agent.useApiKey(key.key);
+agent.setApiKey(key.key);
 
 // ── Assisted, with nothing but an API key ───────────────────────────────────────────────────
 const added = await agent.memories.add(

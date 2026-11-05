@@ -236,7 +236,7 @@ export async function clientFor(resolved: ResolvedCredentials, client: string): 
   if (resolved.recoveryCode) {
     await memdot.account.unlockWithRecoveryCode(resolved.recoveryCode);
   } else if (resolved.apiKey && resolved.identity) {
-    memdot.useAgent({ apiKey: resolved.apiKey, identity: resolved.identity });
+    memdot.connectAgent({ apiKey: resolved.apiKey, identity: resolved.identity });
   }
   return memdot;
 }

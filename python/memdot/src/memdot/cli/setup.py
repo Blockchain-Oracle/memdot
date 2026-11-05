@@ -241,6 +241,7 @@ def _run_login(
     no_wait: bool = False,
     resume: bool = False,
     wait: float | None = None,
+    print_env: bool = False,
 ) -> None:
     resolved = credentials_of(ctx)
     api_url = resolved.api_url
@@ -289,6 +290,38 @@ def _run_login(
         "public_key": public_key,
         "label": label,
     }
+
+    # For somewhere else: a server, n8n, CI. Nothing here changes, and it's revoked on its own.
+    if print_env:
+        click.echo(f"\nOpen {started.url}", err=True)
+        click.echo(f"and type this code: {strong(started.code)}\n", err=True)
+        if not no_browser:
+            _open_browser(started.url)
+        say(dim("Waiting for you to approve it…"))
+        collected = _collect(memdot, pending, _LOGIN_WAIT_SECONDS)
+        if not collected:
+            raise CliError(
+                "Nothing came back in time. Run this again.", EXIT["auth"], "CONNECT_EXPIRED"
+            )
+        env = {
+            "MEMDOT_API_URL": api_url,
+            "MEMDOT_API_KEY": collected["api_key"],
+            "MEMDOT_AGENT_IDENTITY": identity,
+            **(
+                {"MEMDOT_NAMESPACE": collected["namespace_id"]}
+                if collected.get("namespace_id")
+                else {}
+            ),
+        }
+
+        # On stdout and nothing else, so it can go straight into a file.
+        def show_env() -> None:
+            for name, value in env.items():
+                click.echo(f"{name}={value}")
+
+        emit(data=env, text=show_env)
+        return
+
     creds.save_credentials(
         {**creds.for_api(file, api_url), "version": 1, "api_url": api_url, "pending": pending}
     )
@@ -351,6 +384,11 @@ def register(root: click.Group) -> None:
         "--continue", "resume", is_flag=True, help="collect a login started with --no-wait"
     )
     @click.option("--wait", metavar="seconds", type=float, help="how long --continue waits")
+    @click.option(
+        "--print-env",
+        is_flag=True,
+        help="connect somewhere else: print its credentials, and save nothing here",
+    )
     @click.pass_context
     def login(ctx: click.Context, **options: Any) -> None:
         _run_login(ctx, **options)

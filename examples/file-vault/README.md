@@ -12,7 +12,7 @@ The part that matters:
 
 ```ts
 const memdot = MemDot.create({ baseUrl: API_URL, client: "my-app", credentials: "omit" });
-memdot.useAgent({ apiKey, identity });
+memdot.connectAgent({ apiKey, identity });
 
 await memdot.files.put(bytes, { spaceId, name: file.name, mime: file.type });
 const { data } = await memdot.files.get(id);

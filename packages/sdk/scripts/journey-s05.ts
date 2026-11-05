@@ -42,7 +42,7 @@ check("Dana creates a space; its name is sealed with the space key", space.name 
 
 const key = await dana.keys.create({ name: "dana-server", role: "read_write" });
 const server = client();
-server.useApiKey(key.key);
+server.setApiKey(key.key);
 await server.account.unlockWithRecoveryCode(recoveryCode);
 check("her server unlocks with an API key and the recovery code", server.account.unlocked);
 

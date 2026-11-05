@@ -93,7 +93,7 @@ export class MemDot {
   }
 
   /** Switch to (or drop) an API key, for example after minting one in a script. */
-  useApiKey(apiKey: string | undefined): void {
+  setApiKey(apiKey: string | undefined): void {
     this.transport.apiKey = apiKey;
   }
 
@@ -101,9 +101,9 @@ export class MemDot {
    * Runs as a connected agent: this API key, and the device's own identity to open what was shared
    * with it. `memdot login` makes both. Only what the owner chose can be read or written.
    */
-  useAgent(input: { apiKey: string; identity: string }): void {
+  connectAgent(input: { apiKey: string; identity: string }): void {
     this.transport.apiKey = input.apiKey;
-    this.vault.useAgentIdentity(input.identity);
+    this.vault.connectAgentIdentity(input.identity);
   }
 
   usage(): Promise<Usage> {

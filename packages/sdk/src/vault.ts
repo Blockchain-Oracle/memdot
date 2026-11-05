@@ -42,7 +42,7 @@ export class Vault {
     return this.unlocked || this.isAgent;
   }
 
-  useAgentIdentity(identity: string): void {
+  connectAgentIdentity(identity: string): void {
     this.forget();
     this.agentIdentity = identity;
     this.notify();

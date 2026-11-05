@@ -10,7 +10,7 @@ The whole of it is the same two calls as any other namespace:
 
 ```ts
 const memdot = MemDot.create({ baseUrl: API_URL, client: "my-app", credentials: "omit", embedder: browserEmbedder });
-memdot.useAgent({ apiKey, identity });
+memdot.connectAgent({ apiKey, identity });
 
 await memdot.memories.add(text, { userId: "me", namespaceId, infer: false });
 const hits = await memdot.memories.search(query, { namespaceId, filters: { AND: [{ user_id: "me" }] } });

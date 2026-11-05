@@ -26,7 +26,7 @@ function clientFor({ apiKey, identity }: Connection): MemDot {
     credentials: "omit",
     embedder: browserEmbedder,
   });
-  client.useAgent({ apiKey, identity });
+  client.connectAgent({ apiKey, identity });
   return client;
 }
 

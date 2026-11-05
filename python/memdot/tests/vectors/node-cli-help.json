@@ -1037,6 +1037,10 @@
         {
           "flags": "--wait <seconds>",
           "description": "how long --continue waits"
+        },
+        {
+          "flags": "--print-env",
+          "description": "connect somewhere else: print its credentials, and save nothing here"
         }
       ]
     },

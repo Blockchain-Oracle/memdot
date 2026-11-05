@@ -121,7 +121,7 @@ try {
   );
 
   const agent = MemDot.create({ baseUrl, origin, client: "memory-live" });
-  agent.useApiKey(key.key);
+  agent.setApiKey(key.key);
   const picture = await agent.memories.add(
     [
       {

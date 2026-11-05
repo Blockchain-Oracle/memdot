@@ -16,7 +16,7 @@ const CLIENT = "file-vault-example";
 /** A key and an identity from connecting. `credentials: "omit"` is what lets a page on any address call the API. */
 function clientFor({ apiKey, identity }: Connection): MemDot {
   const client = MemDot.create({ baseUrl: API_URL, client: CLIENT, credentials: "omit" });
-  client.useAgent({ apiKey, identity });
+  client.connectAgent({ apiKey, identity });
   return client;
 }
 
