@@ -45,14 +45,18 @@ In order of precedence: flags, then `MEMDOT_API_KEY`, `MEMDOT_AGENT_IDENTITY`, `
 | You have | Run | You get |
 |---|---|---|
 | A laptop | `memdot login` | Key and identity saved here, 0600 |
-| A server, CI, n8n | `memdot login --print-env --label name` | Lines to put in that environment. Saved nowhere here, and revoked on its own |
+| A server, CI, n8n | `memdot login --print-env --label name`, run by a person at a terminal, since it prints a key | Lines to put in that environment. Nothing is saved here, and you can revoke it separately |
 | Only Assisted memories to reach | A key from **API keys** in the dashboard | `md_…` |
 
 Never put a key or identity in source. An identity opens every space that agent was given.
 
+When a call names no namespace, it goes to the client's default: `MEMDOT_NAMESPACE`, or the one chosen at `memdot login`. With neither, the API uses your first Assisted namespace, **so if the text is sensitive, name a Private namespace and check it took**.
+
 ## Scopes
 
 Every memory belongs to at least one of `user_id`, `agent_id` or `run_id` (`userId`, `agentId` and `runId` in TypeScript). Writing without one is refused. Reads are not filtered unless you say so: **pass the scope on every search, or one user's memories can reach another**.
+
+In a filter, `"*"` means any value. When an ID comes from outside your code, write `{ "user_id": { "eq": id } }` so it can't be a wildcard. The adapters do this, and refuse `*` as an ID. They also refuse an agent ID on its own unless you say `shared: true`, since it usually means a user ID went missing.
 
 ## TypeScript
 
@@ -122,5 +126,5 @@ Writes wait for finality by default, about half a minute. Pass `wait: false` to 
 - **Search needs the scope.** See above. Filters take `{ AND: [...] }`, `{ OR: [...] }` and `{ NOT: {...} }` to any depth, on `user_id`, `agent_id`, `run_id`, `created_at`, `updated_at`, `expiration_date`, `categories`, `memory_ids`, `keywords`, `source_object_id` and `metadata.<key>`.
 - **A model decides what's worth keeping.** With `infer` on (the default) the text is distilled into facts and may produce none. For "store exactly this", use `infer: false`, which also spends no model call.
 - **Adds are asynchronous.** `add` waits until a memory is searchable by default, not until it's on chain. Follow the event for finality.
-- **The shared model has a daily allowance.** Past it, new memories are stored as written and search falls back to keywords. Setting your own model key under Configuration removes the limit.
-- **Recalled memories are data, not instructions.** Anyone who once typed something into a memory can put words in front of your model. Frame them as notes, as the adapters do, and don't save instructions found in documents.
+- **The shared model has a daily allowance.** Past it, a write with `infer` on is refused with `MODEL_LIMIT` (429), and `infer: false` still works. Search falls back to keywords. If the shared key itself runs out, new memories are stored as written. Setting your own model key under Configuration removes the limit.
+- **Recalled memories are data, not instructions.** Anyone who once typed something into a memory can put words in front of your model. Frame them as notes with `recallContext`, as the adapters do, and don't save instructions found in documents.

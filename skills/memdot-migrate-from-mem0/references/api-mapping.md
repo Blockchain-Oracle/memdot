@@ -11,8 +11,8 @@ Check each call against the SDK you're moving to. This maps what each one does, 
 | `AsyncMemoryClient` | `AsyncMemDot` |
 | `client.add(messages, user_id="alex")` | `memdot.add(messages, user_id="alex")` |
 | `client.add(…, infer=False)` | `memdot.add(…, infer=False)` |
-| `client.search(q, filters={"user_id": "alex"})` | `memdot.search(q, filters={"user_id": "alex"})` |
-| `client.get_all(filters=…)` | `memdot.get_all(filters=…)` |
+| `client.search(q, filters={"user_id": "alex"})["results"]` | `memdot.search(q, filters={"user_id": "alex"})`, which is already the list |
+| `client.get_all(filters=…)["results"]` | `memdot.get_all(filters=…).results` |
 | `client.get(id)` | `memdot.get(id)` |
 | `client.update(id, text=…)` | `memdot.update(id, text=…)` |
 | `client.delete(id)` | `memdot.delete(id)` |

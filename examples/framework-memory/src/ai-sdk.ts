@@ -8,7 +8,9 @@ const userId = newUser();
 const word = secretWord();
 
 // One line: any model, with memory around it.
-const model = memdot.wrap(google(MODEL), { userId });
+// `whenNoModel` only matters in a Private namespace with no model of its own: this keeps messages as
+// typed, so this example works there too. Leave it off for real conversations.
+const model = memdot.wrap(google(MODEL), { userId, whenNoModel: "as-written" });
 
 console.log(`First session, as ${userId}…`);
 const first = await generateText({

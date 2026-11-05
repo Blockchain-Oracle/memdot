@@ -1,6 +1,8 @@
 # TypeScript SDK
 
-`@memdot/sdk`, Node 22.12 or newer and browsers. The packages aren't on npm yet, so depend on them from a clone of [the repository](https://github.com/Blockchain-Oracle/memdot) with a pnpm workspace, or point at its packages by path.
+`@memdot/sdk`, Node 22.12 or newer and browsers.
+
+The TypeScript packages aren't on npm yet, and they depend on each other through a pnpm workspace, so today they only resolve inside a clone of [the repository](https://github.com/Blockchain-Oracle/memdot): put your code in its `examples/` folder, or add it to `pnpm-workspace.yaml`. In a project that has to stay outside, call the [REST API](rest.md) with `fetch`, or use Python, which installs from git.
 
 ## Connect
 
@@ -18,7 +20,9 @@ const client = MemDot.create({ baseUrl: "https://api.84.46.247.92.sslip.io", api
 client.connectAgent({ apiKey, identity });
 ```
 
-`@memdot/sdk/credentials` is Node only. In a browser, use `memdot.account` to sign in and unlock, with a Worker-backed `embedder` for Private search.
+`@memdot/sdk/credentials` is Node only.
+
+**In a browser,** a page on your own address connects the way the CLI does: it makes a key pair with `newAgentIdentity()`, asks with `memdot.agents.startConnect`, polls with `pollConnect` while the person approves in their dashboard, and then calls `connectAgent`. Pass `credentials: "omit"` for the requests made before there's a key. Sessions, and so `memdot.account`, only work on the dashboard's own address. For Private search, pass a Worker-backed `embedder`. See [`examples/file-vault`](https://github.com/Blockchain-Oracle/memdot/tree/main/examples/file-vault) and [`examples/private-notes`](https://github.com/Blockchain-Oracle/memdot/tree/main/examples/private-notes).
 
 ## Memories: `memdot.memories`
 
@@ -53,7 +57,7 @@ Files up to 64 KiB go into a segment, one blob on chain. Larger ones become 7 MB
 
 ## Shared memory for your own loop
 
-`AgentMemory` is what the adapters use. It frames recalled memories as notes, never fails a model call over a memory problem, and falls back to storing as written when Private has no model.
+`AgentMemory` is what the adapters use. It frames recalled memories as notes, and gives memory 8 seconds (`timeoutMs`) before the model goes ahead without it. Past that, or on any failure, `recall` and `saveExchange` report through `onError` rather than throwing. A Private namespace with no model saves nothing unless you pass `whenNoModel: "as-written"`, which keeps each message exactly as typed.
 
 ```ts
 import { AgentMemory } from "@memdot/sdk";

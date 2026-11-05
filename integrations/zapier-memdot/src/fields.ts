@@ -62,8 +62,14 @@ export const scopeBody = ({ user_id, agent_id, run_id }: Scope) => ({
   ...(run_id ? { run_id } : {}),
 });
 
-/** `{ AND: [...] }`, or nothing when no ID is given. */
-export function scopeFilters(scope: Scope): { filters?: { AND: Record<string, string>[] } } {
-  const parts = Object.entries(scopeBody(scope)).map(([key, value]) => ({ [key]: value }));
+/** `{ AND: [...] }`, or nothing when no ID is given. `eq` so that "*" is only ever someone's text. */
+export function scopeFilters(scope: Scope): { filters?: { AND: Record<string, unknown>[] } } {
+  const parts = Object.entries(scopeBody(scope)).map(([key, value]) => ({ [key]: { eq: value } }));
   return parts.length ? { filters: { AND: parts } } : {};
 }
+
+/** Zapier's own tool counts all of these as no, and a mapped field can hold any of them. */
+export const isYes = (value: unknown, fallback: boolean): boolean => {
+  if (value === undefined || value === null || value === "") return fallback;
+  return !["false", "no", "n", "0", "f", "off"].includes(String(value).trim().toLowerCase());
+};

@@ -7,6 +7,7 @@ import {
   NodeConnectionTypes,
   NodeOperationError,
 } from "n8n-workflow";
+import { TURN_KIND } from "../../lib/chat-memory.js";
 import {
   CREDENTIAL,
   clientFor,
@@ -16,6 +17,9 @@ import {
 } from "../../lib/client.js";
 
 const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 100;
+const PAGE = 100;
+const WILDCARD = "*";
 const memory = { resource: ["memory"] };
 const file = { resource: ["file"] };
 
@@ -185,6 +189,15 @@ export class MemDot implements INodeType {
       },
       ...whoFields(["add", "search", "getAll"]),
       {
+        displayName: "Across Everyone",
+        name: "everyone",
+        type: "boolean",
+        default: false,
+        description:
+          "Whether to look through every person's memories in this namespace. Without this, leaving the IDs empty is an error, so a mapping that comes back empty can't reach other people's.",
+        displayOptions: { show: { ...memory, operation: ["search", "getAll"] } },
+      },
+      {
         displayName: "Memory ID",
         name: "memoryId",
         type: "string",
@@ -193,13 +206,30 @@ export class MemDot implements INodeType {
         displayOptions: { show: { ...memory, operation: ["get", "update", "delete"] } },
       },
       {
+        displayName: "Return All",
+        name: "returnAll",
+        type: "boolean",
+        default: false,
+        description: "Whether to return all results or only up to a given limit",
+        displayOptions: { show: { operation: ["getAll"] } },
+      },
+      {
         displayName: "Limit",
         name: "limit",
         type: "number",
-        typeOptions: { minValue: 1, maxValue: 100 },
+        typeOptions: { minValue: 1, maxValue: MAX_LIMIT },
         default: DEFAULT_LIMIT,
         description: "Max number of results to return",
-        displayOptions: { show: { operation: ["search", "getAll"] } },
+        displayOptions: { show: { operation: ["search"] } },
+      },
+      {
+        displayName: "Limit",
+        name: "limit",
+        type: "number",
+        typeOptions: { minValue: 1, maxValue: MAX_LIMIT },
+        default: DEFAULT_LIMIT,
+        description: "Max number of results to return",
+        displayOptions: { show: { operation: ["getAll"], returnAll: [false] } },
       },
       {
         displayName: "Options",
@@ -332,7 +362,11 @@ export class MemDot implements INodeType {
 
     const parameter = <T>(name: string, i: number, fallback?: T) =>
       this.getNodeParameter(name, i, fallback) as T;
-    const textOf = (name: string, i: number) => String(parameter(name, i, "")).trim();
+    // An expression that finds nothing comes back undefined, which isn't anyone's id.
+    const textOf = (name: string, i: number) => {
+      const value = parameter<unknown>(name, i, "");
+      return value === undefined || value === null ? "" : String(value).trim();
+    };
     const push = (i: number, json: IDataObject) => output.push({ json, pairedItem: { item: i } });
     const jsonOption = (value: unknown, label: string, i: number) => {
       if (value === undefined || value === "" || value === "{}") return undefined;
@@ -359,13 +393,27 @@ export class MemDot implements INodeType {
       const namespaceId = textOf("namespaceId", i);
       return namespaceId ? { namespaceId } : {};
     };
-    const scopeFilters = (i: number) => {
+    /** The filters for a read: an empty scope means everyone only if that was asked for. */
+    const readFilters = (i: number, extra: Record<string, unknown>[] = []) => {
       const { userId, agentId, runId } = scope(i);
-      return [
-        ...(userId ? [{ user_id: userId }] : []),
-        ...(agentId ? [{ agent_id: agentId }] : []),
-        ...(runId ? [{ run_id: runId }] : []),
+      const parts: Record<string, unknown>[] = [
+        ...(userId ? [{ user_id: { eq: userId } }] : []),
+        ...(agentId ? [{ agent_id: { eq: agentId } }] : []),
+        ...(runId ? [{ run_id: { eq: runId } }] : []),
       ];
+      if (parts.length === 0) {
+        if (!parameter<boolean>("everyone", i, false)) {
+          throw new NodeOperationError(
+            this.getNode(),
+            "No User ID, Agent ID or Run ID, so this would search everyone's memories. If a mapping came back empty, fix that. If you do mean everyone, turn on Across Everyone.",
+            { itemIndex: i },
+          );
+        }
+        // Stored chat turns aren't memories about anyone.
+        parts.push({ NOT: { "metadata.kind": TURN_KIND } });
+      }
+      const all = [...parts, ...extra];
+      return { filters: { AND: all } };
     };
     const needKeys = (i: number) => {
       if (holdsKeys) return;
@@ -376,130 +424,167 @@ export class MemDot implements INodeType {
       );
     };
 
-    for (let i = 0; i < items.length; i += 1) {
-      try {
-        const resource = parameter<string>("resource", i);
-        const operation = parameter<string>("operation", i);
+    try {
+      for (let i = 0; i < items.length; i += 1) {
+        try {
+          const resource = parameter<string>("resource", i);
+          const operation = parameter<string>("operation", i);
 
-        if (resource === "memory") {
-          if (operation === "add") {
-            const options = parameter<IDataObject>("addOptions", i, {});
-            const metadata = jsonOption(options.metadata, "Metadata", i);
-            const who = scope(i);
-            if (!who.userId && !who.agentId && !who.runId) {
-              throw new NodeOperationError(
-                this.getNode(),
-                "Give at least one of User ID, Agent ID or Run ID, so the memory has someone to belong to.",
-                { itemIndex: i },
-              );
+          if (resource === "memory") {
+            if (operation === "add") {
+              const options = parameter<IDataObject>("addOptions", i, {});
+              const metadata = jsonOption(options.metadata, "Metadata", i);
+              const who = scope(i);
+              if ([who.userId, who.agentId, who.runId].includes(WILDCARD)) {
+                throw new NodeOperationError(
+                  this.getNode(),
+                  `"${WILDCARD}" means everyone in a filter, so it can't be someone's ID.`,
+                  { itemIndex: i },
+                );
+              }
+              if (!who.userId && !who.agentId && !who.runId) {
+                throw new NodeOperationError(
+                  this.getNode(),
+                  "Give at least one of User ID, Agent ID or Run ID, so the memory has someone to belong to.",
+                  { itemIndex: i },
+                );
+              }
+              const added = await memdot.memories.add(textOf("text", i), {
+                ...who,
+                ...where(i),
+                infer: options.infer !== false,
+                ...(metadata ? { metadata } : {}),
+                ...(options.expirationDate
+                  ? { expirationDate: String(options.expirationDate) }
+                  : {}),
+              });
+              push(i, {
+                event_id: added.eventId,
+                status: added.status,
+                namespace_id: added.namespaceId,
+                results: added.results,
+                duplicates: added.duplicates,
+                note: added.note,
+              } as IDataObject);
+            } else if (operation === "search") {
+              const options = parameter<IDataObject>("searchOptions", i, {});
+              const extra = jsonOption(options.filters, "Filters", i);
+              const found = await memdot.memories.search(textOf("query", i), {
+                ...where(i),
+                topK: parameter<number>("limit", i, DEFAULT_LIMIT),
+                ...readFilters(i, extra ? [extra] : []),
+                ...(options.mode
+                  ? { mode: options.mode as "hybrid" | "semantic" | "keyword" }
+                  : {}),
+                ...(options.threshold !== undefined
+                  ? { threshold: Number(options.threshold) }
+                  : {}),
+                ...(options.rerank ? { rerank: true } : {}),
+              });
+              for (const hit of found) push(i, hit as unknown as IDataObject);
+            } else if (operation === "getAll") {
+              const returnAll = parameter<boolean>("returnAll", i, false);
+              const limit = returnAll
+                ? Number.POSITIVE_INFINITY
+                : parameter<number>("limit", i, DEFAULT_LIMIT);
+              const filters = readFilters(i);
+              let cursor: string | undefined;
+              let sent = 0;
+              do {
+                const page = await memdot.memories.list({
+                  ...where(i),
+                  ...filters,
+                  pageSize: Math.min(PAGE, limit - sent),
+                  ...(cursor ? { cursor } : {}),
+                });
+                for (const row of page.results) push(i, row as unknown as IDataObject);
+                sent += page.results.length;
+                cursor = page.nextCursor ?? undefined;
+              } while (cursor && sent < limit);
+            } else if (operation === "get") {
+              push(i, (await memdot.memories.get(textOf("memoryId", i))) as unknown as IDataObject);
+            } else if (operation === "update") {
+              const id = textOf("memoryId", i);
+              await memdot.memories.update(id, { text: textOf("text", i) });
+              push(i, (await memdot.memories.get(id)) as unknown as IDataObject);
+            } else if (operation === "delete") {
+              const id = textOf("memoryId", i);
+              await memdot.memories.delete(id);
+              push(i, { id, deleted: true });
             }
-            const added = await memdot.memories.add(textOf("text", i), {
-              ...who,
-              ...where(i),
-              infer: options.infer !== false,
-              ...(metadata ? { metadata } : {}),
-              ...(options.expirationDate ? { expirationDate: String(options.expirationDate) } : {}),
+            continue;
+          }
+
+          if (operation === "upload") {
+            needKeys(i);
+            const field = textOf("binaryPropertyName", i);
+            const binary = this.helpers.assertBinaryData(i, field);
+            const data = await this.helpers.getBinaryDataBuffer(i, field);
+            const spaceId = textOf("spaceId", i);
+            if (!spaceId) {
+              throw new NodeOperationError(this.getNode(), "Choose a space to store it in.", {
+                itemIndex: i,
+              });
+            }
+            const { file: stored, job } = await memdot.files.put(new Uint8Array(data), {
+              spaceId,
+              name: textOf("fileName", i) || binary.fileName || "file",
+              ...(binary.mimeType ? { mime: binary.mimeType } : {}),
             });
             push(i, {
-              event_id: added.eventId,
-              status: added.status,
-              namespace_id: added.namespaceId,
-              results: added.results,
-              duplicates: added.duplicates,
-              note: added.note,
+              id: stored.id,
+              name: stored.name,
+              status: job.status,
+              job_id: job.id,
+              tx_hash: job.txHash,
+              block: job.block,
             } as IDataObject);
-          } else if (operation === "search") {
-            const options = parameter<IDataObject>("searchOptions", i, {});
-            const extra = jsonOption(options.filters, "Filters", i);
-            const filters = [...scopeFilters(i), ...(extra ? [extra] : [])];
-            const found = await memdot.memories.search(textOf("query", i), {
-              ...where(i),
-              topK: parameter<number>("limit", i, DEFAULT_LIMIT),
-              ...(filters.length ? { filters: { AND: filters } } : {}),
-              ...(options.mode ? { mode: options.mode as "hybrid" | "semantic" | "keyword" } : {}),
-              ...(options.threshold !== undefined ? { threshold: Number(options.threshold) } : {}),
-              ...(options.rerank ? { rerank: true } : {}),
+          } else if (operation === "download") {
+            needKeys(i);
+            const { data, name, mime } = await memdot.files.get(textOf("fileId", i));
+            const field = textOf("outputField", i);
+            output.push({
+              json: { name, mime, size: data.length },
+              binary: {
+                [field]: await this.helpers.prepareBinaryData(Buffer.from(data), name, mime),
+              },
+              pairedItem: { item: i },
             });
-            for (const hit of found) push(i, hit as unknown as IDataObject);
           } else if (operation === "getAll") {
-            const filters = scopeFilters(i);
-            const { results } = await memdot.memories.list({
-              ...where(i),
-              pageSize: parameter<number>("limit", i, DEFAULT_LIMIT),
-              ...(filters.length ? { filters: { AND: filters } } : {}),
-            });
-            for (const row of results) push(i, row as unknown as IDataObject);
-          } else if (operation === "get") {
-            push(i, (await memdot.memories.get(textOf("memoryId", i))) as unknown as IDataObject);
-          } else if (operation === "update") {
-            const id = textOf("memoryId", i);
-            await memdot.memories.update(id, { text: textOf("text", i) });
-            push(i, (await memdot.memories.get(id)) as unknown as IDataObject);
+            const spaceId = textOf("spaceId", i);
+            const returnAll = parameter<boolean>("returnAll", i, false);
+            const limit = returnAll
+              ? Number.POSITIVE_INFINITY
+              : parameter<number>("limit", i, DEFAULT_LIMIT);
+            let cursor: string | undefined;
+            let sent = 0;
+            do {
+              const page = await memdot.files.list({
+                ...(spaceId ? { spaceId } : {}),
+                limit: Math.min(PAGE, limit - sent),
+                ...(cursor ? { cursor } : {}),
+              });
+              for (const row of page.items) push(i, row as unknown as IDataObject);
+              sent += page.items.length;
+              cursor = page.nextCursor ?? undefined;
+            } while (cursor && sent < limit);
+          } else if (operation === "verify") {
+            push(i, (await memdot.files.verify(textOf("fileId", i))) as unknown as IDataObject);
           } else if (operation === "delete") {
-            const id = textOf("memoryId", i);
-            await memdot.memories.delete(id);
+            const id = textOf("fileId", i);
+            await memdot.files.delete(id);
             push(i, { id, deleted: true });
           }
-          continue;
+        } catch (error) {
+          const failure =
+            error instanceof NodeOperationError ? error : operationError(this, error, i);
+          if (!this.continueOnFail()) throw failure;
+          push(i, { error: failure.message });
         }
-
-        if (operation === "upload") {
-          needKeys(i);
-          const field = textOf("binaryPropertyName", i);
-          const binary = this.helpers.assertBinaryData(i, field);
-          const data = await this.helpers.getBinaryDataBuffer(i, field);
-          const spaceId = textOf("spaceId", i);
-          if (!spaceId) {
-            throw new NodeOperationError(this.getNode(), "Choose a space to store it in.", {
-              itemIndex: i,
-            });
-          }
-          const { file: stored, job } = await memdot.files.put(new Uint8Array(data), {
-            spaceId,
-            name: textOf("fileName", i) || binary.fileName || "file",
-            ...(binary.mimeType ? { mime: binary.mimeType } : {}),
-          });
-          push(i, {
-            id: stored.id,
-            name: stored.name,
-            status: job.status,
-            job_id: job.id,
-            tx_hash: job.txHash,
-            block: job.block,
-          } as IDataObject);
-        } else if (operation === "download") {
-          needKeys(i);
-          const { data, name, mime } = await memdot.files.get(textOf("fileId", i));
-          const field = textOf("outputField", i);
-          output.push({
-            json: { name, mime, size: data.length },
-            binary: {
-              [field]: await this.helpers.prepareBinaryData(Buffer.from(data), name, mime),
-            },
-            pairedItem: { item: i },
-          });
-        } else if (operation === "getAll") {
-          const spaceId = textOf("spaceId", i);
-          const { items: files } = await memdot.files.list({
-            ...(spaceId ? { spaceId } : {}),
-            limit: parameter<number>("limit", i, DEFAULT_LIMIT),
-          });
-          for (const row of files) push(i, row as unknown as IDataObject);
-        } else if (operation === "verify") {
-          push(i, (await memdot.files.verify(textOf("fileId", i))) as unknown as IDataObject);
-        } else if (operation === "delete") {
-          const id = textOf("fileId", i);
-          await memdot.files.delete(id);
-          push(i, { id, deleted: true });
-        }
-      } catch (error) {
-        const failure =
-          error instanceof NodeOperationError ? error : operationError(this, error, i);
-        if (!this.continueOnFail()) throw failure;
-        push(i, { error: failure.message });
       }
+    } finally {
+      await memdot.close();
     }
-    await memdot.close();
     return [output];
   }
 }

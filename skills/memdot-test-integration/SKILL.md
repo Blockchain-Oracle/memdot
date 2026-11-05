@@ -48,11 +48,18 @@ Restart the process, or start a new session, between telling and asking. An answ
 
 As a second user, ask the same question. The word must not appear. Then read the code: every search and list has to pass the scope, and that scope has to come from the app's own authenticated user, not from anything the request can set.
 
-**A search without a scope, or a user ID taken from the request body, is a FAIL on its own**, whatever the run showed.
+**A search without a scope, or a user ID taken from the request body, is a FAIL on its own**, whatever the run showed. So is a hand-built filter holding a bare ID that a user can influence, since `"*"` means everyone. Try a user whose ID is `*`.
 
 ## 5. Failure doesn't break the feature
 
-Run the app with `MEMDOT_API_URL` pointed at an address that refuses connections, or with a revoked key. The app should still answer, without memory, and leave a useful log line.
+Run the app three ways: with `MEMDOT_API_URL` pointed at an address that refuses connections, with a revoked key, and pointed at an address that accepts connections and never answers:
+
+```bash
+node -e 'require("net").createServer(() => {}).listen(9099)' &
+MEMDOT_API_URL=http://localhost:9099 <the app's command>
+```
+
+The app should still answer each time, without memory, within a few seconds, and leave a useful log line. The last one is the case people miss. Hand-written wiring with no timeout hangs on it.
 
 ## 6. Secrets
 

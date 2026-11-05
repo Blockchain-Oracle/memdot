@@ -33,31 +33,36 @@ memdot namespace create my-app --mode assisted --space <id>
 
 ## 3. Export
 
-The hosted client pages through `get_all`, which is the simplest export and keeps IDs and metadata. Export one scope at a time, because it requires filters:
+The hosted client pages through `get_all`, which is the simplest export and keeps IDs and metadata. It requires filters, so export one scope at a time, each to its own file:
 
 ```python
 import json
 from mem0 import MemoryClient
 
 client = MemoryClient()
-rows, page = [], 1
-while True:
-    batch = client.get_all(filters={"user_id": "alex"}, page=page, page_size=200)
-    rows += batch["results"]
-    if not batch.get("next"):
-        break
-    page += 1
-json.dump(rows, open("mem0-export.json", "w"))
+
+def export(scope: dict, path: str) -> None:
+    rows, page = [], 1
+    while True:
+        batch = client.get_all(filters=scope, page=page, page_size=200)
+        rows += batch["results"]
+        if not batch.get("next"):
+            break
+        page += 1
+    json.dump(rows, open(path, "w"))
+    print(path, len(rows))
+
+export({"user_id": "alex"}, "mem0-export-alex.json")
 ```
 
-Run it for each user, agent and run. The dashboard's export also works, and so does a dump from the open-source library's `get_all`. The importer reads each of those shapes: a bare list, or one under `results` or `memories`, with the text in `memory`, `text`, `content` or `data.memory`.
+Run it for each user, agent and run, and keep the counts it prints. The dashboard's export also works, and so does a dump from the open-source library's `get_all`. The importer reads each of those shapes: a bare list, or one under `results` or `memories`, with the text in `memory`, `text`, `content` or `data.memory`.
 
 Export files hold what people said. Keep them out of the repository, and delete them afterwards.
 
 ## 4. Import, and check the counts
 
 ```bash
-memdot import mem0-export.json -n <namespace> --source mem0
+memdot import mem0-export-alex.json -n <namespace> --source mem0
 memdot --agent list -n <namespace> -u alex
 ```
 
@@ -69,7 +74,7 @@ Mind the quota: every memory is stored on chain. `memdot usage` shows what's lef
 
 ## 5. Change the code
 
-Follow [references/api-mapping.md](references/api-mapping.md). For Python, the verbs are the same on the client, so most changes are the import and the constructor. Results still answer to `hit["memory"]`. In TypeScript, move to `@memdot/sdk`, or to an adapter if the project uses a framework.
+Follow [references/api-mapping.md](references/api-mapping.md). For Python, the verbs are the same on the client, so most changes are the import and the constructor, plus one shape: `search` returns a list rather than a dict with `results`. Each result still answers to `hit["memory"]`. In TypeScript, move to `@memdot/sdk`, or to an adapter if the project uses a framework.
 
 ## 6. Check it
 
@@ -77,4 +82,4 @@ Run the `memdot-test-integration` skill. Writing new memories, recall through th
 
 ## 7. Cut over
 
-Tell the person it's ready, and leave switching off the old service to them. Delete `mem0-export.json`. Then remove the old dependency and its API key from the environment.
+Tell the person it's ready, and leave switching off the old service to them. Delete the export files. Then remove the old dependency and its API key from the environment.

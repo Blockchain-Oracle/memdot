@@ -165,6 +165,24 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
   const resolved = await credentialsOf(command);
   const { apiUrl } = resolved;
 
+  if (options.printEnv) {
+    if (options.withKey || options.continue || options.wait === false) {
+      throw new CliError(
+        "--print-env connects something new and saves nothing, so it can't go with --with-key, --continue or --no-wait.",
+        EXIT.usage,
+        "BAD_FLAGS",
+      );
+    }
+    // It ends by printing a key and an identity, which shouldn't land in an agent's transcript.
+    if (!interactive()) {
+      throw new CliError(
+        "--print-env is for a person at a terminal, since it prints a key and an identity. Run it yourself, not through an agent or script.",
+        EXIT.usage,
+        "NEEDS_A_PERSON",
+      );
+    }
+  }
+
   if (options.withKey) {
     const synced = await saveApiKey(apiUrl, options.withKey, resolved.namespaceId ?? undefined);
     emit({
@@ -215,7 +233,7 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
   });
   const pending = pendingFrom(started, key, options.label);
 
-  // For somewhere else: a server, n8n, CI. Nothing here changes, and it's revoked on its own.
+  // For somewhere else: a server, n8n, CI. Nothing here changes, and you can revoke it separately.
   if (options.printEnv) {
     console.error(`\nOpen ${started.url}`);
     console.error(`and type this code: ${strong(started.code)}\n`);
@@ -229,19 +247,11 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
         "CONNECT_EXPIRED",
       );
     }
-    const env = {
-      MEMDOT_API_URL: apiUrl,
-      MEMDOT_API_KEY: collected.apiKey,
-      MEMDOT_AGENT_IDENTITY: key.identity,
-      ...(collected.namespaceId ? { MEMDOT_NAMESPACE: collected.namespaceId } : {}),
-    };
     // On stdout and nothing else, so it can go straight into a file.
-    emit({
-      data: env,
-      text: () => {
-        for (const [name, value] of Object.entries(env)) console.log(`${name}=${value}`);
-      },
-    });
+    console.log(`MEMDOT_API_URL=${apiUrl}`);
+    console.log(`MEMDOT_API_KEY=${collected.apiKey}`);
+    console.log(`MEMDOT_AGENT_IDENTITY=${key.identity}`);
+    if (collected.namespaceId) console.log(`MEMDOT_NAMESPACE=${collected.namespaceId}`);
     return;
   }
 

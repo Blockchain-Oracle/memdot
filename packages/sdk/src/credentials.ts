@@ -203,12 +203,7 @@ async function embeddingRuntime() {
   return adopt(await import(pathToFileURL(installed() as string).href));
 }
 
-/**
- * A client from resolved credentials. With an agent identity it opens what was shared with that
- * agent; with `MEMDOT_RECOVERY_CODE` it acts as the owner, for scripts that need to. The code is
- * only ever read from the environment, never stored.
- */
-/** Reaches MemDot the way the CLI does: flags, then environment, then what `memdot login` saved. */
+/** Reaches MemDot the way the CLI does: flags, then the environment, then what `memdot login` saved. */
 export async function connectFromMachine(
   client: string,
   flags: CredentialFlags & { identity?: string | undefined } = {},
@@ -225,6 +220,29 @@ export async function connectFromMachine(
   return { memdot: await clientFor(resolved, client), resolved };
 }
 
+/**
+ * `connectFromMachine`, the first time something needs it. A failed attempt isn't kept, so a network
+ * blip at startup doesn't turn memory off until the next restart.
+ */
+export function lazyConnection(
+  client: string,
+  flags: CredentialFlags & { identity?: string | undefined } = {},
+): () => ReturnType<typeof connectFromMachine> {
+  let held: ReturnType<typeof connectFromMachine> | null = null;
+  return () => {
+    held ??= connectFromMachine(client, flags).catch((error) => {
+      held = null;
+      throw error;
+    });
+    return held;
+  };
+}
+
+/**
+ * A client from resolved credentials. With an agent identity it opens what was shared with that
+ * agent; with `MEMDOT_RECOVERY_CODE` it acts as the owner, for scripts that need to. The code is
+ * only ever read from the environment, never stored.
+ */
 export async function clientFor(resolved: ResolvedCredentials, client: string): Promise<MemDot> {
   const memdot = MemDot.create({
     baseUrl: resolved.apiUrl,
@@ -232,6 +250,7 @@ export async function clientFor(resolved: ResolvedCredentials, client: string): 
     embedder: localEmbedder(embeddingRuntime),
     completeGrantsOnUnlock: false,
     ...(resolved.apiKey ? { apiKey: resolved.apiKey } : {}),
+    ...(resolved.namespaceId ? { namespaceId: resolved.namespaceId } : {}),
   });
   if (resolved.recoveryCode) {
     await memdot.account.unlockWithRecoveryCode(resolved.recoveryCode);

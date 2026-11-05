@@ -16,6 +16,8 @@ export {
   AgentMemory,
   type AgentMemoryOptions,
   type MemoryBinding,
+  memoryLine,
+  NOTES_NOTICE,
   recallContext,
   scopeFilter,
   withRecall,

@@ -1,6 +1,8 @@
 # Framework adapters
 
-All of them recall before the model answers, framing memories as notes rather than instructions, and save what an exchange taught. A failure in memory never fails the model call.
+Middleware and processors recall before the model answers, framing memories as notes rather than instructions, and save what an exchange taught. If MemDot fails or stalls, the model answers without it after 8 seconds at most (`timeoutMs`), and `onError` hears why. Tools and stores are called directly, so they report failures to whoever called them.
+
+These adapters run from a clone of the repository until the packages are on npm: see [typescript.md](typescript.md).
 
 ## AI SDK 7: `@memdot/ai-sdk`
 
@@ -22,7 +24,7 @@ await generateText({ model: google("gemini-2.5-flash"), tools: memdot.tools({ us
 await generateText({ model: memdot({ userId: "alex" }), prompt });
 ```
 
-Options for `wrap`: `namespaceId`, `recall`, `topK`, `threshold`, `save`, `waitUntil` (for example Next's `after`, so a save doesn't hold up the reply) and `onError`. Create the wrapped model per request when the user changes per request.
+Options for `wrap`: `namespaceId`, `recall`, `topK`, `threshold`, `save`, `timeoutMs`, `whenNoModel`, `waitUntil` (for example Next's `after`, so a save doesn't hold up the reply) and `onError`. Create the wrapped model per request when the user changes per request. An agent ID alone is refused unless you pass `shared: true`.
 
 ## LangChain and LangGraph (TypeScript): `@memdot/langchain`
 
@@ -31,18 +33,19 @@ import { MemDotStore, memdotMiddleware, memdotTools } from "@memdot/langchain";
 import { createAgent } from "langchain";
 
 // Who it's for comes from the options, or per call: agent.invoke(input, { context: { userId } })
+// A call that doesn't say skips memory and reports it, rather than mixing people's.
 const agent = createAgent({ model, tools: [], middleware: [memdotMiddleware({ userId: "alex" })] });
 
 // Tools: remember and recall.
 createAgent({ model, tools: memdotTools({ userId: "alex" }) });
 
 // A LangGraph store: key-addressed, stored as written, found by meaning.
-const store = new MemDotStore();
+const store = new MemDotStore(undefined, { userOf: (namespace) => namespace[1] });
 await store.put(["memories", "alex"], "deploys", { text: "Alex deploys on Fridays" });
 await store.search(["memories", "alex"], { query: "when does Alex deploy?" });
 ```
 
-The store's items have the same shape as Python's `MemDotStore`, so the two read each other's.
+The store's items have the same shape as Python's `MemDotStore`, so the two read each other's. `userOf` says which label names the person, so `memdot delete -u alex` covers these too. Without it, nothing is assumed. A search with a `query` looks at the 100 closest items, since finding by meaning can't be paged.
 
 ## Mastra: `@memdot/mastra`
 

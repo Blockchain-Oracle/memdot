@@ -57,9 +57,15 @@ await mkdir(files);
 await chmod(data, 0o777);
 await chmod(files, 0o755);
 
-const packed = await run("npm", ["pack", "--silent", "--pack-destination", files], PACKAGE);
-const tarball = packed.output.trim().split("\n").at(-1) as string;
-check("it packs", tarball.endsWith(".tgz"), packed.output);
+// N8N_PACKAGE_URL tests the published tarball, as the README installs it. Otherwise, this folder as it is.
+const packageUrl = process.env.N8N_PACKAGE_URL?.trim();
+let source = packageUrl ?? "";
+if (!packageUrl) {
+  const packed = await run("npm", ["pack", "--silent", "--pack-destination", files], PACKAGE);
+  const tarball = packed.output.trim().split("\n").at(-1) as string;
+  check("it packs", tarball.endsWith(".tgz"), packed.output);
+  source = `/files/${tarball}`;
+}
 
 const credentials = [
   { id: "memdotCredential", name: "MemDot", type: "memDotApi", data: { apiKey, apiUrl, identity } },
@@ -122,13 +128,13 @@ interface RunResult {
 
 const SETUP = [
   "cd /home/node/.n8n && mkdir -p nodes && cd nodes",
-  "[ -d node_modules/n8n-nodes-memdot ] || npm install /files/PACKED --omit=peer --ignore-scripts --no-audit --no-fund >/dev/null 2>&1",
+  "[ -d node_modules/n8n-nodes-memdot ] || npm install SOURCE --omit=peer --ignore-scripts --no-audit --no-fund >/dev/null 2>&1",
   "cd / && n8n import:credentials --input=/files/credentials.json >/dev/null 2>&1",
 ].join(" && ");
 
 /** One workflow through one new n8n process. */
 async function execute(file: string, id: string): Promise<RunResult> {
-  const script = `${SETUP.replace("PACKED", tarball)} && n8n import:workflow --input=/files/${file} >/dev/null 2>&1 && n8n execute --id=${id} --rawOutput`;
+  const script = `${SETUP.replace("SOURCE", source)} && n8n import:workflow --input=/files/${file} >/dev/null 2>&1 && n8n execute --id=${id} --rawOutput`;
   const { output } = await run("docker", [
     "run",
     "--rm",
@@ -327,6 +333,44 @@ console.log("\n── An AI Agent with MemDot in its memory slot");
     answer(other),
   );
 
+  const repeatId = anId("a5");
+  const repeatFile = await prepare(
+    "agent-with-memory",
+    message("Please say the word continue, and nothing else.", `repeat-${stamp}`),
+    repeatId,
+  );
+  await executeWithModel(repeatFile, repeatId);
+  const repeated = await executeWithModel(repeatFile, repeatId);
+  const third = await executeWithModel(repeatFile, repeatId);
+  const seen = third.nodes["MemDot Chat Memory"]?.find(
+    (step) => step.json?.action === "loadMemoryVariables",
+  )?.json?.chatHistory as unknown[] | undefined;
+  check(
+    "the same words twice are still two turns",
+    repeated.status === "success" && (seen?.length ?? 0) >= 4,
+    seen?.length,
+  );
+
+  const noSessionId = anId("a6");
+  const noSession = await execute(
+    await prepare(
+      "agent-with-memory",
+      (node) => {
+        if (node.name === "Message") {
+          node.parameters.jsonOutput = JSON.stringify({ chatInput: "Hello there" });
+        }
+        if (node.name === "MemDot Chat Memory") node.parameters.userId = user;
+      },
+      noSessionId,
+    ),
+    noSessionId,
+  );
+  check(
+    "a chat with no session is refused, not pooled",
+    noSession.status !== "success" && /Session ID is empty/.test(JSON.stringify(noSession.nodes)),
+    noSession.nodes,
+  );
+
   const strangerId = anId("a4");
   const stranger = await executeWithModel(
     await prepare(
@@ -343,6 +387,27 @@ console.log("\n── An AI Agent with MemDot in its memory slot");
     "someone else doesn't get it",
     stranger.status === "success" && !answer(stranger).includes(word),
     answer(stranger) || stranger.raw,
+  );
+}
+
+console.log("\n── An empty scope doesn't mean everyone");
+{
+  const id = anId("e");
+  const empty = await execute(
+    await prepare(
+      "remember-and-search",
+      (node) => {
+        if (node.name === "Remember") node.parameters.userId = user;
+        if (node.name === "Search") node.parameters.userId = "={{ $json.nothing_here }}";
+      },
+      id,
+    ),
+    id,
+  );
+  check(
+    "a mapping that finds nothing is refused",
+    empty.status !== "success" && /Across Everyone/.test(JSON.stringify(empty.nodes)),
+    empty.nodes,
   );
 }
 
@@ -447,4 +512,4 @@ if (failures) {
   console.log(`\n${failures} checks failed.`);
   process.exit(1);
 }
-console.log(`\nEverything held. ${JSON.stringify(evidence)}`);
+console.log(`\nEverything held.\nEVIDENCE ${JSON.stringify(evidence)}`);

@@ -46,7 +46,8 @@ A word no model could guess is the point: an answer holding it can only have com
 ## What not to do
 
 - Don't search with no scope. It looks across everyone.
+- Don't put a bare ID in a filter you build yourself: `"*"` means everyone. Use `{ "eq": id }`, or `scopeFilter` from the SDK.
 - Don't take the user ID from the request body. Whoever sends the request could read someone else's memories.
-- Don't save every message as written with `infer: false`. It fills a space's quota with chatter. Let a model distill, or save only chosen facts through a tool.
+- Don't save every message as written with `infer: false` or `whenNoModel: "as-written"`. It fills a space's quota with chatter, and whatever someone pasted goes on chain and comes back as a note. Let a model distill, or save only chosen facts through a tool.
 - Don't re-save what was recalled. The adapters only save the new exchange.
 - Don't run a model call and a chain wait in a request path. `wait: "chain"` takes half a minute.

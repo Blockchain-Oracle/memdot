@@ -105,10 +105,12 @@ Anything that can't be undone asks first, or needs `--force` when no person is t
 
 ## Connect somewhere else
 
-For a server, CI or n8n: this prints the credentials, saves nothing here, and that connection is revoked on its own under Agents.
+For a server, CI or n8n: this prints the credentials and saves nothing here, and you can revoke that connection separately under Agents. It's for a person at a terminal, since it prints a key.
 
 ```bash
-memdot login --print-env --label ci >> .env
+(umask 077; memdot login --print-env --label ci >> .env)
 ```
+
+The `umask` keeps the file readable only by you.
 
 Every command and flag: `memdot help --json`, or the [`memdot-cli` skill](../../skills/memdot-cli/references/commands.md).

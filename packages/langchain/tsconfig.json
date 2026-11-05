@@ -4,5 +4,5 @@
     "lib": ["ES2023", "ESNext.Disposable", "DOM"],
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }

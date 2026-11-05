@@ -6,7 +6,7 @@ import {
   type ZObject,
 } from "zapier-platform-core";
 import { INDEX_WAIT_MS, POLL_MS } from "../constants.js";
-import { namespaceField, scopeBody, scopeFields } from "../fields.js";
+import { isYes, namespaceField, scopeBody, scopeFields } from "../fields.js";
 
 const inputFields = defineInputFields([
   {
@@ -75,6 +75,13 @@ const perform = (async (z, bundle) => {
       400,
     );
   }
+  if (Object.values(scope).includes("*")) {
+    throw new z.errors.Error(
+      "\"*\" means everyone in a filter, so it can't be someone's ID.",
+      "BadScope",
+      400,
+    );
+  }
   let parsedMetadata: unknown;
   if (metadata) {
     try {
@@ -88,8 +95,7 @@ const perform = (async (z, bundle) => {
     url: "/v1/memories",
     body: {
       messages: [{ role: "user", content: text }],
-      // Zapier sends booleans as text.
-      infer: String(infer) !== "false",
+      infer: isYes(infer, true),
       ...scope,
       ...(namespace_id ? { namespace_id } : {}),
       ...(parsedMetadata ? { metadata: parsedMetadata } : {}),

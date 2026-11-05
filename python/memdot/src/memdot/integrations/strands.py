@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from . import missing
+from . import missing, notes
 
 try:
     from strands import tool
@@ -144,7 +144,7 @@ def memdot_tool(
             return added.note or json.dumps([r.to_dict() for r in added.results])
         if action == "retrieve" and query:
             hits = await memories.search(query, namespace_id=namespace_id, filters=scope or None)
-            return json.dumps([{"id": h.id, "memory": h.memory, "score": h.score} for h in hits])
+            return notes(hits)
         if action == "list":
             page = await memories.list(
                 namespace_id=namespace_id, filters=scope or None, page_size=_LIST_PAGE

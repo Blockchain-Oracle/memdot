@@ -11,7 +11,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: Blockchain-Oracle
-  version: 0.1.3
+  version: 0.1.4
   category: ai-memory
 ---
 
@@ -33,7 +33,7 @@ memdot login --continue --wait 120
 
 | To | Run |
 |---|---|
-| Connect somewhere else (a server, CI, n8n), saving nothing here | `memdot login --print-env --label name` |
+| Connect somewhere else (a server, CI, n8n), saving nothing here | `memdot login --print-env --label name`. A person runs this at a terminal: it prints a key, so it refuses to run through an agent or script |
 | Use a dashboard key (Assisted only, no browser) | `memdot login --with-key md_…` or `MEMDOT_API_KEY` |
 | See what you're connected as | `memdot whoami`, `memdot status` |
 

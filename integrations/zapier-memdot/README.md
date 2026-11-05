@@ -11,6 +11,8 @@ Long-term memory on Portaldot V3, in any Zap.
 | Search | **Search Memories** | Finds what's been remembered, by meaning and keyword |
 | Search | **Find Memory by ID** | Reads one memory, with Zapier's "not found" path when it's gone |
 
+Search Memories needs a User, Agent or Run ID, or **Search Everyone** set to Yes, so a mapped field that comes back empty can't reach other people's memories. New Memory's settings are chosen once, so leaving its IDs empty means every new memory in the namespace.
+
 ## Connect it
 
 Create a key under **API keys** in the [dashboard](https://app.84.46.247.92.sslip.io), and paste it when Zapier asks.

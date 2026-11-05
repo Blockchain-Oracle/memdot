@@ -10,20 +10,24 @@
     store.search(("memories", "alex"), query="when does Alex deploy?")
 
 A store is key-addressed and MemDot gives memories their own ids, so the namespace and key travel in
-the memory's metadata. Memories are stored as written, never through a model. `MemDotStore` embeds on
-MemDot's side or this machine's, so an `index` config is accepted and ignored.
+the memory's metadata, in the same shape as the TypeScript store: the two read each other's items.
+Memories are stored as written, never through a model. `MemDotStore` embeds on MemDot's side or this
+machine's, so an `index` config is accepted and ignored. A search with a `query` looks at the 100
+closest items in the namespace, since finding by meaning can't be paged.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
-from collections.abc import Iterable, Mapping
+import operator
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
 from typing import Any
 
 from ..models import Memory, ScoredMemory
-from . import missing
+from . import missing, notes
 
 try:
     from langchain_core.tools import StructuredTool
@@ -51,6 +55,57 @@ _PAGE = 100
 #: Search asks for more than it returns, since a namespace prefix and a filter are applied here.
 _SEARCH_OVERFETCH = 4
 _MAX_FETCH = 100
+_RUN_ID_HEX = 24
+
+
+def _join(namespace: Iterable[str]) -> str:
+    """A namespace as one string that can be taken apart again, whatever its labels hold."""
+    return _SEPARATOR.join(label.replace("%", "%25").replace("/", "%2F") for label in namespace)
+
+
+def _split(joined: str) -> tuple[str, ...]:
+    return tuple(
+        label.replace("%2F", "/").replace("%25", "%") for label in joined.split(_SEPARATOR)
+    )
+
+
+def _run_of(namespace: tuple[str, ...], key: str) -> str:
+    """Each key gets its own run, since identical text under one scope isn't stored twice."""
+    digest = hashlib.sha256(f"{_join(namespace)}\0{key}".encode()).hexdigest()
+    return f"store-{digest[:_RUN_ID_HEX]}"
+
+
+def _same(a: Any, b: Any) -> bool:
+    return json.dumps(a, sort_keys=True, default=str) == json.dumps(b, sort_keys=True, default=str)
+
+
+_COMPARISONS: dict[str, Callable[[Any, Any], bool]] = {
+    "$eq": _same,
+    "$ne": lambda have, operand: not _same(have, operand),
+    "$gt": operator.gt,
+    "$gte": operator.ge,
+    "$lt": operator.lt,
+    "$lte": operator.le,
+}
+
+
+def _passes(have: Any, op: str, operand: Any) -> bool:
+    try:
+        return _COMPARISONS[op](have, operand)
+    except TypeError:
+        return False
+
+
+def _matches_filter(value: Mapping[str, Any], wanted: Mapping[str, Any]) -> bool:
+    """What LangGraph's filters mean: a plain value is equality, and `$`-keys compare."""
+    for field, rule in wanted.items():
+        have = value.get(field)
+        if not isinstance(rule, Mapping) or not all(op in _COMPARISONS for op in rule):
+            if not _same(have, rule):
+                return False
+        elif not all(_passes(have, op, operand) for op, operand in rule.items()):
+            return False
+    return True
 
 
 def _text_of(value: Mapping[str, Any]) -> str:
@@ -77,13 +132,21 @@ def _matches_condition(namespace: tuple[str, ...], condition: MatchCondition) ->
 class MemDotStore(BaseStore):
     """Implements `batch`, which gives `get`, `put`, `search`, `delete` and `list_namespaces`."""
 
-    def __init__(self, client: Any, *, namespace_id: str | None = None) -> None:
+    def __init__(
+        self,
+        client: Any,
+        *,
+        namespace_id: str | None = None,
+        user_of: Callable[[tuple[str, ...]], str | None] | None = None,
+    ) -> None:
+        """`user_of` says which label names the person, so `memdot delete -u alex` covers these too.
+
+        For example `lambda namespace: namespace[1]` for `("memories", "alex")`. Layouts differ, so
+        nothing is assumed: without it, items belong only to their key.
+        """
         self._client = client
         self._namespace_id = namespace_id
-
-    def _user_of(self, namespace: tuple[str, ...]) -> str:
-        """`("memories", "alex")` is about alex, so forgetting alex forgets these too."""
-        return namespace[1] if len(namespace) > 1 else namespace[0]
+        self._user_of = user_of
 
     def _find(self, namespace: tuple[str, ...], key: str) -> Memory | None:
         page = self._client.memories.list(
@@ -91,7 +154,7 @@ class MemDotStore(BaseStore):
             page_size=1,
             filters={
                 "AND": [
-                    {f"metadata.{_NAMESPACE}": _SEPARATOR.join(namespace)},
+                    {f"metadata.{_NAMESPACE}": _join(namespace)},
                     {f"metadata.{_KEY}": key},
                 ]
             },
@@ -102,7 +165,7 @@ class MemDotStore(BaseStore):
         metadata = memory.metadata or {}
         if _KEY not in metadata or _NAMESPACE not in metadata:
             return None
-        namespace = tuple(str(metadata[_NAMESPACE]).split(_SEPARATOR))
+        namespace = _split(str(metadata[_NAMESPACE]))
         value = metadata.get(_VALUE)
         return (
             namespace,
@@ -134,7 +197,7 @@ class MemDotStore(BaseStore):
                 self._client.memories.delete(current.id)
             return
         metadata = {
-            _NAMESPACE: _SEPARATOR.join(op.namespace),
+            _NAMESPACE: _join(op.namespace),
             _KEY: op.key,
             _VALUE: dict(op.value),
         }
@@ -142,9 +205,11 @@ class MemDotStore(BaseStore):
         if current:
             self._client.memories.update(current.id, text=text, metadata=metadata)
             return
+        user_id = self._user_of(op.namespace) if self._user_of else None
         self._client.memories.add(
             text,
-            user_id=self._user_of(op.namespace),
+            run_id=_run_of(op.namespace, op.key),
+            **({"user_id": user_id} if user_id else {}),
             namespace_id=self._namespace_id,
             metadata=metadata,
             infer=False,
@@ -155,40 +220,49 @@ class MemDotStore(BaseStore):
         return bool(fields) and fields[0][: len(prefix)] == prefix
 
     def _search(self, op: SearchOp) -> list[SearchItem]:
-        scope = {f"metadata.{_NAMESPACE}": {"contains": _SEPARATOR.join(op.namespace_prefix)}}
+        scope = {f"metadata.{_NAMESPACE}": {"contains": _join(op.namespace_prefix)}}
         wanted = op.limit + op.offset
-        if op.query:
-            found: list[Any] = self._client.memories.search(
-                op.query,
-                namespace_id=self._namespace_id,
-                filters=scope,
-                top_k=min(_MAX_FETCH, wanted * _SEARCH_OVERFETCH),
-                threshold=0,
-            )
-        else:
-            found = self._client.memories.list(
-                namespace_id=self._namespace_id,
-                filters=scope,
-                page_size=min(_MAX_FETCH, wanted * _SEARCH_OVERFETCH),
-            ).results
         items: list[SearchItem] = []
-        for memory in found:
-            fields = self._fields(memory)
-            if not fields or not self._under(memory, op.namespace_prefix):
-                continue
-            namespace, key, value = fields
-            if op.filter and any(value.get(k) != v for k, v in op.filter.items()):
-                continue
-            items.append(
-                SearchItem(
-                    namespace=namespace,
-                    key=key,
-                    value=value,
-                    created_at=_when(memory.created_at),
-                    updated_at=_when(memory.updated_at),
-                    score=memory.score if isinstance(memory, ScoredMemory) else None,
+
+        def take(found: Iterable[Any]) -> None:
+            for memory in found:
+                fields = self._fields(memory)
+                if not fields or not self._under(memory, op.namespace_prefix):
+                    continue
+                namespace, key, value = fields
+                if op.filter and not _matches_filter(value, op.filter):
+                    continue
+                items.append(
+                    SearchItem(
+                        namespace=namespace,
+                        key=key,
+                        value=value,
+                        created_at=_when(memory.created_at),
+                        updated_at=_when(memory.updated_at),
+                        score=memory.score if isinstance(memory, ScoredMemory) else None,
+                    )
+                )
+
+        if op.query:
+            take(
+                self._client.memories.search(
+                    op.query,
+                    namespace_id=self._namespace_id,
+                    filters=scope,
+                    top_k=_MAX_FETCH,
+                    threshold=0,
                 )
             )
+            return items[op.offset : wanted]
+        cursor = None
+        while True:
+            page = self._client.memories.list(
+                namespace_id=self._namespace_id, filters=scope, page_size=_PAGE, cursor=cursor
+            )
+            take(page.results)
+            cursor = page.next_cursor
+            if not cursor or len(items) >= wanted:
+                break
         return items[op.offset : wanted]
 
     def _list_namespaces(self, op: ListNamespacesOp) -> list[tuple[str, ...]]:
@@ -196,7 +270,10 @@ class MemDotStore(BaseStore):
         cursor = None
         while True:
             page = self._client.memories.list(
-                namespace_id=self._namespace_id, page_size=_PAGE, cursor=cursor
+                namespace_id=self._namespace_id,
+                filters={f"metadata.{_NAMESPACE}": "*"},
+                page_size=_PAGE,
+                cursor=cursor,
             )
             for memory in page.results:
                 fields = self._fields(memory)
@@ -256,7 +333,7 @@ def memory_tools(
         hits = client.memories.search(
             query, namespace_id=namespace_id, filters=scope() or None, top_k=top_k
         )
-        return "\n".join(f"- {hit.memory}" for hit in hits) or "Nothing remembered about that."
+        return notes(hits)
 
     return [
         StructuredTool.from_function(remember, name="remember"),

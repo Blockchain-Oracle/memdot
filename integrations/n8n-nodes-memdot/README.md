@@ -31,7 +31,7 @@ Create a **MemDot API** credential.
   memdot login --print-env --label n8n
   ```
 
-  It prints `MEMDOT_API_KEY` and `MEMDOT_AGENT_IDENTITY`. Use both. Nothing is saved on the machine you ran it on, and you can revoke n8n on its own under Agents. Anyone who can read this credential can open the spaces you gave that agent, so give it only the ones it needs.
+  It prints `MEMDOT_API_KEY` and `MEMDOT_AGENT_IDENTITY`. Use both. Nothing is saved on the machine you ran it on, and you can revoke n8n separately under Agents. Anyone who can read this credential can open the spaces you gave that agent, so give it only the ones it needs.
 
 ## Try it
 
@@ -51,6 +51,9 @@ For a chat, swap the first two nodes of `agent-with-memory` for a Chat Trigger. 
 - **Session ID** names the conversation. Its last turns come back with every message.
 - **User ID** names the person. With one, a model distills what each turn taught into memories about them, and a new session finds those by meaning. Without one, only the session's turns are kept.
 - A turn is one memory under that session, cut to 4,000 characters per message. A person's facts never mix with transcripts, because turns carry no user ID.
+- An empty Session ID is an error, not a shared conversation. If MemDot is down, the agent answers without memory and n8n logs why.
+
+Search and Get Many on the MemDot node need a User, Agent or Run ID, so a mapping that comes back empty can't reach other people's memories. To look through everyone in a namespace, turn on **Across Everyone**.
 
 Every turn is a write on Portaldot V3 and every distilled turn is a model call, both within your account's limits.
 

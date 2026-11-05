@@ -18,7 +18,7 @@ import json
 import uuid
 from typing import Any
 
-from . import missing
+from . import missing, notes
 
 try:
     from agents import function_tool
@@ -54,7 +54,7 @@ def memory_tools(
         hits = await client.memories.search(
             query, namespace_id=namespace_id, filters=scope() or None, top_k=top_k
         )
-        return "\n".join(f"- {hit.memory}" for hit in hits) or "Nothing remembered about that."
+        return notes(hits)
 
     @function_tool
     async def save_memory(text: str) -> str:

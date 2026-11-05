@@ -13,6 +13,8 @@ import {
   scopeFilters,
 } from "../fields.js";
 
+// Unlike an action, a trigger's settings are chosen once and don't come from an earlier step, so
+// leaving the IDs empty here can only mean what it says: every new memory in the namespace.
 const inputFields = defineInputFields([...scopeFields, ...namespaceField]);
 
 const perform = (async (z, bundle) => {

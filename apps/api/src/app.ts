@@ -63,9 +63,11 @@ export function createApp(services: Services) {
   // Anyone's page can call the API with a key, which is what the browser SDK is for. Cookies stay out
   // of it: without allow-credentials a browser won't send or read a session from another address.
   const openCors = cors({ ...corsRules, origin: "*" });
-  app.use("*", (c, next) =>
-    (c.req.header("origin") === env.WEB_ORIGIN ? dashboardCors : openCors)(c, next),
-  );
+  app.use("*", async (c, next) => {
+    // The answer differs by origin, and the CID gateway's responses are cached for a year.
+    c.header("Vary", "Origin", { append: true });
+    await (c.req.header("origin") === env.WEB_ORIGIN ? dashboardCors : openCors)(c, next);
+  });
 
   const jsonLimit = bodyLimit({
     maxSize: JSON_BODY_LIMIT,

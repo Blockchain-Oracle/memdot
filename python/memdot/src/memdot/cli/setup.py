@@ -246,6 +246,23 @@ def _run_login(
     resolved = credentials_of(ctx)
     api_url = resolved.api_url
 
+    if print_env:
+        if with_key or resume or no_wait:
+            raise CliError(
+                "--print-env connects something new and saves nothing, so it can't go with "
+                "--with-key, --continue or --no-wait.",
+                EXIT["usage"],
+                "BAD_FLAGS",
+            )
+        # It ends by printing a key and an identity, which shouldn't land in an agent's transcript.
+        if not interactive():
+            raise CliError(
+                "--print-env is for a person at a terminal, since it prints a key and an identity. "
+                "Run it yourself, not through an agent or script.",
+                EXIT["usage"],
+                "NEEDS_A_PERSON",
+            )
+
     if with_key:
         synced = _save_api_key(api_url, with_key, resolved.namespace_id)
         emit(
@@ -291,7 +308,7 @@ def _run_login(
         "label": label,
     }
 
-    # For somewhere else: a server, n8n, CI. Nothing here changes, and it's revoked on its own.
+    # For somewhere else: a server, n8n, CI. Nothing here changes, and you can revoke it separately.
     if print_env:
         click.echo(f"\nOpen {started.url}", err=True)
         click.echo(f"and type this code: {strong(started.code)}\n", err=True)
@@ -303,23 +320,12 @@ def _run_login(
             raise CliError(
                 "Nothing came back in time. Run this again.", EXIT["auth"], "CONNECT_EXPIRED"
             )
-        env = {
-            "MEMDOT_API_URL": api_url,
-            "MEMDOT_API_KEY": collected["api_key"],
-            "MEMDOT_AGENT_IDENTITY": identity,
-            **(
-                {"MEMDOT_NAMESPACE": collected["namespace_id"]}
-                if collected.get("namespace_id")
-                else {}
-            ),
-        }
-
         # On stdout and nothing else, so it can go straight into a file.
-        def show_env() -> None:
-            for name, value in env.items():
-                click.echo(f"{name}={value}")
-
-        emit(data=env, text=show_env)
+        click.echo(f"MEMDOT_API_URL={api_url}")
+        click.echo(f"MEMDOT_API_KEY={collected['api_key']}")
+        click.echo(f"MEMDOT_AGENT_IDENTITY={identity}")
+        if collected.get("namespace_id"):
+            click.echo(f"MEMDOT_NAMESPACE={collected['namespace_id']}")
         return
 
     creds.save_credentials(

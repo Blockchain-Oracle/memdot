@@ -16,6 +16,7 @@ const latestLive = latest("s08-live-");
 const latestAgents = latest("s09-agents-");
 const latestPython = latest("s10-python-");
 const latestPlugin = latest("s11-plugin-");
+const latestIntegrations = latest("s12-integrations-");
 
 const seed = read(`docs/evidence/${latestSeed}`);
 const selfSigned = latestSelfSigned ? read(`docs/evidence/${latestSelfSigned}`) : null;
@@ -24,6 +25,7 @@ const live = latestLive ? read(`docs/evidence/${latestLive}`) : null;
 const agents = latestAgents ? read(`docs/evidence/${latestAgents}`) : null;
 const python = latestPython ? read(`docs/evidence/${latestPython}`) : null;
 const plugin = latestPlugin ? read(`docs/evidence/${latestPlugin}`) : null;
+const integrations = latestIntegrations ? read(`docs/evidence/${latestIntegrations}`) : null;
 const registry = read("packages/contracts/deployments/portaldot-v3.json");
 const block = (n) => `[#${n.toLocaleString("en-US")}](${seed.app}/proof/block/${n})`;
 const tx = (hash) => `[\`${hash.slice(0, 10)}…${hash.slice(-6)}\`](${seed.app}/proof/tx/${hash})`;
@@ -140,6 +142,16 @@ const rows = [
           tx(plugin.checkpoint.txHash),
           block(plugin.checkpoint.block),
           cid(plugin.checkpoint.cid),
+        ],
+      ]
+    : []),
+  ...(integrations
+    ? [
+        [
+          "A file encrypted inside an n8n workflow, read back and verified there",
+          tx(integrations.n8n.file.txHash),
+          block(integrations.n8n.file.block),
+          cid(integrations.n8n.cid),
         ],
       ]
     : []),

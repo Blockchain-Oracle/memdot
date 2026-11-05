@@ -28,17 +28,17 @@ const lines = [
   "",
 ];
 
-function usage(command, path) {
+// `help --json` already gives a subcommand its whole name, "file put".
+function usage(command) {
   const args = (command.arguments ?? []).map((arg) =>
     arg.required ? `<${arg.name}>` : `[${arg.name}]`,
   );
-  return [...path, ...args].join(" ");
+  return ["memdot", command.name, ...args].join(" ");
 }
 
-function write(command, path, depth) {
-  const here = [...path, command.name];
+function write(command, depth) {
   if (depth > 0) {
-    lines.push(`${"#".repeat(Math.min(depth + 1, 4))} \`${usage(command, here)}\``, "");
+    lines.push(`${"#".repeat(Math.min(depth + 1, 4))} \`${usage(command)}\``, "");
     if (command.description) lines.push(table(command.description), "");
     const options = (command.options ?? []).filter((option) => option.flags !== "-h, --help");
     if (options.length) {
@@ -50,8 +50,8 @@ function write(command, path, depth) {
     }
   }
   for (const sub of command.subcommands ?? []) {
-    if (sub.name === "help") continue;
-    write(sub, here, depth + 1);
+    if (sub.name === "help" || sub.name.endsWith(" help")) continue;
+    write(sub, depth + 1);
   }
 }
 
@@ -61,7 +61,7 @@ for (const option of root.options ?? []) {
   lines.push(`| \`${table(option.flags)}\` | ${table(option.description)} |`);
 }
 lines.push("");
-write(root, [], 0);
+write(root, 0);
 const text = `${lines.join("\n").trimEnd()}\n`;
 
 if (process.argv.includes("--check")) {

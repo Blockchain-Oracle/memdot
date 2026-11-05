@@ -30,6 +30,8 @@ export interface MemDotOptions extends TransportOptions {
    * In a browser, pass a Worker-backed one so typing never waits on it.
    */
   embedder?: Embedder;
+  /** Where memories go when a call doesn't name a namespace. Default: the API picks your first Assisted one. */
+  namespaceId?: string;
 }
 
 /**
@@ -82,7 +84,14 @@ export class MemDot {
     this.folders = new FoldersApi(ctx, this.spaces);
     this.files = new FilesApi(ctx, this.spaces, this.jobs);
     this.sharing = new SharingApi(ctx, this.spaces);
-    this.memories = new MemoriesApi(ctx, this.spaces, this.folders, this.jobs, options.embedder);
+    this.memories = new MemoriesApi(
+      ctx,
+      this.spaces,
+      this.folders,
+      this.jobs,
+      options.embedder,
+      options.namespaceId,
+    );
     this.data = new DataApi(ctx, this.spaces, this.folders, this.files, this.memories);
     this.agents = new AgentsApi(ctx, this.sharing);
     this.account = new AccountApi(ctx, options.origin, () => this.afterUnlock());
@@ -115,17 +124,22 @@ export class MemDot {
    * and a UI can follow `client.finalizedBlock$` for the live head. Never routed through MemDot.
    */
   chain(): Promise<ChainClient> {
-    this.chainClient ??= import("@memdot/chain").then(({ createChainClient }) =>
-      createChainClient(this.options.rpc ?? PORTALDOT_WSS),
-    );
+    this.chainClient ??= import("@memdot/chain")
+      .then(({ createChainClient }) => createChainClient(this.options.rpc ?? PORTALDOT_WSS))
+      .catch((error) => {
+        this.chainClient = null;
+        throw error;
+      });
     return this.chainClient;
   }
 
   /** Closes the chain connection, if one was opened. Keys stay until `account.lock()`. */
   async close(): Promise<void> {
-    const chain = await this.chainClient;
-    chain?.destroy();
+    const opening = this.chainClient;
     this.chainClient = null;
+    // One that never connected has nothing to close.
+    const chain = await opening?.catch(() => null);
+    chain?.destroy();
   }
 
   private async afterUnlock(): Promise<void> {

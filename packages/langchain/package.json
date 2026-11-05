@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsdown src/index.ts --dts",
     "dev": "tsdown src/index.ts --dts --watch --no-clean",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@memdot/sdk": "workspace:*"
@@ -38,6 +39,7 @@
     "@types/node": "catalog:",
     "langchain": "1.6.0",
     "tsdown": "catalog:",
+    "tsx": "^4.23.15",
     "typescript": "catalog:",
     "zod": "catalog:"
   }

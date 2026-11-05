@@ -118,7 +118,7 @@ Rebuild a namespace's search from the chain
 
 Encrypted files on Portaldot V3
 
-### `memdot file file put <path>`
+### `memdot file put <path>`
 
 Encrypt a file here and store it
 
@@ -132,7 +132,7 @@ Encrypt a file here and store it
 | `--dry-run` | say what it would cost, and store nothing |
 | `--no-wait` | return once it's queued, before it's on chain |
 
-### `memdot file file get <id>`
+### `memdot file get <id>`
 
 Fetch a file and decrypt it here
 
@@ -141,7 +141,7 @@ Fetch a file and decrypt it here
 | `-O, --out <path>` | where to write it (default: its own name) |
 | `--stdout` | write the bytes to stdout |
 
-### `memdot file file ls`
+### `memdot file ls`
 
 List files, names decrypted here
 
@@ -152,11 +152,11 @@ List files, names decrypted here
 | `--limit <n>` | how many |
 | `--cursor <cursor>` |  |
 
-### `memdot file file verify <id>`
+### `memdot file verify <id>`
 
 Check a file against the chain, from this machine
 
-### `memdot file file share [id]`
+### `memdot file share [id]`
 
 Share a file or a space, which takes the owner's keys
 
@@ -168,7 +168,7 @@ Share a file or a space, which takes the owner's keys
 | `--scope <scope>` | read or read_write |
 | `--expires-days <n>` | stop working after this many days |
 
-### `memdot file file revoke <grantId>`
+### `memdot file revoke <grantId>`
 
 Stop a share; future writes use a key they never get
 
@@ -176,7 +176,7 @@ Stop a share; future writes use a key they never get
 |---|---|
 | `--force` | don't ask |
 
-### `memdot file file rm <id>`
+### `memdot file rm <id>`
 
 Delete a file; its bytes leave the chain within 7 days
 
@@ -184,7 +184,7 @@ Delete a file; its bytes leave the chain within 7 days
 |---|---|
 | `--force` | don't ask |
 
-### `memdot file file renew <id>`
+### `memdot file renew <id>`
 
 Renew a file now, without waiting for the keeper
 
@@ -192,7 +192,7 @@ Renew a file now, without waiting for the keeper
 |---|---|
 | `--no-wait` | return once it's queued |
 
-### `memdot file file versions <id>`
+### `memdot file versions <id>`
 
 Every version of a file
 
@@ -200,15 +200,15 @@ Every version of a file
 
 Spaces: where files and namespaces live
 
-### `memdot space space ls`
+### `memdot space ls`
 
 List the spaces this key can reach
 
-### `memdot space space get <id>`
+### `memdot space get <id>`
 
 Read one space
 
-### `memdot space space create <name>`
+### `memdot space create <name>`
 
 Create a space, which takes the owner's keys
 
@@ -216,11 +216,11 @@ Create a space, which takes the owner's keys
 |---|---|
 | `--self-signed` | your wallet signs each store |
 
-### `memdot space space rename <id> <name>`
+### `memdot space rename <id> <name>`
 
 Rename a space
 
-### `memdot space space rm <id>`
+### `memdot space rm <id>`
 
 Delete a space and everything in it
 
@@ -232,7 +232,7 @@ Delete a space and everything in it
 
 Folders inside a space
 
-### `memdot folder folder ls`
+### `memdot folder ls`
 
 List folders in a space
 
@@ -240,7 +240,7 @@ List folders in a space
 |---|---|
 | `--space <id>` |  |
 
-### `memdot folder folder create <name>`
+### `memdot folder create <name>`
 
 Create a folder; its name is sealed here
 
@@ -249,7 +249,7 @@ Create a folder; its name is sealed here
 | `--space <id>` |  |
 | `--parent <id>` |  |
 
-### `memdot folder folder rename <id> <name>`
+### `memdot folder rename <id> <name>`
 
 Rename a folder
 
@@ -257,7 +257,7 @@ Rename a folder
 |---|---|
 | `--space <id>` |  |
 
-### `memdot folder folder rm <id>`
+### `memdot folder rm <id>`
 
 Delete a folder
 
@@ -269,7 +269,7 @@ Delete a folder
 
 Where memories live
 
-### `memdot namespace namespace ls`
+### `memdot namespace ls`
 
 List namespaces
 
@@ -277,7 +277,7 @@ List namespaces
 |---|---|
 | `--space <id>` |  |
 
-### `memdot namespace namespace create <name>`
+### `memdot namespace create <name>`
 
 Create a namespace; its mode can't change afterwards
 
@@ -290,11 +290,11 @@ Create a namespace; its mode can't change afterwards
 
 The users, agents and runs memories are about
 
-### `memdot entity entity ls`
+### `memdot entity ls`
 
 List them, with how many memories each has
 
-### `memdot entity entity rm <type> <id>`
+### `memdot entity rm <type> <id>`
 
 Forget one and all its memories
 
@@ -307,7 +307,7 @@ Forget one and all its memories
 
 Memory operations
 
-### `memdot event event ls`
+### `memdot event ls`
 
 Recent writes, and whether each finished
 
@@ -315,7 +315,7 @@ Recent writes, and whether each finished
 |---|---|
 | `--limit <n>` | how many |
 
-### `memdot event event get <id>`
+### `memdot event get <id>`
 
 One operation: whether it's indexed, and on the chain
 
@@ -323,7 +323,7 @@ One operation: whether it's indexed, and on the chain
 
 Storage jobs
 
-### `memdot job job ls`
+### `memdot job ls`
 
 Recent jobs
 
@@ -332,11 +332,11 @@ Recent jobs
 | `--status <status>` |  |
 | `--limit <n>` | how many |
 
-### `memdot job job get <id>`
+### `memdot job get <id>`
 
 One job
 
-### `memdot job job wait <id>`
+### `memdot job wait <id>`
 
 Wait until a job finishes
 
@@ -344,15 +344,15 @@ Wait until a job finishes
 
 Connected agents; managing them takes an account-wide management key
 
-### `memdot agents agents ls`
+### `memdot agents ls`
 
 List connected agents
 
-### `memdot agents agents rename <id> <label>`
+### `memdot agents rename <id> <label>`
 
 Rename a connected agent
 
-### `memdot agents agents revoke <id>`
+### `memdot agents revoke <id>`
 
 Stop an agent now: its keys and tokens stop working, and its spaces change key
 
@@ -364,11 +364,11 @@ Stop an agent now: its keys and tokens stop working, and its spaces change key
 
 API keys; managing them takes an account-wide management key
 
-### `memdot keys keys ls`
+### `memdot keys ls`
 
 List API keys
 
-### `memdot keys keys create <name>`
+### `memdot keys create <name>`
 
 Make a key. It's shown once, here
 
@@ -378,7 +378,7 @@ Make a key. It's shown once, here
 | `--space <id...>` | limit it to these spaces |
 | `--expires-days <n>` | stop working after this many days |
 
-### `memdot keys keys rotate <id>`
+### `memdot keys rotate <id>`
 
 Revoke a key and make a new one with the same name, role and spaces
 
@@ -386,7 +386,7 @@ Revoke a key and make a new one with the same name, role and spaces
 |---|---|
 | `--force` | don't ask |
 
-### `memdot keys keys revoke <id>`
+### `memdot keys revoke <id>`
 
 Revoke a key
 
@@ -444,15 +444,15 @@ This CLI's version
 
 What's saved on this machine
 
-### `memdot config config show`
+### `memdot config show`
 
 Show it, with keys hidden
 
-### `memdot config config get <key>`
+### `memdot config get <key>`
 
 Read one setting
 
-### `memdot config config set <key> <value>`
+### `memdot config set <key> <value>`
 
 Save one setting
 
@@ -460,7 +460,7 @@ Save one setting
 
 Run the local MCP server over stdio, or set a client up to use it
 
-### `memdot mcp mcp config`
+### `memdot mcp config`
 
 What a client needs to use MemDot; --write adds it to the client's settings
 

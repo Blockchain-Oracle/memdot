@@ -11,7 +11,7 @@ import {
 import type { Command } from "commander";
 import { CliError, EXIT, interactive } from "./output.js";
 
-export const VERSION = "0.1.3";
+export const VERSION = "0.1.4";
 /** What the activity log calls this caller. A plugin running the CLI names itself. */
 const CLIENT = process.env.MEMDOT_CLIENT?.trim() || `cli/${VERSION}`;
 

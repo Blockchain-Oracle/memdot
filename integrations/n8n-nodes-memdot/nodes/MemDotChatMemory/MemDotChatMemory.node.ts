@@ -4,11 +4,13 @@ import {
   type INodeTypeDescription,
   type ISupplyDataFunctions,
   NodeConnectionTypes,
+  NodeOperationError,
   type SupplyData,
 } from "n8n-workflow";
 import { MemDotChatMemory as Memory } from "../../lib/chat-memory.js";
 import { CREDENTIAL, clientFor, namespaceOptions } from "../../lib/client.js";
 
+const DEFAULT_WINDOW = 10;
 const DOCS = "https://github.com/Blockchain-Oracle/memdot/tree/main/integrations/n8n-nodes-memdot";
 
 export class MemDotChatMemory implements INodeType {
@@ -59,7 +61,7 @@ export class MemDotChatMemory implements INodeType {
         name: "windowSize",
         type: "number",
         typeOptions: { minValue: 1, maxValue: 50 },
-        default: 10,
+        default: DEFAULT_WINDOW,
         description: "How many of this session's latest turns the agent sees",
       },
       {
@@ -77,17 +79,28 @@ export class MemDotChatMemory implements INodeType {
   methods = { loadOptions: { getNamespaces: namespaceOptions } };
 
   async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-    const parameter = (name: string, fallback: unknown = "") =>
-      this.getNodeParameter(name, itemIndex, fallback);
+    // An expression that finds nothing comes back undefined, which isn't anyone's name for anything.
+    const text = (name: string) => {
+      const value = this.getNodeParameter(name, itemIndex, "");
+      return value === undefined || value === null ? "" : String(value).trim();
+    };
+    const sessionId = text("sessionId");
+    if (!sessionId) {
+      throw new NodeOperationError(
+        this.getNode(),
+        "Session ID is empty, so this message has no conversation to belong to. Map it to something that identifies the chat.",
+        { itemIndex },
+      );
+    }
     const { memdot } = await clientFor(this);
-    const userId = String(parameter("userId")).trim();
-    const query = String(parameter("query")).trim();
-    const namespaceId = String(parameter("namespaceId")).trim();
+    const userId = text("userId");
+    const query = text("query");
+    const namespaceId = text("namespaceId");
     return supplyMemory(
       this,
       new Memory(memdot, {
-        sessionId: String(parameter("sessionId")),
-        windowSize: Number(parameter("windowSize", 10)),
+        sessionId,
+        windowSize: Number(this.getNodeParameter("windowSize", itemIndex, DEFAULT_WINDOW)),
         warn: (message) => this.logger.warn(message),
         ...(userId ? { userId } : {}),
         ...(query ? { query } : {}),

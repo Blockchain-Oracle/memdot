@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from . import missing
+from . import missing, notes
 
 try:
     from crewai.tools import BaseTool
@@ -66,7 +66,7 @@ class MemDotRecallTool(_MemDotTool):
         hits = self.client.memories.search(
             query, namespace_id=self.namespace_id, filters=self._scope() or None, top_k=top_k
         )
-        return "\n".join(f"- {hit.memory}" for hit in hits) or "Nothing remembered about that."
+        return notes(hits)
 
 
 def memory_tools(

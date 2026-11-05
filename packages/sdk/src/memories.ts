@@ -273,6 +273,7 @@ export class MemoriesApi {
     private readonly folders: FoldersApi,
     private readonly jobs: JobsApi,
     embedder?: Embedder,
+    private readonly defaultNamespaceId?: string,
   ) {
     this.embedder = embedder ?? null;
     ctx.vault.subscribe(() => {
@@ -524,11 +525,15 @@ export class MemoriesApi {
 
   // ── Remember ────────────────────────────────────────────────────────────────────────────────
 
+  /** The namespace a call named, or this client's default. */
+  private inDefault<T extends { namespaceId?: string }>(options: T): T {
+    const namespaceId = options.namespaceId ?? this.defaultNamespaceId;
+    return namespaceId ? { ...options, namespaceId } : options;
+  }
+
   /** Remembers a string or chat messages. At least one of userId, agentId or runId is required. */
-  async add(
-    messages: string | ChatMessage | ChatMessage[],
-    options: AddOptions,
-  ): Promise<AddResult> {
+  async add(messages: string | ChatMessage | ChatMessage[], named: AddOptions): Promise<AddResult> {
+    const options = this.inDefault(named);
     if (!options.userId && !options.agentId && !options.runId) {
       throw new MemDotError(
         400,
@@ -668,7 +673,8 @@ export class MemoriesApi {
 
   // ── Recall ──────────────────────────────────────────────────────────────────────────────────
 
-  async search(query: string, options: SearchOptions = {}): Promise<ScoredMemory[]> {
+  async search(query: string, named: SearchOptions = {}): Promise<ScoredMemory[]> {
+    const options = this.inDefault(named);
     const held = await this.route(options.namespaceId);
     if (held) {
       const asOf = options.referenceDate !== undefined ? when(options.referenceDate) : undefined;
@@ -713,8 +719,9 @@ export class MemoriesApi {
   }
 
   async list(
-    options: ListOptions = {},
+    named: ListOptions = {},
   ): Promise<{ results: Memory[]; count: number; nextCursor: string | null }> {
+    const options = this.inDefault(named);
     const pageSize = options.pageSize ?? DEFAULT_PAGE;
     const held = await this.route(options.namespaceId);
     if (held) {
@@ -835,7 +842,8 @@ export class MemoriesApi {
   }
 
   /** Forgets everything in a scope. `"*"` matches every value of one. */
-  async deleteAll(scope: MemoryScope & { namespaceId?: string }): Promise<{ deleted: number }> {
+  async deleteAll(named: MemoryScope & { namespaceId?: string }): Promise<{ deleted: number }> {
+    const scope = this.inDefault(named);
     if (!scope.userId && !scope.agentId && !scope.runId) {
       throw new MemDotError(
         400,

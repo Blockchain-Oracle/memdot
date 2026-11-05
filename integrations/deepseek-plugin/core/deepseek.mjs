@@ -9,9 +9,9 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 // src/cli-release.ts
 const CLI_RELEASE = {
-	version: "0.1.3",
-	sha256: "29d8399a35a0bbf470c1ae490a7862f989ac5e37a4ff57f8a90d7a426781fc38",
-	url: "https://raw.githubusercontent.com/Blockchain-Oracle/memdot/main/integrations/agent-plugin-core/cli/memdot-cli-0.1.3.tgz"
+	version: "0.1.4",
+	sha256: "a07340ad7cc16c36652d830680c26a5a2113ebe494f21fca88c6c57a33d33420",
+	url: "https://raw.githubusercontent.com/Blockchain-Oracle/memdot/main/integrations/agent-plugin-core/cli/memdot-cli-0.1.4.tgz"
 };
 // src/constants.ts
 const PLUGIN_VERSION = "0.1.0";

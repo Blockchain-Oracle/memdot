@@ -28,6 +28,6 @@ pnpm --filter @memdot/example-framework-memory langchain
 pnpm --filter @memdot/example-framework-memory mastra
 ```
 
-Each prints the answer and says whether it came from memory. Set `MEMDOT_NAMESPACE` to choose where memories go. In a Private namespace, recall and search run on your machine, which downloads a small model the first time.
+Each prints the answer and says whether it came from memory. Set `MEMDOT_NAMESPACE` to choose where memories go. In a Private namespace, recall and search run on your machine, which downloads a small model the first time, and the AI SDK script keeps messages as typed because that namespace has no model of its own.
 
 Set `EXAMPLE_MODEL` to use a Gemini model other than `gemini-3.5-flash`.

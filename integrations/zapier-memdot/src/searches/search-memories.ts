@@ -6,6 +6,7 @@ import {
 } from "zapier-platform-core";
 import { DEFAULT_TOP_K, MAX_RESULTS } from "../constants.js";
 import {
+  isYes,
   memoryOutput,
   memorySample,
   namespaceField,
@@ -24,6 +25,14 @@ const inputFields = defineInputFields([
   ...scopeFields,
   ...namespaceField,
   {
+    key: "everyone",
+    label: "Search Everyone",
+    type: "boolean",
+    default: "false",
+    helpText:
+      "Yes looks through every person's memories in this namespace. With No, empty IDs are an error, so a mapped field that comes back empty can't reach other people's.",
+  },
+  {
     key: "top_k",
     label: "How Many",
     type: "integer",
@@ -33,14 +42,22 @@ const inputFields = defineInputFields([
 ]);
 
 const perform = (async (z, bundle) => {
-  const { query, top_k, namespace_id } = bundle.inputData;
+  const { query, top_k, namespace_id, everyone } = bundle.inputData;
+  const scope = scopeFilters(bundle.inputData);
+  if (!scope.filters && !isYes(everyone, false)) {
+    throw new z.errors.Error(
+      "No User ID, Agent ID or Run ID, so this would search everyone's memories. If a mapped field came back empty, fix that. If you do mean everyone, set Search Everyone to Yes.",
+      "ScopeRequired",
+      400,
+    );
+  }
   const response = await z.request({
     method: "POST",
     url: "/v1/memories/search",
     body: {
       query,
       top_k: Math.min(Number(top_k) || DEFAULT_TOP_K, MAX_RESULTS),
-      ...scopeFilters(bundle.inputData),
+      ...scope,
       ...(namespace_id ? { namespace_id } : {}),
     },
   });
