@@ -8,6 +8,7 @@ import {
   KeyRoundIcon,
   LayoutGridIcon,
   type LucideIcon,
+  NetworkIcon,
   RefreshCwIcon,
   SettingsIcon,
   SlidersHorizontalIcon,
@@ -46,7 +47,13 @@ export const NAV: { label: string; items: NavItem[] }[] = [
         title: "Entities",
         href: "/entities",
         icon: ContactRoundIcon,
-        keywords: ["users", "agents", "runs", "people"],
+        keywords: ["users", "agents", "runs", "people", "profile"],
+      },
+      {
+        title: "Graph",
+        href: "/graph",
+        icon: NetworkIcon,
+        keywords: ["relations", "connections", "entities", "names"],
       },
       {
         title: "Shared with me",
