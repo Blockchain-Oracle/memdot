@@ -229,6 +229,7 @@ async function draftsFor(
     return extracted.map((memory) => ({
       text: memory.text,
       entities: memory.entities,
+      relations: memory.relations,
       categories: memory.categories,
       attributedTo: memory.attributed_to,
     }));
@@ -438,6 +439,7 @@ async function handleRestore(deps: Deps, job: typeof jobs.$inferSelect) {
         sealedText: sealBody(deps.memoryKeys, folderId, {
           text: entry.text,
           entities: entry.entities,
+          relations: entry.relations,
         }),
         dedupeKey: blindDedupeKey(deps.memoryKeys, folderId, entry.text, entry),
         embedding: vector,

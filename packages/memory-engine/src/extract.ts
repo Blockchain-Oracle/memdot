@@ -97,6 +97,7 @@ const ExtractedMemory = z.object({
   text: z.string(),
   attributed_to: z.enum(["user", "assistant"]),
   entities: z.array(z.string()),
+  relations: z.array(z.object({ source: z.string(), relation: z.string(), target: z.string() })),
   categories: z.array(z.string()),
 });
 export type ExtractedMemory = z.infer<typeof ExtractedMemory>;

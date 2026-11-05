@@ -10,6 +10,7 @@ import {
   dedupeKey,
   type MemoryChange,
   type MemoryEntry,
+  type MemoryRelation,
   normalizeEntity,
   termFrequencies,
 } from "@memdot/memory-engine";
@@ -65,10 +66,11 @@ export function blindDedupeKey(
   return keys.blindTerm(folderId, `dedupe:${dedupeKey(text, scope)}`);
 }
 
-/** What only the holder of the namespace's key can read: the text and the names it mentions. */
+/** What only the holder of the namespace's key can read: the text, and who and what it mentions. */
 export interface MemoryBody {
   text: string;
   entities?: string[] | undefined;
+  relations?: MemoryRelation[] | undefined;
 }
 
 export const sealBody = (keys: AssistedKeys, folderId: string, body: MemoryBody): Uint8Array =>
@@ -82,7 +84,7 @@ export function entryOf(
   row: MemoryRow,
   text: string,
   history: MemoryChange[],
-  entities: string[] | undefined,
+  { entities, relations }: Pick<MemoryBody, "entities" | "relations">,
 ): MemoryEntry {
   const source =
     row.sourceKind === null
@@ -103,6 +105,7 @@ export function entryOf(
     ...(row.metadata ? { metadata: row.metadata as Record<string, unknown> } : {}),
     ...(row.categories?.length ? { categories: row.categories } : {}),
     ...(entities?.length ? { entities } : {}),
+    ...(relations?.length ? { relations } : {}),
     ...(row.memoryType ? { memoryType: row.memoryType as "fact" | "procedural" } : {}),
     ...(row.attributedTo ? { attributedTo: row.attributedTo as "user" | "assistant" } : {}),
     ...(source ? { source } : {}),

@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { IDEMPOTENCY_HEADER } from "@memdot/config";
 import { folders, jobs, memories, memoryHistory, memoryInbox, objects } from "@memdot/db";
 import { enqueueMemory, JOB_KIND } from "@memdot/jobs";
-import { normalizeMessages } from "@memdot/memory-engine";
+import { buildGraph, normalizeMessages } from "@memdot/memory-engine";
 import { rerankTexts, summarizeMemories } from "@memdot/memory-engine/llm";
 import {
   blindDedupeKey,
@@ -62,6 +62,9 @@ const MAX_BATCH = 1000;
 const MAX_ATTACHMENTS = 8;
 /** Memories a summary reads at most, newest first. */
 const SUMMARY_MEMORIES = 200;
+/** Memories a graph is built from at most, newest first. Each one is opened to read its names. */
+const MAX_GRAPH_MEMORIES = 2000;
+const DEFAULT_GRAPH_MEMORIES = 1000;
 /** Results sent to the model for reordering. */
 const RERANK_CANDIDATES = 50;
 const MEMORY_JOB_KINDS = [
@@ -491,6 +494,86 @@ export function memoryRoutes(services: Services) {
             next_cursor:
               rows.length > body.page_size && last ? encodeCursor(last.createdAt, last.id) : null,
           },
+          200,
+        );
+      },
+    )
+    .openapi(
+      createRoute({
+        method: "post",
+        path: "/v1/memories/graph",
+        tags: ["Memories"],
+        summary: "Entities and how they connect",
+        description:
+          "Derived from the memories themselves, so it can't drift from them. An edge with a null relation means two things were only mentioned together. Use filters to scope it to one person. Assisted namespaces only: for a Private one, the SDK builds this on your device.",
+        security: authenticated,
+        middleware: [requireScope("memories", "read")] as const,
+        request: {
+          body: {
+            content: jsonContent(
+              z.object({
+                namespace_id: z.uuid().optional(),
+                filters: ListRequest.shape.filters,
+                limit: z
+                  .number()
+                  .int()
+                  .min(1)
+                  .max(MAX_GRAPH_MEMORIES)
+                  .default(DEFAULT_GRAPH_MEMORIES),
+              }),
+            ),
+            required: true,
+          },
+        },
+        responses: {
+          200: {
+            description: "Graph",
+            content: jsonContent(
+              z
+                .object({
+                  nodes: z.array(
+                    z.object({ id: z.string(), name: z.string(), memories: z.array(z.uuid()) }),
+                  ),
+                  edges: z.array(
+                    z.object({
+                      source: z.string(),
+                      target: z.string(),
+                      relation: z.string().nullable(),
+                      memories: z.array(z.uuid()),
+                    }),
+                  ),
+                  memories_read: z.number().int(),
+                  truncated: z.boolean(),
+                })
+                .openapi("MemoryGraph"),
+            ),
+          },
+          ...errorResponses,
+        },
+      }),
+      async (c) => {
+        const body = c.req.valid("json");
+        const namespace = await resolveAssisted(c, body.namespace_id);
+        const rows = await db
+          .select({ id: memories.id, sealedText: memories.sealedText })
+          .from(memories)
+          .where(
+            scopeOf(keys, {
+              folderId: namespace.id,
+              filter: parseFilters(body.filters),
+              at: new Date(),
+              showExpired: false,
+            }),
+          )
+          .orderBy(...newestFirst(memories.createdAt, memories.id))
+          .limit(body.limit + 1);
+        const read = rows.slice(0, body.limit).flatMap((row) => {
+          if (!row.sealedText) return [];
+          const { entities, relations } = openBody(keys, namespace.id, row.sealedText);
+          return [{ id: row.id, entities, relations }];
+        });
+        return c.json(
+          { ...buildGraph(read), memories_read: read.length, truncated: rows.length > body.limit },
           200,
         );
       },

@@ -53,7 +53,7 @@ export async function persistMemories(
   const encoded = rows.map((row) => {
     if (!row.sealedText) throw new Error(`memory ${row.id} has no text to persist`);
     const body = openBody(keys, input.folderId, row.sealedText);
-    const entry = entryOf(row, body.text, history.get(row.id) ?? [], body.entities);
+    const entry = entryOf(row, body.text, history.get(row.id) ?? [], body);
     return { id: row.id, data: encodeEntry(entry) };
   });
 

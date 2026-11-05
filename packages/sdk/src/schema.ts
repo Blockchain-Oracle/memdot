@@ -7373,6 +7373,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/memories/graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Entities and how they connect
+         * @description Derived from the memories themselves, so it can't drift from them. An edge with a null relation means two things were only mentioned together. Use filters to scope it to one person. Assisted namespaces only: for a Private one, the SDK builds this on your device.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        namespace_id?: string;
+                        /**
+                         * @description Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, source_object_id, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; "*" means any value.
+                         * @example {
+                         *       "AND": [
+                         *         {
+                         *           "user_id": "alice"
+                         *         },
+                         *         {
+                         *           "created_at": {
+                         *             "gte": "2026-10-01"
+                         *           }
+                         *         }
+                         *       ]
+                         *     }
+                         */
+                        filters?: {
+                            [key: string]: unknown;
+                        };
+                        /** @default 1000 */
+                        limit?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Graph */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MemoryGraph"];
+                    };
+                };
+                /** @description The request is not valid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Sign in or pass an API key. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description The API key lacks this permission or space. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Conflicts with the current state. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limited. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/memories/summary": {
         parameters: {
             query?: never;
@@ -10016,6 +10136,21 @@ export interface components {
             cursor?: string;
             /** @default 50 */
             page_size: number;
+        };
+        MemoryGraph: {
+            nodes: {
+                id: string;
+                name: string;
+                memories: string[];
+            }[];
+            edges: {
+                source: string;
+                target: string;
+                relation: string | null;
+                memories: string[];
+            }[];
+            memories_read: number;
+            truncated: boolean;
         };
         MemoryEvent: {
             /** Format: uuid */

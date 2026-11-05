@@ -21,6 +21,14 @@ export {
   matchesFilter,
   parseFilter,
 } from "./filters.js";
+export {
+  buildGraph,
+  type GraphEdge,
+  type GraphMemory,
+  type GraphNode,
+  type MemoryGraph,
+  type MemoryRelation,
+} from "./graph.js";
 export { type ImportItem, type ParsedImport, parseMemoryImport } from "./import.js";
 export { LocalIndex, readSnapshot, type SnapshotHeader } from "./local-index.js";
 export {

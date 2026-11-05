@@ -1,5 +1,6 @@
 import { blake2b } from "@noble/hashes/blake2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import type { MemoryRelation } from "./graph.js";
 
 /** Why a memory exists. Deleting a file deletes the memories derived from it (R8). */
 export interface MemorySource {
@@ -38,6 +39,8 @@ export interface MemoryEntry {
   categories?: string[] | undefined;
   /** Names of people, places and things the text mentions; they lift matching searches. */
   entities?: string[] | undefined;
+  /** How those names connect, in the memory's own words. Graph memory is built from these. */
+  relations?: MemoryRelation[] | undefined;
   memoryType?: "fact" | "procedural" | undefined;
   /** Whose statement this is: the user, or the assistant in the conversation. */
   attributedTo?: "user" | "assistant" | undefined;

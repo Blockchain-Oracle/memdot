@@ -365,6 +365,7 @@ class AsyncPrivateNamespace:
             {
                 "text": memory["text"],
                 "entities": memory["entities"],
+                "relations": memory.get("relations") or [],
                 "categories": memory["categories"],
                 "attributedTo": memory["attributed_to"],
             }
@@ -562,6 +563,7 @@ class AsyncPrivateNamespace:
         # The old entity names described the old text.
         if new_text != current["text"]:
             next_entry["entities"] = []
+            next_entry["relations"] = []
         change = {"event": "UPDATE", "text": new_text, "previous": current["text"], "at": now}
         if actor:
             change["actor"] = actor

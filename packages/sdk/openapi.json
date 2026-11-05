@@ -3136,6 +3136,82 @@
           }
         }
       },
+      "MemoryGraph": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "memories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "memories"
+              ]
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                },
+                "relation": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "memories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              },
+              "required": [
+                "source",
+                "target",
+                "relation",
+                "memories"
+              ]
+            }
+          },
+          "memories_read": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "memories_read",
+          "truncated"
+        ]
+      },
       "MemoryEvent": {
         "type": "object",
         "properties": {
@@ -12369,6 +12445,134 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MemoryPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in or pass an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks this permission or space.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with the current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/memories/graph": {
+      "post": {
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Entities and how they connect",
+        "description": "Derived from the memories themselves, so it can't drift from them. An edge with a null relation means two things were only mentioned together. Use filters to scope it to one person. Assisted namespaces only: for a Private one, the SDK builds this on your device.",
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {
+            "Session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "namespace_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "filters": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "Conditions on user_id, agent_id, run_id, created_at, updated_at, expiration_date, categories, memory_ids, source_object_id, keywords and metadata, combined with AND, OR and NOT to any depth; sibling keys mean AND. Operators: eq, ne, in, nin, gt, gte, lt, lte, contains, icontains; \"*\" means any value.",
+                    "example": {
+                      "AND": [
+                        {
+                          "user_id": "alice"
+                        },
+                        {
+                          "created_at": {
+                            "gte": "2026-10-01"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2000,
+                    "default": 1000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Graph",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryGraph"
                 }
               }
             }

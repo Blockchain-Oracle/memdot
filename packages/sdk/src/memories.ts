@@ -6,6 +6,7 @@ import {
   type FilterNode,
   type LlmConfig,
   type MemoryEntry,
+  type MemoryGraph,
   normalizeMessages,
   type PromptCategory,
   parseFilter,
@@ -31,6 +32,8 @@ const EVENT_POLL_MS = 500;
 const INDEX_TIMEOUT_MS = 120_000;
 /** Writes before a Private namespace's index is worth saving again. */
 const SNAPSHOT_EVERY = 100;
+/** Memories a graph is built from, newest first. */
+const DEFAULT_GRAPH_MEMORIES = 1000;
 
 type RawMemory = Schemas["Memory"];
 type RawScored = Schemas["ScoredMemory"];
@@ -959,6 +962,34 @@ export class MemoriesApi {
         },
       }),
     );
+  }
+
+  /**
+   * Entities and how they connect, derived from memories. Scope it with `filters`, or it covers
+   * everyone in the namespace. Assisted is read by the server; Private is built on this device.
+   */
+  async graph(
+    named: { namespaceId?: string; filters?: Record<string, unknown>; limit?: number } = {},
+  ): Promise<MemoryGraph & { memoriesRead: number; truncated: boolean }> {
+    const options = this.inDefault(named);
+    const limit = options.limit ?? DEFAULT_GRAPH_MEMORIES;
+    const held = await this.route(options.namespaceId);
+    if (held) return held.graph({ filter: parseFilters(options.filters), limit });
+    const graph = await unwrap(
+      this.ctx.transport.api.POST("/v1/memories/graph", {
+        body: {
+          limit,
+          ...(options.namespaceId ? { namespace_id: options.namespaceId } : {}),
+          ...(options.filters ? { filters: options.filters } : {}),
+        },
+      }),
+    );
+    return {
+      nodes: graph.nodes,
+      edges: graph.edges,
+      memoriesRead: graph.memories_read,
+      truncated: graph.truncated,
+    };
   }
 
   async summary(options: { namespaceId?: string; filters?: Record<string, unknown> } = {}) {

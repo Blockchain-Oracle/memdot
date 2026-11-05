@@ -2,6 +2,7 @@ import { bitswapGet } from "@memdot/chain";
 import { SEGMENT_PACK_BYTES } from "@memdot/config";
 import { openSegment, openWith, sealSegment, sealTo, WrongKeyError } from "@memdot/crypto";
 import {
+  buildGraph,
   type ChatMessage,
   candidateCount,
   decodeEntry,
@@ -395,6 +396,7 @@ export class PrivateNamespace {
         drafts: extracted.map((memory) => ({
           text: memory.text,
           entities: memory.entities,
+          relations: memory.relations,
           categories: memory.categories,
           attributedTo: memory.attributed_to,
         })),
@@ -613,8 +615,8 @@ export class PrivateNamespace {
         : current.expiresAt
           ? { expiresAt: current.expiresAt }
           : {}),
-      // The old entity names described the old text.
-      ...(text !== current.text ? { entities: [] } : {}),
+      // The old names and connections described the old text.
+      ...(text !== current.text ? { entities: [], relations: [] } : {}),
       history: [
         ...(current.history ?? []),
         {
@@ -730,6 +732,16 @@ export class PrivateNamespace {
     this.index = null;
     await this.sync(true);
     return { restored: this.entries.size, segments: this.opened.size };
+  }
+
+  /** Entities and how they connect, from what's on this device. Nothing leaves it. */
+  async graph(options: { filter?: FilterNode | undefined; limit: number }) {
+    const entries = await this.list({ ...options, showExpired: false });
+    return {
+      ...buildGraph(entries.slice(0, options.limit)),
+      memoriesRead: Math.min(entries.length, options.limit),
+      truncated: entries.length > options.limit,
+    };
   }
 
   async summary(options: { filter?: FilterNode | undefined }): Promise<string> {

@@ -1,5 +1,11 @@
 export { formatTpot } from "@memdot/chain";
 export { isValidRecoveryCode, normalizeRecoveryCode } from "@memdot/crypto";
+export type {
+  GraphEdge,
+  GraphNode,
+  MemoryGraph,
+  MemoryRelation,
+} from "@memdot/memory-engine";
 export {
   type Account,
   AccountApi,

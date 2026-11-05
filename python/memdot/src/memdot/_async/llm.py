@@ -35,9 +35,22 @@ _EXTRACTION = {
                     "text": {"type": "string"},
                     "attributed_to": {"type": "string", "enum": ["user", "assistant"]},
                     "entities": {"type": "array", "items": {"type": "string"}},
+                    "relations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "source": {"type": "string"},
+                                "relation": {"type": "string"},
+                                "target": {"type": "string"},
+                            },
+                            "required": ["source", "relation", "target"],
+                            "additionalProperties": False,
+                        },
+                    },
                     "categories": {"type": "array", "items": {"type": "string"}},
                 },
-                "required": ["text", "attributed_to", "entities", "categories"],
+                "required": ["text", "attributed_to", "entities", "relations", "categories"],
                 "additionalProperties": False,
             },
         }
@@ -377,6 +390,7 @@ async def extract_memories(
                 "text": memory["text"],
                 "attributed_to": memory["attributed_to"],
                 "entities": memory["entities"],
+                "relations": memory.get("relations") or [],
                 "categories": memory["categories"],
             }
             for memory in output["memories"]

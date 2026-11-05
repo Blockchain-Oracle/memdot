@@ -2,6 +2,7 @@ import { memories, memoryHistory } from "@memdot/db";
 import {
   type ChatMessage,
   type ImportItem,
+  type MemoryRelation,
   type MemorySource,
   type PromptCategory,
   SERVER_EMBEDDING_DIMENSIONS,
@@ -49,6 +50,7 @@ export interface MemoryDraft {
   id?: string | undefined;
   text: string;
   entities?: string[] | undefined;
+  relations?: MemoryRelation[] | undefined;
   categories?: string[] | undefined;
   attributedTo?: "user" | "assistant" | undefined;
   memoryType?: "fact" | "procedural" | undefined;
@@ -112,7 +114,11 @@ export async function insertDrafts(
         attributedTo: draft.attributedTo ?? null,
         raw: draft.raw ?? false,
         immutable: draft.immutable ?? false,
-        sealedText: sealBody(keys, scope.folderId, { text: draft.text, entities: draft.entities }),
+        sealedText: sealBody(keys, scope.folderId, {
+          text: draft.text,
+          entities: draft.entities,
+          relations: draft.relations,
+        }),
         dedupeKey: blindDedupeKey(keys, scope.folderId, draft.text, draft),
         embedding: usableVector,
         embeddingModel: usableVector ? (draft.embeddingModel ?? null) : null,
