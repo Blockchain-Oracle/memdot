@@ -16,6 +16,11 @@ export interface TransportOptions {
    */
   origin?: string;
   fetch?: typeof fetch;
+  /**
+   * Whether a browser sends MemDot's session cookie. The dashboard does. A page on any other address
+   * runs on an API key and must say "omit", which is all the API allows from there.
+   */
+  credentials?: RequestCredentials;
   /** Names the caller in the activity log (default `sdk-ts/<version>`). */
   client?: string;
 }
@@ -35,7 +40,7 @@ export class Transport {
     this.api = createClient<paths>({
       baseUrl: options.baseUrl,
       ...(options.fetch ? { fetch: options.fetch } : {}),
-      ...(isBrowser ? { credentials: "include" } : {}),
+      ...(isBrowser ? { credentials: options.credentials ?? "include" } : {}),
     });
     const auth: Middleware = {
       onRequest: ({ request }) => {
@@ -76,7 +81,7 @@ export class Transport {
       method,
       headers,
       body,
-      ...(isBrowser ? { credentials: "include" as const } : {}),
+      ...(isBrowser ? { credentials: this.options.credentials ?? "include" } : {}),
     });
     this.remember(response);
     if (!response.ok) throw await errorFrom(response);

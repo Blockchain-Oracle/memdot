@@ -53,22 +53,18 @@ export function createApp(services: Services) {
 
   app.use("*", requestId({ headerName: REQUEST_ID_HEADER }));
   app.use("*", secureHeaders({ crossOriginResourcePolicy: "cross-origin" }));
-  app.use(
-    "*",
-    cors({
-      origin: env.WEB_ORIGIN,
-      credentials: true,
-      allowHeaders: [
-        "content-type",
-        "authorization",
-        "x-api-key",
-        IDEMPOTENCY_HEADER,
-        CLIENT_HEADER,
-      ],
-      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      exposeHeaders: [REQUEST_ID_HEADER, "retry-after"],
-      maxAge: 600,
-    }),
+  const corsRules = {
+    allowHeaders: ["content-type", "authorization", "x-api-key", IDEMPOTENCY_HEADER, CLIENT_HEADER],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    exposeHeaders: [REQUEST_ID_HEADER, "retry-after"],
+    maxAge: 600,
+  };
+  const dashboardCors = cors({ ...corsRules, origin: env.WEB_ORIGIN, credentials: true });
+  // Anyone's page can call the API with a key, which is what the browser SDK is for. Cookies stay out
+  // of it: without allow-credentials a browser won't send or read a session from another address.
+  const openCors = cors({ ...corsRules, origin: "*" });
+  app.use("*", (c, next) =>
+    (c.req.header("origin") === env.WEB_ORIGIN ? dashboardCors : openCors)(c, next),
   );
 
   const jsonLimit = bodyLimit({
