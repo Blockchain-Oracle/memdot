@@ -89,6 +89,7 @@ export {
   type MemoryMode,
   type MemoryScope,
   type MemoryUpdate,
+  memoriesToCsv,
   type Namespace,
   type NamespaceSettings,
   type ProfileResult,

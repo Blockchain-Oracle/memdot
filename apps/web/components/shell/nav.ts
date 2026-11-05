@@ -1,5 +1,6 @@
 import {
   ActivityIcon,
+  BarChart3Icon,
   BotIcon,
   BrainIcon,
   ContactRoundIcon,
@@ -91,6 +92,12 @@ export const NAV: { label: string; items: NavItem[] }[] = [
         href: "/activity",
         icon: ActivityIcon,
         keywords: ["requests", "logs", "transactions", "jobs"],
+      },
+      {
+        title: "Analytics",
+        href: "/analytics",
+        icon: BarChart3Icon,
+        keywords: ["charts", "top users", "latency", "errors", "traffic"],
       },
       {
         title: "Renewals",

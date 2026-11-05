@@ -259,6 +259,41 @@ const fromEntry = (entry: MemoryEntry, namespaceId: string): Memory => ({
   mode: "private",
 });
 
+const CSV_COLUMNS = [
+  "id",
+  "memory",
+  "user_id",
+  "agent_id",
+  "run_id",
+  "categories",
+  "metadata",
+  "expiration_date",
+  "created_at",
+  "updated_at",
+];
+
+/**
+ * One row per memory. Memories can be written by anyone an agent talks to, and a spreadsheet runs a
+ * cell that starts like a formula, so those cells are marked as plain text with a leading quote.
+ */
+export function memoriesToCsv(rows: Record<string, unknown>[]): string {
+  const cell = (value: unknown) => {
+    if (value === null || value === undefined) return "";
+    const text =
+      typeof value === "string"
+        ? value
+        : Array.isArray(value) && value.every((item) => typeof item === "string")
+          ? value.join(";")
+          : typeof value === "object"
+            ? JSON.stringify(value)
+            : String(value);
+    const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+    return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
+  };
+  const lines = rows.map((row) => CSV_COLUMNS.map((column) => cell(row[column])).join(","));
+  return `${[CSV_COLUMNS.join(","), ...lines].join("\r\n")}\r\n`;
+}
+
 function parseFilters(filters: Record<string, unknown> | undefined): FilterNode | undefined {
   if (!filters || Object.keys(filters).length === 0) return undefined;
   try {
@@ -1422,6 +1457,11 @@ export class MemoriesApi {
       }),
     );
     return memories;
+  }
+
+  /** The same as `exportMemories`, as a CSV a spreadsheet can open. */
+  async exportCsv(namespaceId: string): Promise<string> {
+    return memoriesToCsv(await this.exportMemories(namespaceId));
   }
 
   /**

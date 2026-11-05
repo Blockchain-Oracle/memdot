@@ -188,6 +188,11 @@
   --md-warn-fg: #8a5a00;
   --md-danger: #d13438;
   --md-danger-fg: #d13438;
+  /* Series colours, checked for contrast and colour blindness against each theme's surface. */
+  --md-chart-1: #e64a24;
+  --md-chart-2: #3b6fd4;
+  --md-chart-3: #1b9aaa;
+  --md-chart-4: #8e5bd0;
   --md-shadow-overlay: 0 8px 24px rgb(11 11 15 / 0.1);
   --md-shadow-card: inset 0 -1px 0 rgb(11 11 15 / 0.06);
 
@@ -214,11 +219,11 @@
   --input: var(--md-border-strong);
   --ring: var(--md-ember);
   /* Charts: a neutral ramp; ember only for the highlighted series, ok for success stacks. */
-  --chart-1: var(--md-text);
-  --chart-2: var(--md-text-3);
-  --chart-3: var(--md-border-strong);
-  --chart-4: var(--md-ember);
-  --chart-5: var(--md-ok);
+  --chart-1: var(--md-chart-1);
+  --chart-2: var(--md-chart-2);
+  --chart-3: var(--md-chart-3);
+  --chart-4: var(--md-chart-4);
+  --chart-5: var(--md-text-3);
   --radius: 0.375rem;
   --sidebar: var(--md-surface-2);
   --sidebar-foreground: var(--md-text-2);
@@ -248,6 +253,10 @@
   --md-warn-fg: #f0b43c;
   --md-danger: #f2555a;
   --md-danger-fg: #f2555a;
+  --md-chart-1: #f25c36;
+  --md-chart-2: #4a82ea;
+  --md-chart-3: #14a89a;
+  --md-chart-4: #a26ae2;
   --md-shadow-overlay: 0 12px 32px rgb(0 0 0 / 0.55);
   --md-shadow-card: none;
 

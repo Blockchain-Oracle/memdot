@@ -9,7 +9,15 @@ import { Spinner } from "@memdot/ui/components/spinner";
 import { Switch } from "@memdot/ui/components/switch";
 import { Textarea } from "@memdot/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { DownloadIcon, PlusIcon, SparklesIcon, UploadIcon, XIcon } from "lucide-react";
+import {
+  BracesIcon,
+  DownloadIcon,
+  PlusIcon,
+  SheetIcon,
+  SparklesIcon,
+  UploadIcon,
+  XIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -19,6 +27,7 @@ import { useUploads } from "@/components/files/uploads";
 import { describeError } from "@/lib/errors";
 import { formatNumber } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
+import { SchemaExportDialog } from "./schema-export";
 
 const MAX_IMPORT_BYTES = 1024 * 1024;
 const DEFAULT_HALF_LIFE_DAYS = 30;
@@ -89,6 +98,7 @@ export function NamespaceSettings({ namespace }: { namespace: Namespace }) {
   const [useCase, setUseCase] = useState("");
   const [testMessage, setTestMessage] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [schemaOpen, setSchemaOpen] = useState(false);
   const isPrivate = namespace.mode === "private";
 
   const settings = useQuery({
@@ -174,6 +184,16 @@ export function NamespaceSettings({ namespace }: { namespace: Namespace }) {
         new TextEncoder().encode(JSON.stringify({ memories }, null, 2)),
         `${namespace.name ?? namespace.id}-memories.json`,
         "application/json",
+      );
+    },
+    onError: fail,
+  });
+  const exportCsv = useMutation({
+    mutationFn: async () => {
+      saveBytes(
+        new TextEncoder().encode(await memdot.memories.exportCsv(namespace.id)),
+        `${namespace.name ?? namespace.id}-memories.csv`,
+        "text/csv",
       );
     },
     onError: fail,
@@ -371,6 +391,21 @@ export function NamespaceSettings({ namespace }: { namespace: Namespace }) {
             )}
             Export JSON
           </Button>
+          <Button
+            variant="outline"
+            disabled={exportCsv.isPending}
+            onClick={() => exportCsv.mutate()}
+          >
+            {exportCsv.isPending ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <SheetIcon data-icon="inline-start" />
+            )}
+            Export CSV
+          </Button>
+          <Button variant="outline" onClick={() => setSchemaOpen(true)}>
+            <BracesIcon data-icon="inline-start" /> Fill a schema
+          </Button>
           <input
             ref={importInput}
             type="file"
@@ -440,6 +475,7 @@ export function NamespaceSettings({ namespace }: { namespace: Namespace }) {
         />
       </Group>
 
+      <SchemaExportDialog namespace={namespace} open={schemaOpen} onOpenChange={setSchemaOpen} />
       <ConfirmDialog
         open={confirmReset}
         onOpenChange={setConfirmReset}
