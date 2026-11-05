@@ -1,0 +1,9 @@
+{
+  "extends": "@memdot/config/tsconfig/node.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "ESNext.Disposable", "DOM"],
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": ["credentials", "nodes", "lib", "types", "scripts", "tsdown.config.ts"]
+}

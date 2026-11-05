@@ -1,0 +1,127 @@
+{
+  "id": "memdotTool00001",
+  "name": "MemDot: memory as a tool",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "input",
+      "name": "Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"chatInput\": \"Search your memory: when are the ferns watered?\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [440, 0],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "model",
+      "name": "Gemini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [380, 220],
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {}
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": "Gemini"
+        }
+      }
+    },
+    {
+      "id": "tool",
+      "name": "Search memory",
+      "type": "n8n-nodes-memdot.memDotTool",
+      "typeVersion": 1,
+      "position": [560, 220],
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Finds what's been remembered. Give it a question in plain words.",
+        "resource": "memory",
+        "operation": "search",
+        "query": "={{ $fromAI('query', 'What to look for, in plain words', 'string') }}",
+        "userId": "rosa",
+        "limit": 3
+      },
+      "credentials": {
+        "memDotApi": {
+          "id": "",
+          "name": "MemDot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search memory": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

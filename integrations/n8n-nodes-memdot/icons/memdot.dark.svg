@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="MemDot">
+  <!-- Three memory bars, each shorter than the last, resolving into one durable dot. -->
+  <rect x="12" y="35" width="58" height="12" rx="6" fill="#EDE6DA"/>
+  <rect x="12" y="54" width="44" height="12" rx="6" fill="#EDE6DA" fill-opacity="0.72"/>
+  <rect x="12" y="73" width="30" height="12" rx="6" fill="#EDE6DA" fill-opacity="0.44"/>
+  <circle cx="92" cy="60" r="16" fill="#FF5C35"/>
+</svg>

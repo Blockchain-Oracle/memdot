@@ -3,6 +3,7 @@ packages:
   - packages/*
   # The plugins beside it are generated output, not packages to install or build.
   - integrations/agent-plugin-core
+  - integrations/n8n-nodes-memdot
   - examples/*
 
 # Refuse versions published less than a day ago (supply-chain guard).
@@ -21,6 +22,8 @@ catalog:
 
 allowBuilds:
   esbuild: true
+  # Only for n8n-workflow's types here; n8n brings its own at runtime.
+  isolated-vm: false
   # The local embedding model's runtime ships its binaries in the package; no install scripts needed.
   onnxruntime-node: false
   protobufjs: false

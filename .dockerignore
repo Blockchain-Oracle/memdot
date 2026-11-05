@@ -26,10 +26,12 @@ docs
 examples
 python
 skills
-# The plugins aren't part of a service, except that the web image serves Kimi's as a zip, and pnpm
+# The plugins aren't part of a service, except that the web image serves Kimi's as a zip and the n8n
+# node as a tarball, and pnpm
 # wants every workspace package's manifest to be there.
 integrations/*
 !integrations/kimi-plugin
+!integrations/n8n-nodes-memdot
 !integrations/agent-plugin-core
 integrations/agent-plugin-core/*
 !integrations/agent-plugin-core/package.json

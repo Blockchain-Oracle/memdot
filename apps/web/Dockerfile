@@ -9,11 +9,14 @@ ARG NEXT_PUBLIC_RPC_URL
 ARG NEXT_PUBLIC_DOCS_URL
 WORKDIR /repo
 COPY . .
-RUN pnpm install --frozen-lockfile --filter "@memdot/web..." --filter "@memdot/cli..."
-RUN pnpm --filter "@memdot/web..." --filter "@memdot/cli..." build
+RUN pnpm install --frozen-lockfile --filter "@memdot/web..." --filter "@memdot/cli..." --filter "n8n-nodes-memdot..."
+RUN pnpm --filter "@memdot/web..." --filter "@memdot/cli..." --filter "n8n-nodes-memdot..." build
 # The CLI is served from here, so installing it needs nothing but this site.
 RUN mkdir -p apps/web/public/cli && cd packages/cli && npm pack --pack-destination ../../apps/web/public/cli \
   && mv ../../apps/web/public/cli/memdot-cli-*.tgz ../../apps/web/public/cli/memdot-cli.tgz
+# The n8n node isn't on npm yet, and self-hosted n8n installs it from an address just as well.
+RUN mkdir -p apps/web/public/n8n && cd integrations/n8n-nodes-memdot && npm pack --pack-destination ../../apps/web/public/n8n \
+  && mv ../../apps/web/public/n8n/n8n-nodes-memdot-*.tgz ../../apps/web/public/n8n/n8n-nodes-memdot.tgz
 # Kimi Code can't install from a folder inside a repository, so its plugin is served as a zip.
 RUN mkdir -p apps/web/public/plugins && cd integrations/kimi-plugin \
   && zip -qr ../../apps/web/public/plugins/memdot-kimi.zip .

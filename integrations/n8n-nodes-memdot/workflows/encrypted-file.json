@@ -1,0 +1,211 @@
+{
+  "id": "memdotFiles0001",
+  "name": "MemDot: an encrypted file",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "text",
+      "name": "A note",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"body\": \"The cellar key is under the third brick.\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "file",
+      "name": "To a file",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [440, 0],
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "body",
+        "options": {
+          "fileName": "cellar-note.txt"
+        }
+      }
+    },
+    {
+      "id": "upload",
+      "name": "Encrypt and store",
+      "type": "n8n-nodes-memdot.memDot",
+      "typeVersion": 1,
+      "position": [660, 0],
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "spaceId": "",
+        "binaryPropertyName": "data",
+        "fileName": ""
+      },
+      "credentials": {
+        "memDotApi": {
+          "id": "",
+          "name": "MemDot"
+        }
+      }
+    },
+    {
+      "id": "download",
+      "name": "Fetch and decrypt",
+      "type": "n8n-nodes-memdot.memDot",
+      "typeVersion": 1,
+      "position": [880, 0],
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "fileId": "={{ $json.id }}",
+        "outputField": "data"
+      },
+      "credentials": {
+        "memDotApi": {
+          "id": "",
+          "name": "MemDot"
+        }
+      }
+    },
+    {
+      "id": "read",
+      "name": "Read it",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "data",
+        "destinationKey": "text",
+        "options": {}
+      }
+    },
+    {
+      "id": "verify",
+      "name": "Check the chain",
+      "type": "n8n-nodes-memdot.memDot",
+      "typeVersion": 1,
+      "position": [1320, 0],
+      "parameters": {
+        "resource": "file",
+        "operation": "verify",
+        "fileId": "={{ $('Encrypt and store').item.json.id }}"
+      },
+      "credentials": {
+        "memDotApi": {
+          "id": "",
+          "name": "MemDot"
+        }
+      }
+    },
+    {
+      "id": "delete",
+      "name": "Delete it",
+      "type": "n8n-nodes-memdot.memDot",
+      "typeVersion": 1,
+      "position": [1540, 0],
+      "parameters": {
+        "resource": "file",
+        "operation": "delete",
+        "fileId": "={{ $('Encrypt and store').item.json.id }}"
+      },
+      "credentials": {
+        "memDotApi": {
+          "id": "",
+          "name": "MemDot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "A note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A note": {
+      "main": [
+        [
+          {
+            "node": "To a file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "To a file": {
+      "main": [
+        [
+          {
+            "node": "Encrypt and store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encrypt and store": {
+      "main": [
+        [
+          {
+            "node": "Fetch and decrypt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch and decrypt": {
+      "main": [
+        [
+          {
+            "node": "Read it",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read it": {
+      "main": [
+        [
+          {
+            "node": "Check the chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check the chain": {
+      "main": [
+        [
+          {
+            "node": "Delete it",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "id": "memdotAgent0001",
+  "name": "MemDot: an agent that remembers",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "input",
+      "name": "Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\"chatInput\": \"Please remember that my desk is by the east window.\", \"sessionId\": \"desk-chat\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [440, 0],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.chatInput }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "model",
+      "name": "Gemini",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [380, 220],
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {}
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": "Gemini"
+        }
+      }
+    },
+    {
+      "id": "memory",
+      "name": "MemDot Chat Memory",
+      "type": "n8n-nodes-memdot.memDotChatMemory",
+      "typeVersion": 1,
+      "position": [560, 220],
+      "parameters": {
+        "sessionId": "={{ $json.sessionId }}",
+        "userId": "desk-owner",
+        "query": "={{ $json.chatInput }}",
+        "windowSize": 10
+      },
+      "credentials": {
+        "memDotApi": {
+          "id": "",
+          "name": "MemDot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MemDot Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

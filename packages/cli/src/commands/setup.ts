@@ -158,6 +158,7 @@ interface LoginOptions {
   /** false: --no-wait. A number: how long --continue waits. */
   wait?: number | false;
   continue?: boolean;
+  printEnv?: boolean;
 }
 
 async function runLogin(options: LoginOptions, command: Command): Promise<void> {
@@ -213,6 +214,37 @@ async function runLogin(options: LoginOptions, command: Command): Promise<void> 
     client: clientName(),
   });
   const pending = pendingFrom(started, key, options.label);
+
+  // For somewhere else: a server, n8n, CI. Nothing here changes, and it's revoked on its own.
+  if (options.printEnv) {
+    console.error(`\nOpen ${started.url}`);
+    console.error(`and type this code: ${strong(started.code)}\n`);
+    if (options.browser !== false) openBrowser(started.url);
+    say(dim("Waiting for you to approve it…"));
+    const collected = await collect(memdot, pending, LOGIN_WAIT_SECONDS);
+    if (!collected) {
+      throw new CliError(
+        "Nothing came back in time. Run this again.",
+        EXIT.auth,
+        "CONNECT_EXPIRED",
+      );
+    }
+    const env = {
+      MEMDOT_API_URL: apiUrl,
+      MEMDOT_API_KEY: collected.apiKey,
+      MEMDOT_AGENT_IDENTITY: key.identity,
+      ...(collected.namespaceId ? { MEMDOT_NAMESPACE: collected.namespaceId } : {}),
+    };
+    // On stdout and nothing else, so it can go straight into a file.
+    emit({
+      data: env,
+      text: () => {
+        for (const [name, value] of Object.entries(env)) console.log(`${name}=${value}`);
+      },
+    });
+    return;
+  }
+
   await saveCredentials({
     ...credentialsForApi(file, apiUrl),
     version: 1,
@@ -284,6 +316,7 @@ export function setupCommands(program: Command): void {
     .option("--no-wait", "print the address and return; finish later with --continue")
     .option("--continue", "collect a login started with --no-wait")
     .option("--wait <seconds>", "how long --continue waits", Number)
+    .option("--print-env", "connect somewhere else: print its credentials, and save nothing here")
     .action(runLogin);
 
   program

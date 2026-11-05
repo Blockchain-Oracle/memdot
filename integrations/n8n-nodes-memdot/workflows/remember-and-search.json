@@ -1,0 +1,84 @@
+{
+  "id": "memdotBasics001",
+  "name": "MemDot: remember and search",
+  "active": false,
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {}
+    },
+    {
+      "id": "add",
+      "name": "Remember",
+      "type": "n8n-nodes-memdot.memDot",
+      "typeVersion": 1,
+      "position": [220, 0],
+      "parameters": {
+        "resource": "memory",
+        "operation": "add",
+        "text": "Rosa waters the ferns on Tuesdays",
+        "userId": "rosa",
+        "addOptions": {
+          "infer": false
+        }
+      },
+      "credentials": {
+        "memDotApi": {
+          "id": "",
+          "name": "MemDot"
+        }
+      }
+    },
+    {
+      "id": "search",
+      "name": "Search",
+      "type": "n8n-nodes-memdot.memDot",
+      "typeVersion": 1,
+      "position": [440, 0],
+      "parameters": {
+        "resource": "memory",
+        "operation": "search",
+        "query": "when are the ferns watered?",
+        "userId": "rosa",
+        "limit": 3
+      },
+      "credentials": {
+        "memDotApi": {
+          "id": "",
+          "name": "MemDot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Remember",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remember": {
+      "main": [
+        [
+          {
+            "node": "Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "name": "n8n-nodes-memdot",
+  "version": "0.1.0",
+  "description": "MemDot for n8n: long-term agent memory and encrypted files on Portaldot V3.",
+  "license": "MIT",
+  "keywords": [
+    "n8n-community-node-package",
+    "memdot",
+    "memory",
+    "ai",
+    "agents",
+    "encryption",
+    "portaldot"
+  ],
+  "homepage": "https://github.com/Blockchain-Oracle/memdot/tree/main/integrations/n8n-nodes-memdot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Blockchain-Oracle/memdot.git",
+    "directory": "integrations/n8n-nodes-memdot"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json",
+    "journey": "tsx scripts/journey.mts"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "aiNodeSdkVersion": 1,
+    "strict": true,
+    "credentials": [
+      "dist/credentials/MemDotApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/MemDot/MemDot.node.js",
+      "dist/nodes/MemDotChatMemory/MemDotChatMemory.node.js"
+    ]
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "devDependencies": {
+    "@memdot/config": "workspace:*",
+    "@memdot/memory-engine": "workspace:*",
+    "@memdot/sdk": "workspace:*",
+    "@types/node": "catalog:",
+    "n8n-workflow": "2.16.0",
+    "tsdown": "catalog:",
+    "tsx": "^4.23.15",
+    "typescript": "catalog:"
+  }
+}
