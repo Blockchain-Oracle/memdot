@@ -13,6 +13,7 @@ import {
   SettingsIcon,
   SlidersHorizontalIcon,
   UsersIcon,
+  WebhookIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -73,6 +74,12 @@ export const NAV: { label: string; items: NavItem[] }[] = [
         keywords: ["connect", "mcp", "claude", "cursor", "cli", "oauth", "revoke"],
       },
       { title: "API keys", href: "/keys", icon: KeyRoundIcon, keywords: ["token", "secret"] },
+      {
+        title: "Webhooks",
+        href: "/webhooks",
+        icon: WebhookIcon,
+        keywords: ["events", "deliveries", "signing", "integration"],
+      },
       {
         title: "Configuration",
         href: "/configuration",
