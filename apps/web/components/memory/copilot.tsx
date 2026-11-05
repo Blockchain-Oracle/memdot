@@ -21,7 +21,9 @@ import { ConfirmDialog } from "@/components/files/file-dialogs";
 import { API_URL } from "@/lib/env";
 import { describeError } from "@/lib/errors";
 import { useMemDot } from "@/lib/memdot";
+import { ModelError } from "./model-error";
 import { ProposalCard, ProposalDiff, type ProposalState } from "./proposal-diff";
+import { Reply } from "./reply";
 
 const STARTERS = [
   "Is anything here out of date or said twice?",
@@ -356,9 +358,7 @@ export function Copilot({ namespace }: { namespace: Namespace }) {
                     {part.text}
                   </p>
                 ) : (
-                  <p key={key} className="text-ui whitespace-pre-wrap">
-                    {part.text}
-                  </p>
+                  <Reply key={key}>{part.text ?? ""}</Reply>
                 );
               }
               if (!part.type.startsWith("tool-")) return null;
@@ -386,7 +386,7 @@ export function Copilot({ namespace }: { namespace: Namespace }) {
           </div>
         ))}
         {status === "submitted" && <Spinner aria-label="Thinking" />}
-        {error && <p className="text-ui-sm text-danger-fg">{describeError(error).title}</p>}
+        {error && <ModelError error={error} />}
       </div>
       <form
         className="flex items-end gap-2 border-t border-border p-3"

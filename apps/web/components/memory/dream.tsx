@@ -11,8 +11,8 @@ import { MoonStarIcon, SparklesIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/files/file-dialogs";
-import { describeError } from "@/lib/errors";
 import { useMemDot } from "@/lib/memdot";
+import { ModelError } from "./model-error";
 
 const GROUPS: { kind: DreamProposal["kind"]; title: string; description: string }[] = [
   {
@@ -47,7 +47,6 @@ export function Dream({ namespace }: { namespace: Namespace }) {
       setPicked(new Set(proposals.map((_, index) => index)));
       setApplied(new Set());
     },
-    onError: (error) => toast.error(describeError(error).title),
   });
   const proposals = run.data?.proposals;
   const texts = new Map(run.data?.memories.map((memory) => [memory.id, memory.memory]));
@@ -86,6 +85,7 @@ export function Dream({ namespace }: { namespace: Namespace }) {
           )}
           {run.isPending ? "Reading…" : "Look for changes"}
         </Button>
+        {run.error && <ModelError error={run.error} />}
       </div>
     );
   }

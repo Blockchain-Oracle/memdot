@@ -47,17 +47,20 @@ const CANVAS_HEIGHT = 560;
 /** Each one is a read, so the panel opens the first few and counts the rest. */
 const PANEL_MEMORIES = 8;
 
-/** Fills its width. The canvas needs real numbers. */
+/**
+ * Fills its width. The canvas needs real numbers. A callback ref, since the box only exists once the
+ * graph has loaded, and again each time the view switches back.
+ */
 function useWidth() {
-  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {
-    if (!ref.current) return;
+    if (!box) return;
     const observer = new ResizeObserver(([entry]) => setWidth(entry?.contentRect.width ?? 0));
-    observer.observe(ref.current);
+    observer.observe(box);
     return () => observer.disconnect();
-  }, []);
-  return { ref, width };
+  }, [box]);
+  return { ref: setBox, width };
 }
 
 function EntityPanel({

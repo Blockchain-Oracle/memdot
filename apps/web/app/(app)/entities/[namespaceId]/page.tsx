@@ -13,6 +13,7 @@ import { useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { MemoryExplorer } from "@/components/memory/memory-explorer";
 import { ModeBadge } from "@/components/memory/mode-badge";
+import { ModelError } from "@/components/memory/model-error";
 import { useNamespace } from "@/components/memory/queries";
 import { Page } from "@/components/page-header";
 import { describeError } from "@/lib/errors";
@@ -50,7 +51,9 @@ function Profile({ namespace, userId }: { namespace: Namespace; userId: string }
   const write = useMutation({
     mutationFn: () => memdot.memories.generateProfile(userId, { namespaceId: namespace.id }),
     onSuccess: (written) => queryClient.setQueryData(key, written),
-    onError: (error) => toast.error(describeError(error).title),
+    onError: (error) => {
+      if (profile.data?.profile) toast.error(describeError(error).title);
+    },
   });
 
   if (profile.isPending) return <Skeleton className="h-48 w-full rounded-xl" />;
@@ -81,6 +84,7 @@ function Profile({ namespace, userId }: { namespace: Namespace; userId: string }
           )}
           Write a profile
         </Button>
+        {write.error && <ModelError error={write.error} />}
       </div>
     );
   }

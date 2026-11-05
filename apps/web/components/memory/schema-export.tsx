@@ -18,11 +18,10 @@ import { Textarea } from "@memdot/ui/components/textarea";
 import { useMutation } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
 import { useId, useState } from "react";
-import { toast } from "sonner";
 import { saveBytes } from "@/components/files/file-sheet";
-import { describeError } from "@/lib/errors";
 import { formatNumber } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
+import { ModelError } from "./model-error";
 
 const STARTER = `{
   "type": "object",
@@ -66,7 +65,6 @@ export function SchemaExportDialog({
         schema: parsed as Record<string, unknown>,
         ...(instructions.trim() ? { instructions: instructions.trim() } : {}),
       }),
-    onError: (error) => toast.error(describeError(error).title),
   });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -102,6 +100,7 @@ export function SchemaExportDialog({
               onChange={(event) => setInstructions(event.target.value)}
             />
           </div>
+          {run.error && <ModelError error={run.error} />}
           {run.data && (
             <div className="flex flex-col gap-1.5">
               <span className="eyebrow">

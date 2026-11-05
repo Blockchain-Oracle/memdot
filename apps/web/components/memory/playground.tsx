@@ -18,6 +18,8 @@ import { describeError } from "@/lib/errors";
 import { formatRelative } from "@/lib/format";
 import { useMemDot } from "@/lib/memdot";
 import { MemorySheet } from "./memory-sheet";
+import { ModelError } from "./model-error";
+import { Reply } from "./reply";
 
 const DEFAULT_USER = "playground";
 const LIST_SIZE = 30;
@@ -36,7 +38,7 @@ interface Turn {
   recalled?: Recalled;
   saving?: boolean;
   saved?: number;
-  error?: string;
+  error?: unknown;
 }
 
 function MemoryRow({
@@ -142,7 +144,7 @@ export function Playground({ namespace }: { namespace: Namespace }) {
       }
     } catch (error) {
       if (!controller.signal.aborted) {
-        patchLast((turn) => ({ ...turn, saving: false, error: describeError(error).title }));
+        patchLast((turn) => ({ ...turn, saving: false, error }));
       }
     } finally {
       setBusy(false);
@@ -224,13 +226,13 @@ export function Playground({ namespace }: { namespace: Namespace }) {
               ) : (
                 <>
                   {turn.content ? (
-                    <p className="text-ui whitespace-pre-wrap">{turn.content}</p>
+                    <Reply>{turn.content}</Reply>
                   ) : (
                     !turn.error &&
                     busy &&
                     index === turns.length - 1 && <Spinner aria-label="Thinking" />
                   )}
-                  {turn.error && <p className="text-ui-sm text-danger-fg">{turn.error}</p>}
+                  {Boolean(turn.error) && <ModelError error={turn.error} />}
                   <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-text-3">
                     {turn.recalled && (
                       <span>

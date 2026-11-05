@@ -23,6 +23,7 @@ type Node = NodeObject<CanvasNode>;
 type Link = LinkObject<CanvasNode, CanvasLink>;
 
 const REPULSION = -140;
+const LINK_DISTANCE = 60;
 const WARMUP_TICKS = 120;
 const COOLDOWN_TICKS = 160;
 const FIT_PADDING = 48;
@@ -31,6 +32,8 @@ const LABEL_PX = 11;
 const LABELS_AT_SCALE = 1.1;
 const RELATIONS_AT_SCALE = 1.8;
 const TOUCH_SLOP = 4;
+/** A handful of names fits at any size, and shouldn't fill the box with one huge dot. */
+const MAX_ZOOM = 3.5;
 
 const radius = (weight: number) => 3 + Math.sqrt(weight) * 1.6;
 
@@ -51,7 +54,7 @@ function readPalette(): Palette {
   return {
     node: color("--md-text-3"),
     faint: color("--md-border"),
-    line: color("--md-border-strong"),
+    line: color("--md-text-4"),
     text: color("--md-text"),
     mark: color("--md-ember"),
     surface: color("--md-surface-1"),
@@ -81,7 +84,7 @@ export default function GraphCanvas({
   const graph = useRef<ForceGraphMethods<Node, Link> | undefined>(undefined);
   const { resolvedTheme } = useTheme();
   const [reduced] = useState(() => matchMedia("(prefers-reduced-motion: reduce)").matches);
-  const [palette, setPalette] = useState<Palette | null>(null);
+  const [palette, setPalette] = useState(readPalette);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the tokens change with the theme
   useEffect(() => setPalette(readPalette()), [resolvedTheme]);
 
@@ -105,9 +108,17 @@ export default function GraphCanvas({
 
   useEffect(() => {
     graph.current?.d3Force("charge")?.strength?.(REPULSION);
+    graph.current?.d3Force("link")?.distance?.(LINK_DISTANCE);
+    graph.current?.d3ReheatSimulation();
   }, []);
 
-  if (!palette) return null;
+  // Opening the panel narrows the box, which would otherwise cut off whatever's near the edge.
+  const firstWidth = useRef(width);
+  useEffect(() => {
+    if (width === firstWidth.current) return;
+    firstWidth.current = width;
+    graph.current?.zoomToFit(reduced ? 0 : 300, FIT_PADDING);
+  }, [width, reduced]);
 
   const faded = (id: string) =>
     highlighted
@@ -124,6 +135,7 @@ export default function GraphCanvas({
       warmupTicks={reduced ? WARMUP_TICKS * 2 : 0}
       cooldownTicks={reduced ? 0 : COOLDOWN_TICKS}
       onEngineStop={() => graph.current?.zoomToFit(reduced ? 0 : 300, FIT_PADDING)}
+      maxZoom={MAX_ZOOM}
       nodeRelSize={1}
       nodeVal={(node) => radius(node.weight) ** 2}
       onNodeClick={(node) => onSelect(String(node.id))}
@@ -152,8 +164,8 @@ export default function GraphCanvas({
         ctx.arc(node.x ?? 0, node.y ?? 0, radius(node.weight) + TOUCH_SLOP, 0, Math.PI * 2);
         ctx.fill();
       }}
-      linkColor={() => palette.line}
-      linkWidth={(link) => (link.relation ? 1 : 0.5)}
+      linkColor={(link) => (link.relation ? palette.node : palette.line)}
+      linkWidth={(link) => (link.relation ? 1.5 : 1)}
       linkLineDash={(link) => (link.relation ? null : [2, 2])}
       linkDirectionalArrowLength={(link) => (link.relation ? 3 : 0)}
       linkDirectionalArrowRelPos={0.9}
